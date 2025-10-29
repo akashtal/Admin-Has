@@ -1,0 +1,80 @@
+{
+  "expo": {
+    "name": "HashView",
+    "slug": "hashview",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/HashViewlogo-01.png",
+    "splash": {
+      "image": "./assets/HashViewlogo-01.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2D1B69"
+    },
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hashview.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "HashView needs your location to show nearby businesses and verify reviews.",
+        "NSLocationAlwaysUsageDescription": "HashView uses your location to provide accurate business information.",
+        "NSCameraUsageDescription": "HashView needs camera access to scan QR codes and upload photos.",
+        "NSPhotoLibraryUsageDescription": "HashView needs access to your photo library to upload images."
+      },
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.hashview.app",
+      "versionCode": 1,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "NOTIFICATIONS"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCgafT4Tw62CuxxN5DwbkqWIK9pVflKEXI"
+        }
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-dev-client",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow HashView to use your location."
+        }
+      ],
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow HashView to access your photos."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow HashView to access your camera."
+        }
+      ],
+      "expo-font",
+      "expo-secure-store"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
+    },
+    "owner": "your-expo-username"
+  }
+}
+

@@ -1,0 +1,131 @@
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import ApiService from '../../services/api.service';
+
+export const getNearbyBusinesses = createAsyncThunk(
+  'business/getNearbyBusinesses',
+  async (params, { rejectWithValue }) => {
+    try {
+      const response = await ApiService.getNearbyBusinesses(params);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const searchBusinesses = createAsyncThunk(
+  'business/searchBusinesses',
+  async (params, { rejectWithValue }) => {
+    try {
+      const response = await ApiService.searchBusinesses(params);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const getBusiness = createAsyncThunk(
+  'business/getBusiness',
+  async (id, { rejectWithValue }) => {
+    try {
+      const response = await ApiService.getBusiness(id);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const registerBusiness = createAsyncThunk(
+  'business/registerBusiness',
+  async (data, { rejectWithValue }) => {
+    try {
+      console.log('📤 Sending business registration data:', data);
+      const response = await ApiService.registerBusiness(data);
+      console.log('✅ Business registration response:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ Business registration error:', error);
+      const errorMessage = error?.response?.data?.message || 
+                          error?.message || 
+                          'Failed to register business. Please check your connection and try again.';
+      console.error('Error message:', errorMessage);
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+const businessSlice = createSlice({
+  name: 'business',
+  initialState: {
+    businesses: [],
+    selectedBusiness: null,
+    myBusiness: null,
+    loading: false,
+    error: null,
+  },
+  reducers: {
+    clearError: (state) => {
+      state.error = null;
+    },
+    clearSelectedBusiness: (state) => {
+      state.selectedBusiness = null;
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(getNearbyBusinesses.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getNearbyBusinesses.fulfilled, (state, action) => {
+        state.loading = false;
+        state.businesses = action.payload.businesses;
+      })
+      .addCase(getNearbyBusinesses.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(searchBusinesses.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(searchBusinesses.fulfilled, (state, action) => {
+        state.loading = false;
+        state.businesses = action.payload.businesses;
+      })
+      .addCase(searchBusinesses.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(getBusiness.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getBusiness.fulfilled, (state, action) => {
+        state.loading = false;
+        state.selectedBusiness = action.payload.business;
+      })
+      .addCase(getBusiness.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(registerBusiness.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(registerBusiness.fulfilled, (state, action) => {
+        state.loading = false;
+        state.myBusiness = action.payload.business;
+      })
+      .addCase(registerBusiness.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+  },
+});
+
+export const { clearError, clearSelectedBusiness } = businessSlice.actions;
+export default businessSlice.reducer;
+

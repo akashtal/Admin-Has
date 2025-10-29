@@ -1,0 +1,709 @@
+const User = require('../models/User.model');
+const BusinessOwner = require('../models/BusinessOwner.model');
+const { generateToken } = require('../utils/jwt');
+const crypto = require('crypto');
+const logger = require('../utils/logger');
+const { sendOTPEmail, sendPasswordResetEmail } = require('../utils/emailService');
+
+// In-memory OTP storage (in production, use Redis)
+const otpStore = new Map();
+const emailOtpStore = new Map();
+
+// @desc    Register new user
+// @route   POST /api/auth/register
+// @access  Public
+exports.register = async (req, res, next) => {
+  try {
+    const { name, email, phone, password, role } = req.body;
+
+    console.log('\n📝 Registration attempt:', { 
+      name, 
+      email, 
+      phone, 
+      phoneLength: phone?.length,
+      role 
+    });
+
+    // Prevent admin registration through API
+    if (role === 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin accounts cannot be created through registration. Please contact system administrator.'
+      });
+    }
+
+    // Validate role
+    const allowedRoles = ['customer', 'business'];
+    const userRole = role && allowedRoles.includes(role) ? role : 'customer';
+
+    // Check if email exists in BOTH collections (email must be unique across all)
+    const existingUserByEmail = await User.findOne({ email });
+    const existingBusinessOwnerByEmail = await BusinessOwner.findOne({ email });
+
+    // Email must be unique across both collections
+    if (existingUserByEmail || existingBusinessOwnerByEmail) {
+      const existingRole = existingUserByEmail ? 'customer' : 'business owner';
+      console.log(`❌ Email already registered as ${existingRole}`);
+      
+      return res.status(400).json({
+        success: false,
+        message: `This email is already registered as a ${existingRole}. Please login or use a different email.`,
+        field: 'email'
+      });
+    }
+
+    // Check if phone exists in SAME ROLE collection only (allow same phone for different roles)
+    let existingPhoneInSameRole = null;
+    
+    if (userRole === 'business') {
+      existingPhoneInSameRole = await BusinessOwner.findOne({ phone });
+      if (existingPhoneInSameRole) {
+        console.log(`❌ Phone number already registered as business owner`);
+        return res.status(400).json({
+          success: false,
+          message: 'This phone number is already registered as a business owner. Please login or use a different phone number.',
+          field: 'phone'
+        });
+      }
+    } else {
+      existingPhoneInSameRole = await User.findOne({ phone });
+      if (existingPhoneInSameRole) {
+        console.log(`❌ Phone number already registered as customer`);
+        return res.status(400).json({
+          success: false,
+          message: 'This phone number is already registered as a customer. Please login or use a different phone number.',
+          field: 'phone'
+        });
+      }
+    }
+
+    console.log(`✅ Email and phone are available for ${userRole} registration`);
+
+    let user;
+    let token;
+
+    // Create business owner in separate collection
+    if (userRole === 'business') {
+      console.log('Creating business owner with data:', { name, email, phone, role: userRole });
+      user = await BusinessOwner.create({
+        name,
+        email,
+        phone,
+        passwordHash: password,
+        role: 'business'
+      });
+      console.log('✅ Business owner created successfully:', user._id);
+      
+      // Generate token with userType to identify collection
+      token = generateToken(user._id, 'business');
+    } else {
+      // Create customer in User collection
+      console.log('Creating customer with data:', { name, email, phone, role: userRole });
+      user = await User.create({
+        name,
+        email,
+        phone,
+        passwordHash: password,
+        role: userRole
+      });
+      console.log('✅ Customer created successfully:', user._id);
+      
+      // Generate token with userType
+      token = generateToken(user._id, 'customer');
+    }
+
+    // Welcome message (email sending can be added later if needed)
+    logger.info(`New user registered: ${email} as ${userRole}`);
+
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        profileImage: user.profileImage,
+        emailVerified: user.emailVerified,
+        phoneVerified: user.phoneVerified
+      }
+    });
+  } catch (error) {
+    console.error('❌ Registration error:', error.message);
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(e => e.message);
+      console.error('Validation errors:', errors);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors
+      });
+    }
+    next(error);
+  }
+};
+
+// @desc    Login user
+// @route   POST /api/auth/login
+// @access  Public
+exports.login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    let user = null;
+    let userType = null;
+
+    // Try to find user in User collection (customers, admin)
+    user = await User.findOne({ email }).select('+passwordHash');
+    
+    if (user) {
+      userType = user.role === 'admin' ? 'admin' : 'customer';
+    } else {
+      // Try to find in BusinessOwner collection
+      user = await BusinessOwner.findOne({ email }).select('+passwordHash');
+      if (user) {
+        userType = 'business';
+      }
+    }
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check password
+    const isPasswordMatch = await user.comparePassword(password);
+    
+    if (!isPasswordMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check if account is active
+    if (user.status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: 'Account is not active. Please contact support.'
+      });
+    }
+
+    // Update last login
+    user.lastLogin = new Date();
+    await user.save();
+
+    // Generate token with userType
+    const token = generateToken(user._id, userType);
+
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        profileImage: user.profileImage,
+        emailVerified: user.emailVerified,
+        phoneVerified: user.phoneVerified
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Send OTP for phone login
+// @route   POST /api/auth/send-otp
+// @access  Public
+exports.sendOTP = async (req, res, next) => {
+  try {
+    const { phone } = req.body;
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store OTP with 5 minute expiry
+    otpStore.set(phone, {
+      otp,
+      expiresAt: Date.now() + 5 * 60 * 1000
+    });
+
+    // In production, send OTP via SMS service (Twilio, etc.)
+    logger.info(`OTP for ${phone}: ${otp}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP sent successfully',
+      // Only for development - remove in production
+      otp: process.env.NODE_ENV === 'development' ? otp : undefined
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Login with phone and OTP
+// @route   POST /api/auth/login-phone
+// @access  Public
+exports.loginWithPhone = async (req, res, next) => {
+  try {
+    const { phone, otp } = req.body;
+
+    // Verify OTP
+    const storedOTP = otpStore.get(phone);
+    
+    if (!storedOTP) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP not found or expired'
+      });
+    }
+
+    if (Date.now() > storedOTP.expiresAt) {
+      otpStore.delete(phone);
+      return res.status(400).json({
+        success: false,
+        message: 'OTP expired'
+      });
+    }
+
+    if (storedOTP.otp !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid OTP'
+      });
+    }
+
+    // Find user in both collections
+    let user = await User.findOne({ phone });
+    let userType = 'customer';
+    
+    if (!user) {
+      user = await BusinessOwner.findOne({ phone });
+      if (user) {
+        userType = 'business';
+      }
+    }
+    
+    if (!user) {
+      // Create new customer with phone
+      user = await User.create({
+        name: 'User',
+        email: `${phone}@hashview.temp`,
+        phone,
+        passwordHash: crypto.randomBytes(16).toString('hex'),
+        phoneVerified: true,
+        role: 'customer'
+      });
+      userType = 'customer';
+    } else {
+      user.phoneVerified = true;
+      user.lastLogin = new Date();
+      await user.save();
+    }
+
+    // Delete OTP after successful login
+    otpStore.delete(phone);
+
+    // Generate token with userType
+    const token = generateToken(user._id, userType);
+
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        profileImage: user.profileImage,
+        emailVerified: user.emailVerified,
+        phoneVerified: user.phoneVerified
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Forgot password
+// @route   POST /api/auth/forgot-password
+// @access  Public
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found with this email'
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+    user.resetPasswordExpire = Date.now() + 60 * 60 * 1000; // 1 hour
+
+    await user.save();
+
+    // Note: This function is not used in current flow
+    // Password reset uses OTP via sendEmailOTP function instead
+    logger.info(`Password reset requested for ${email}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset email sent',
+      // Only for development
+      resetToken: process.env.NODE_ENV === 'development' ? resetToken : undefined
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reset password
+// @route   POST /api/auth/reset-password
+// @access  Public
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+
+    // Hash token
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    // Find user with valid token
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset token'
+      });
+    }
+
+    // Update password
+    user.passwordHash = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    // Generate new token
+    const authToken = generateToken(user._id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successful',
+      token: authToken
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get current user
+// @route   GET /api/auth/me
+// @access  Private
+exports.getMe = async (req, res, next) => {
+  try {
+    // req.user is already populated by the auth middleware
+    // It contains the user from the correct collection (User or BusinessOwner)
+    const user = req.user;
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Return user data based on their role
+    res.status(200).json({
+      success: true,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        profileImage: user.profileImage,
+        emailVerified: user.emailVerified,
+        phoneVerified: user.phoneVerified,
+        status: user.status,
+        createdAt: user.createdAt,
+        // Include business-specific fields if it's a business owner
+        ...(user.role === 'business' && { businesses: user.businesses }),
+        // Include customer-specific fields if it's a customer
+        ...(user.role === 'customer' && { location: user.location })
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update push token
+// @route   PUT /api/auth/push-token
+// @access  Private
+exports.updatePushToken = async (req, res, next) => {
+  try {
+    const { pushToken } = req.body;
+
+    // req.user is already populated by auth middleware with correct user
+    req.user.pushToken = pushToken;
+    await req.user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Push token updated successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Send email OTP
+// @route   POST /api/auth/send-email-otp
+// @access  Public
+exports.sendEmailOTP = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    // Normalize email to lowercase
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store OTP with 10 minute expiry
+    emailOtpStore.set(normalizedEmail, {
+      otp,
+      expiresAt: Date.now() + 10 * 60 * 1000
+    });
+
+    // Send OTP via Gmail SMTP
+    if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+      try {
+        await sendOTPEmail(normalizedEmail, otp);
+        console.log(`\n✅ Real OTP email sent to: ${normalizedEmail}`);
+      } catch (error) {
+        logger.error('Error sending email OTP:', error);
+        console.error('❌ Failed to send email:', error.message);
+      }
+    } else {
+      console.log('\n⚠️  Gmail credentials not configured - Email not sent');
+      console.log('Add GMAIL_USER and GMAIL_APP_PASSWORD to .env file');
+    }
+
+    // Always log OTP to console for backup/testing
+    console.log(`\n🔐 EMAIL OTP for ${normalizedEmail}: ${otp}`);
+    console.log(`⏰ Expires in 10 minutes`);
+    console.log(`📝 Stored in emailOtpStore with key: ${normalizedEmail}\n`);
+    logger.info(`Email OTP process completed for ${normalizedEmail}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Verification code sent to your email successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Verify email OTP
+// @route   POST /api/auth/verify-email-otp
+// @access  Public
+exports.verifyEmailOTP = async (req, res, next) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and OTP are required'
+      });
+    }
+
+    // Normalize email to lowercase and trim OTP
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedOTP = otp.trim();
+
+    // Debug logging
+    console.log(`\n🔍 Verifying OTP for email: ${normalizedEmail}`);
+    console.log(`🔍 Received OTP: ${normalizedOTP}`);
+    console.log(`🔍 Available OTPs in store:`, Array.from(emailOtpStore.keys()));
+
+    // Verify OTP
+    const storedOTP = emailOtpStore.get(normalizedEmail);
+    
+    if (!storedOTP) {
+      console.log(`❌ No OTP found for email: ${normalizedEmail}\n`);
+      return res.status(400).json({
+        success: false,
+        message: 'OTP not found or expired'
+      });
+    }
+
+    console.log(`🔍 Stored OTP: ${storedOTP.otp}`);
+    console.log(`🔍 Expiry time: ${new Date(storedOTP.expiresAt).toLocaleString()}`);
+
+    if (Date.now() > storedOTP.expiresAt) {
+      console.log(`❌ OTP expired for ${normalizedEmail}\n`);
+      emailOtpStore.delete(normalizedEmail);
+      return res.status(400).json({
+        success: false,
+        message: 'OTP expired'
+      });
+    }
+
+    if (storedOTP.otp !== normalizedOTP) {
+      console.log(`❌ Invalid OTP. Expected: ${storedOTP.otp}, Got: ${normalizedOTP}\n`);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid OTP'
+      });
+    }
+
+    console.log(`✅ OTP verified successfully for ${normalizedEmail}\n`);
+
+    // Mark as verified for password reset (valid for 5 minutes)
+    emailOtpStore.set(`verified_${normalizedEmail}`, {
+      verified: true,
+      expiresAt: Date.now() + 5 * 60 * 1000
+    });
+
+    // Delete OTP after successful verification
+    emailOtpStore.delete(normalizedEmail);
+
+    // Update user's email verification status if user exists in either collection
+    let user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      user = await BusinessOwner.findOne({ email: normalizedEmail });
+    }
+    if (user) {
+      user.emailVerified = true;
+      await user.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Email verified successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reset password with OTP
+// @route   POST /api/auth/reset-password-otp
+// @access  Public
+exports.resetPasswordWithOTP = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required'
+      });
+    }
+
+    // Normalize email
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check if email was verified via OTP
+    const verificationRecord = emailOtpStore.get(`verified_${normalizedEmail}`);
+    
+    if (!verificationRecord) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please verify your email with OTP first'
+      });
+    }
+
+    if (Date.now() > verificationRecord.expiresAt) {
+      emailOtpStore.delete(`verified_${normalizedEmail}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Verification expired. Please request a new OTP'
+      });
+    }
+
+    // Find user in both collections
+    let user = await User.findOne({ email: normalizedEmail }).select('+passwordHash');
+    let userType = 'customer';
+    
+    if (!user) {
+      user = await BusinessOwner.findOne({ email: normalizedEmail }).select('+passwordHash');
+      if (user) {
+        userType = 'business';
+      }
+    }
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update password
+    user.passwordHash = password;
+    await user.save();
+
+    // Clear verification record
+    emailOtpStore.delete(`verified_${normalizedEmail}`);
+
+    // Generate auth token with userType
+    const token = generateToken(user._id, userType);
+
+    console.log(`✅ Password reset successful for ${normalizedEmail}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successful',
+      token,
+      user: user.getPublicProfile()
+    });
+  } catch (error) {
+    console.error('❌ Reset password error:', error);
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(e => e.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors
+      });
+    }
+    next(error);
+  }
+};
+
