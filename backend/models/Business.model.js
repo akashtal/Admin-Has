@@ -81,65 +81,110 @@ const businessSchema = new mongoose.Schema({
     url: String,
     publicId: String
   },
-  documents: {
-    ownerIdProof: {
-      url: String,
-      publicId: String,
-      verified: {
-        type: Boolean,
-        default: false
-      },
-      diditVerificationId: String,
-      diditVerificationStatus: {
-        type: String,
-        enum: ['pending', 'verified', 'rejected', 'not_submitted'],
-        default: 'not_submitted'
-      },
-      diditVerifiedAt: Date
+  selfieUrl: String, // Owner selfie for face matching
+  selfiePublicId: String,
+  submittedForReviewAt: Date, // When documents were submitted
+  
+  // Didit Comprehensive KYC Verification (Custom Workflow)
+  // Uses Didit's hosted UI for all verification steps
+  diditVerification: {
+    sessionId: String,
+    workflowId: String,
+    verificationLink: String,
+    linkExpiresAt: Date,
+    status: {
+      type: String,
+      enum: ['not_started', 'pending', 'in_progress', 'completed', 'failed', 'expired'],
+      default: 'not_started'
     },
-    foodSafetyCertificate: {
-      url: String,
-      publicId: String,
-      verified: {
-        type: Boolean,
-        default: false
-      },
-      diditVerificationId: String,
-      diditVerificationStatus: {
-        type: String,
-        enum: ['pending', 'verified', 'rejected', 'not_submitted'],
-        default: 'not_submitted'
-      },
-      diditVerifiedAt: Date
+    
+    // 1. ID Verification (Passport, Driver's License, National ID)
+    idVerification: {
+      status: { type: String, enum: ['pending', 'verified', 'failed'] },
+      documentType: String,
+      documentNumber: String,
+      fullName: String,
+      dateOfBirth: Date,
+      expiryDate: Date,
+      issuingCountry: String,
+      extractedData: mongoose.Schema.Types.Mixed,
+      verifiedAt: Date
     },
-    businessLicense: {
-      url: String,
-      publicId: String,
-      verified: {
-        type: Boolean,
-        default: false
-      },
-      diditVerificationId: String,
-      diditVerificationStatus: {
-        type: String,
-        enum: ['pending', 'verified', 'rejected', 'not_submitted'],
-        default: 'not_submitted'
-      },
-      diditVerifiedAt: Date
-    }
+    
+    // 2. Liveness Check (Ensure person is real and present)
+    liveness: {
+      status: { type: String, enum: ['pending', 'passed', 'failed'] },
+      confidence: Number, // 0-1 score
+      type: String, // 'active' or 'passive'
+      verifiedAt: Date
+    },
+    
+    // 3. Face Match (Compare selfie with ID photo)
+    faceMatch: {
+      status: { type: String, enum: ['pending', 'matched', 'not_matched'] },
+      similarity: Number, // 0-1 score
+      confidence: Number,
+      threshold: Number,
+      verifiedAt: Date
+    },
+    
+    // 4. Proof of Address (Utility bill, bank statement, etc.)
+    proofOfAddress: {
+      status: { type: String, enum: ['pending', 'verified', 'failed'] },
+      documentType: String,
+      address: String,
+      documentDate: Date,
+      documentAge: Number, // Days old
+      verifiedAt: Date
+    },
+    
+    // 5. Phone Verification (SMS OTP)
+    phoneVerification: {
+      status: { type: String, enum: ['pending', 'verified', 'failed'] },
+      phoneNumber: String,
+      countryCode: String,
+      carrier: String,
+      verifiedAt: Date
+    },
+    
+    // 6. IP Analysis (Fraud detection, geolocation)
+    ipAnalysis: {
+      ipAddress: String,
+      country: String,
+      city: String,
+      region: String,
+      timezone: String,
+      isVPN: Boolean,
+      isProxy: Boolean,
+      isTor: Boolean,
+      riskScore: Number, // 0-100 (higher is more risky)
+      analyzedAt: Date
+    },
+    
+    // Overall result
+    overallResult: { type: String, enum: ['pass', 'fail', 'review'] },
+    completedAt: Date,
+    failureReason: String,
+    submittedAt: Date,
+    rawData: mongoose.Schema.Types.Mixed // Store full Didit response for reference
   },
+  
+  // KYC Status
   kycStatus: {
     type: String,
-    enum: ['pending', 'in_review', 'approved', 'rejected'],
+    enum: ['pending', 'in_review', 'verified', 'approved', 'rejected'],
     default: 'pending'
   },
-  diditSessionId: String, // Didit verification session ID
-  diditVerificationLink: String, // Didit verification URL for business owner
-  videoCallVerified: {
-    type: Boolean,
-    default: false
+  
+  // Admin verification (after Didit)
+  adminVerification: {
+    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    reviewedAt: Date,
+    notes: String,
+    rejectionReason: String
   },
-  videoCallScheduledAt: Date,
+  
   status: {
     type: String,
     enum: ['pending', 'active', 'inactive', 'suspended', 'rejected'],

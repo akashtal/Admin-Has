@@ -23,11 +23,14 @@ export default function SplashScreen({ navigation }) {
       }),
     ]).start();
 
-    const timer = setTimeout(() => {
-      navigation.replace('RoleSelection');
-    }, 3000);
-
-    return () => clearTimeout(timer);
+    // Only navigate if navigation prop exists (when used inside AuthNavigator)
+    // When used in AppNavigator, navigation is handled by isReady state
+    if (navigation && navigation.replace) {
+      const timer = setTimeout(() => {
+        navigation.replace('RoleSelection');
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
   }, [navigation]);
 
   return (

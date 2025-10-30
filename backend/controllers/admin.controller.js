@@ -1,8 +1,10 @@
 const User = require('../models/User.model');
 const Business = require('../models/Business.model');
+const BusinessOwner = require('../models/BusinessOwner.model');
 const Review = require('../models/Review.model');
 const Coupon = require('../models/Coupon.model');
 const { sendPushNotification, sendBulkNotifications } = require('../utils/notification');
+const { sendEmail } = require('../utils/emailService');
 
 // @desc    Get admin dashboard stats
 // @route   GET /api/admin/dashboard
@@ -181,31 +183,92 @@ exports.updateBusinessKYC = async (req, res, next) => {
       });
     }
 
+    // Get business owner
+    const owner = await BusinessOwner.findById(business.owner);
+
     if (action === 'approve') {
       business.kycStatus = 'approved';
       business.status = 'active';
       business.verifiedAt = new Date();
       business.verifiedBy = req.user.id;
 
-      // Send notification to business owner
+      // Send push notification to business owner
       await sendPushNotification(
         business.owner,
         'Business Approved! 🎉',
         `Your business "${business.name}" has been approved and is now active.`,
         { type: 'business_verification', businessId: business._id.toString() }
       );
+
+      // Send email notification
+      if (owner) {
+        await sendEmail({
+          to: owner.email,
+          subject: 'Business Approved - You Are Now Live! 🎉',
+          html: `
+            <h2>Congratulations ${owner.name}!</h2>
+            <p>Great news! Your business <strong>${business.name}</strong> has been approved by our admin team!</p>
+            
+            <p><strong>✅ What This Means:</strong></p>
+            <ul>
+              <li>Your business is now <strong>LIVE</strong> and visible to all HashView users</li>
+              <li>Customers can now find you, read reviews, and redeem coupons</li>
+              <li>You can start managing your business dashboard</li>
+            </ul>
+            
+            <p><strong>Next Steps:</strong></p>
+            <ol>
+              <li>Log in to your business dashboard</li>
+              <li>Update your business hours and details</li>
+              <li>Create special offers and coupons for customers</li>
+              <li>Start building your reputation with verified reviews</li>
+            </ol>
+            
+            <p>Thank you for choosing HashView!</p>
+            <p>Best regards,<br>HashView Team</p>
+          `
+        });
+      }
     } else if (action === 'reject') {
       business.kycStatus = 'rejected';
       business.status = 'rejected';
       business.rejectionReason = reason || 'KYC verification failed';
 
-      // Send notification to business owner
+      // Send push notification to business owner
       await sendPushNotification(
         business.owner,
         'Business Verification Failed',
         `Your business "${business.name}" verification was rejected. Reason: ${business.rejectionReason}`,
         { type: 'business_verification', businessId: business._id.toString() }
       );
+
+      // Send email notification
+      if (owner) {
+        await sendEmail({
+          to: owner.email,
+          subject: 'Business Verification Status - Action Required',
+          html: `
+            <h2>Hi ${owner.name},</h2>
+            <p>We regret to inform you that your business <strong>${business.name}</strong> could not be approved at this time.</p>
+            
+            <p><strong>Reason:</strong></p>
+            <p style="background-color: #FEF2F2; border-left: 4px solid #EF4444; padding: 12px; color: #991B1B;">
+              ${business.rejectionReason}
+            </p>
+            
+            <p><strong>What You Can Do:</strong></p>
+            <ol>
+              <li>Review the rejection reason above</li>
+              <li>Update your business information or documents</li>
+              <li>Resubmit your verification request</li>
+              <li>Contact our support team if you need assistance: support@hashview.com</li>
+            </ol>
+            
+            <p>We're here to help you get verified!</p>
+            <p>Best regards,<br>HashView Team</p>
+          `
+        });
+      }
     }
 
     await business.save();

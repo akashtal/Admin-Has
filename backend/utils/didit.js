@@ -1,10 +1,12 @@
 const axios = require('axios');
 const logger = require('./logger');
 
-// Didit API Configuration
-const DIDIT_API_URL = process.env.DIDIT_API_URL || 'https://api.didit.me/v1';
+// Didit API Configuration (V2 session API uses verification.didit.me)
+const DIDIT_API_URL = process.env.DIDIT_API_URL || 'https://verification.didit.me/v2';
 const DIDIT_API_KEY = process.env.DIDIT_API_KEY;
 const DIDIT_SECRET_KEY = process.env.DIDIT_SECRET_KEY;
+
+// V2 uses x-api-key header, no OAuth token flow required
 
 /**
  * Create a Didit verification session for document verification
@@ -19,85 +21,48 @@ exports.createVerificationSession = async (businessData) => {
 
     logger.info('Creating Didit verification session for business:', businessData.businessId);
 
+    // V2: Create session with x-api-key
     const response = await axios.post(
-      `${DIDIT_API_URL}/verifications`,
+      `${DIDIT_API_URL}/session/`,
       {
-        // Verification type - document verification
-        type: 'document_verification',
-        
-        // Business owner information
-        user: {
-          externalId: businessData.ownerId,
-          email: businessData.email,
-          name: businessData.ownerName,
-          phone: businessData.phone
-        },
-        
-        // Required documents
-        documents: [
-          {
-            type: 'id_card', // Owner ID proof (passport, driver's license, national ID)
-            required: true
-          },
-          {
-            type: 'business_license', // Business registration/license
-            required: true
-          },
-          {
-            type: 'certificate', // Food safety certificate or other permits
-            required: false
-          }
-        ],
-        
-        // Verification settings
-        settings: {
-          autoApprove: false, // Manual review by admin
-          liveness: true, // Selfie verification to match ID
-          facematch: true, // Compare selfie with ID photo
-          documentCheck: true, // Verify document authenticity
-          extractData: true // Extract data from documents
-        },
-        
-        // Webhook for status updates
-        webhookUrl: `${process.env.BACKEND_URL}/api/webhooks/didit`,
-        
-        // Callback URLs
-        successUrl: `${process.env.FRONTEND_URL}/business/verification-success`,
-        failureUrl: `${process.env.FRONTEND_URL}/business/verification-failed`,
-        
-        // Metadata
-        metadata: {
-          businessId: businessData.businessId,
-          businessName: businessData.businessName,
-          category: businessData.category,
-          timestamp: new Date().toISOString()
-        }
+        workflow_id: process.env.DIDIT_WORKFLOW_ID,
+        vendor_data: businessData.businessId || businessData.ownerId,
+        callback: `${process.env.BACKEND_URL}/api/webhooks/didit`
       },
       {
         headers: {
-          'Authorization': `Bearer ${DIDIT_API_KEY}`,
-          'X-Secret-Key': DIDIT_SECRET_KEY,
+          'accept': 'application/json',
+          'content-type': 'application/json',
+          'x-api-key': DIDIT_API_KEY,
           'Content-Type': 'application/json'
         }
       }
     );
 
-    logger.info('Didit session created successfully:', response.data.sessionId);
+    logger.info('Didit session created successfully:', response.data?.session_id || response.data?.sessionId);
 
     return {
       success: true,
-      sessionId: response.data.sessionId,
-      verificationLink: response.data.verificationUrl,
-      expiresAt: response.data.expiresAt,
-      status: response.data.status
+      sessionId: response.data?.session_id || response.data?.sessionId,
+      verificationLink: response.data?.url || response.data?.verificationUrl,
+      expiresAt: response.data?.expires_at || response.data?.expiresAt,
+      status: response.data?.status || 'pending'
     };
 
   } catch (error) {
-    logger.error('Didit verification session creation failed:', error.response?.data || error.message);
+    const errorDetail = error.response?.data || error.message;
+    logger.error('Didit verification session creation failed:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      detail: errorDetail
+    });
     
     return {
       success: false,
-      error: error.response?.data?.message || error.message
+      error: error.response?.data?.message || error.response?.data?.error || error.message,
+      statusCode: error.response?.status,
+      details: errorDetail
     };
   }
 };
@@ -111,12 +76,17 @@ exports.getVerificationStatus = async (sessionId) => {
   try {
     logger.info('Fetching Didit verification status for session:', sessionId);
 
+    // Get access token
+    const token = await getAccessToken();
+
     const response = await axios.get(
       `${DIDIT_API_URL}/verifications/${sessionId}`,
       {
         headers: {
-          'Authorization': `Bearer ${DIDIT_API_KEY}`,
-          'X-Secret-Key': DIDIT_SECRET_KEY
+          'Authorization': `Bearer ${token}`,
+          'X-API-Key': DIDIT_API_KEY,
+          'X-Secret-Key': DIDIT_SECRET_KEY,
+          'Content-Type': 'application/json'
         }
       }
     );
@@ -226,13 +196,18 @@ exports.cancelVerification = async (sessionId) => {
   try {
     logger.info('Cancelling Didit session:', sessionId);
 
+    // Get access token
+    const token = await getAccessToken();
+
     const response = await axios.post(
       `${DIDIT_API_URL}/verifications/${sessionId}/cancel`,
       {},
       {
         headers: {
-          'Authorization': `Bearer ${DIDIT_API_KEY}`,
-          'X-Secret-Key': DIDIT_SECRET_KEY
+          'Authorization': `Bearer ${token}`,
+          'X-API-Key': DIDIT_API_KEY,
+          'X-Secret-Key': DIDIT_SECRET_KEY,
+          'Content-Type': 'application/json'
         }
       }
     );
@@ -259,12 +234,17 @@ exports.cancelVerification = async (sessionId) => {
  */
 exports.getVerificationLink = async (sessionId) => {
   try {
+    // Get access token
+    const token = await getAccessToken();
+
     const response = await axios.get(
       `${DIDIT_API_URL}/verifications/${sessionId}/link`,
       {
         headers: {
-          'Authorization': `Bearer ${DIDIT_API_KEY}`,
-          'X-Secret-Key': DIDIT_SECRET_KEY
+          'Authorization': `Bearer ${token}`,
+          'X-API-Key': DIDIT_API_KEY,
+          'X-Secret-Key': DIDIT_SECRET_KEY,
+          'Content-Type': 'application/json'
         }
       }
     );

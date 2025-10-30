@@ -76,6 +76,12 @@ app.use('/api/external-reviews', externalReviewsRoutes);
 app.use('/api/verification', verificationRoutes);
 app.use('/api/webhooks', webhookRoutes);
 
+// Test route for Didit API (Development only)
+if (process.env.NODE_ENV !== 'production') {
+  const testDiditRoutes = require('./routes/testDidit.routes');
+  app.use('/api/test-didit', testDiditRoutes);
+}
+
 // Socket.IO for real-time chat
 const chatSocket = require('./sockets/chat.socket');
 chatSocket(io);

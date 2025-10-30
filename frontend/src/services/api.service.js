@@ -81,9 +81,6 @@ const ApiService = {
   getUserReviews: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_USER_REVIEWS, { params }),
   getUserCoupons: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_USER_COUPONS, { params }),
   getRewardHistory: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_REWARD_HISTORY, { params }),
-  uploadProfileImage: (formData) => apiClient.post(API_CONFIG.ENDPOINTS.UPLOAD_PROFILE_IMAGE, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
   
   // Business APIs
   registerBusiness: (data) => {
@@ -102,64 +99,79 @@ const ApiService = {
   getNearbyBusinesses: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_NEARBY_BUSINESSES, { params }),
   searchBusinesses: (params) => apiClient.get(API_CONFIG.ENDPOINTS.SEARCH_BUSINESSES, { params }),
   getBusiness: (id) => apiClient.get(`${API_CONFIG.ENDPOINTS.GET_BUSINESS}/${id}`),
-  getBusinessDashboard: (id) => apiClient.get(API_CONFIG.ENDPOINTS.GET_BUSINESS_DASHBOARD.replace(':id', id)),
+  getBusinessDashboard: (id) => apiClient.get(buildEndpoint(API_CONFIG.ENDPOINTS.GET_BUSINESS_DASHBOARD, { id })),
   uploadDocuments: (id, formData) => apiClient.post(
-    API_CONFIG.ENDPOINTS.UPLOAD_DOCUMENTS.replace(':id', id),
+    buildEndpoint(API_CONFIG.ENDPOINTS.UPLOAD_DOCUMENTS, { id }),
     formData,
     { headers: { 'Content-Type': 'multipart/form-data' } }
   ),
-  generateQR: (id) => apiClient.post(API_CONFIG.ENDPOINTS.GENERATE_QR.replace(':id', id)),
+  generateQR: (id) => apiClient.post(buildEndpoint(API_CONFIG.ENDPOINTS.GENERATE_QR, { id })),
   getMyBusinesses: () => apiClient.get(API_CONFIG.ENDPOINTS.GET_MY_BUSINESSES),
   
   // Review APIs
   createReview: (data) => apiClient.post(API_CONFIG.ENDPOINTS.CREATE_REVIEW, data),
   getBusinessReviews: (businessId, params) => 
-    apiClient.get(API_CONFIG.ENDPOINTS.GET_BUSINESS_REVIEWS.replace(':businessId', businessId), { params }),
-  getReview: (id) => apiClient.get(API_CONFIG.ENDPOINTS.GET_REVIEW.replace(':id', id)),
-  updateReview: (id, data) => apiClient.put(API_CONFIG.ENDPOINTS.UPDATE_REVIEW.replace(':id', id), data),
-  deleteReview: (id) => apiClient.delete(API_CONFIG.ENDPOINTS.DELETE_REVIEW.replace(':id', id)),
-  markHelpful: (id) => apiClient.post(API_CONFIG.ENDPOINTS.MARK_HELPFUL.replace(':id', id)),
+    apiClient.get(buildEndpoint(API_CONFIG.ENDPOINTS.GET_BUSINESS_REVIEWS, { businessId }), { params }),
+  getReview: (id) => apiClient.get(buildEndpoint(API_CONFIG.ENDPOINTS.GET_REVIEW, { id })),
+  updateReview: (id, data) => apiClient.put(buildEndpoint(API_CONFIG.ENDPOINTS.UPDATE_REVIEW, { id }), data),
+  deleteReview: (id) => apiClient.delete(buildEndpoint(API_CONFIG.ENDPOINTS.DELETE_REVIEW, { id })),
+  markHelpful: (id) => apiClient.post(buildEndpoint(API_CONFIG.ENDPOINTS.MARK_HELPFUL, { id })),
   
   // Coupon APIs
   getCoupons: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_COUPONS, { params }),
-  getCoupon: (id) => apiClient.get(API_CONFIG.ENDPOINTS.GET_COUPON.replace(':id', id)),
+  getCoupon: (id) => apiClient.get(buildEndpoint(API_CONFIG.ENDPOINTS.GET_COUPON, { id })),
   verifyCoupon: (data) => apiClient.post(API_CONFIG.ENDPOINTS.VERIFY_COUPON, data),
-  redeemCoupon: (id) => apiClient.post(API_CONFIG.ENDPOINTS.REDEEM_COUPON.replace(':id', id)),
+  redeemCoupon: (id) => apiClient.post(buildEndpoint(API_CONFIG.ENDPOINTS.REDEEM_COUPON, { id })),
   getBusinessCoupons: (businessId) => 
-    apiClient.get(API_CONFIG.ENDPOINTS.GET_BUSINESS_COUPONS.replace(':businessId', businessId)),
+    apiClient.get(buildEndpoint(API_CONFIG.ENDPOINTS.GET_BUSINESS_COUPONS, { businessId })),
   createCoupon: (data) => apiClient.post(API_CONFIG.ENDPOINTS.CREATE_COUPON, data),
   updateBusiness: (id, data) => apiClient.put(`/business/${id}`, data),
   
   // Notification APIs
   getNotifications: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_NOTIFICATIONS, { params }),
-  markAsRead: (id) => apiClient.put(API_CONFIG.ENDPOINTS.MARK_AS_READ.replace(':id', id)),
+  markAsRead: (id) => apiClient.put(buildEndpoint(API_CONFIG.ENDPOINTS.MARK_AS_READ, { id })),
   markAllRead: () => apiClient.put(API_CONFIG.ENDPOINTS.MARK_ALL_READ),
   
-  // Admin APIs
+  // Admin APIs (Read-only analytics for mobile app)
+  // Management features (users, businesses, reviews) are only available on Web Dashboard
   getDashboardStats: () => apiClient.get(API_CONFIG.ENDPOINTS.GET_DASHBOARD_STATS),
-  getAllUsers: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_ALL_USERS, { params }),
-  getAllBusinesses: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_ALL_BUSINESSES, { params }),
-  updateBusinessKYC: (id, data) => 
-    apiClient.put(API_CONFIG.ENDPOINTS.UPDATE_BUSINESS_KYC.replace(':id', id), data),
-  updateUserStatus: (id, data) => 
-    apiClient.put(API_CONFIG.ENDPOINTS.UPDATE_USER_STATUS.replace(':id', id), data),
-  getAllReviews: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_ALL_REVIEWS, { params }),
-  sendNotification: (data) => apiClient.post(API_CONFIG.ENDPOINTS.SEND_NOTIFICATION, data),
+  
+  // Management APIs removed from mobile app - Use Web Dashboard instead
+  // getAllUsers: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_ALL_USERS, { params }),
+  // getAllBusinesses: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_ALL_BUSINESSES, { params }),
+  // updateBusinessKYC: (id, data) => apiClient.put(API_CONFIG.ENDPOINTS.UPDATE_BUSINESS_KYC.replace(':id', id), data),
+  // updateUserStatus: (id, data) => apiClient.put(API_CONFIG.ENDPOINTS.UPDATE_USER_STATUS.replace(':id', id), data),
+  // getAllReviews: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_ALL_REVIEWS, { params }),
+  // sendNotification: (data) => apiClient.post(API_CONFIG.ENDPOINTS.SEND_NOTIFICATION, data),
   
   // Chat APIs
   getChatHistory: (userId, params) => {
     if (!userId || !API_CONFIG.ENDPOINTS.GET_CHAT_HISTORY) {
       return Promise.reject(new Error('Invalid chat history request'));
     }
-    return apiClient.get(API_CONFIG.ENDPOINTS.GET_CHAT_HISTORY.replace(':userId', userId), { params });
+    return apiClient.get(buildEndpoint(API_CONFIG.ENDPOINTS.GET_CHAT_HISTORY, { userId }), { params });
   },
   sendMessage: (data) => apiClient.post(API_CONFIG.ENDPOINTS.SEND_MESSAGE, data),
   getConversations: () => apiClient.get(API_CONFIG.ENDPOINTS.GET_CONVERSATIONS),
   
+  // External Reviews APIs
+  syncGoogleReviews: (businessId) => {
+    const endpoint = API_CONFIG.ENDPOINTS.SYNC_GOOGLE_REVIEWS;
+    if (!endpoint) return Promise.reject(new Error('Endpoint not configured'));
+    return apiClient.post(buildEndpoint(endpoint, { id: businessId }));
+  },
+  syncTripAdvisorReviews: (businessId) => {
+    const endpoint = API_CONFIG.ENDPOINTS.SYNC_TRIPADVISOR_REVIEWS;
+    if (!endpoint) return Promise.reject(new Error('Endpoint not configured'));
+    return apiClient.post(buildEndpoint(endpoint, { id: businessId }));
+  },
+  getAllBusinessReviews: (businessId) => {
+    const endpoint = API_CONFIG.ENDPOINTS.GET_ALL_BUSINESS_REVIEWS;
+    if (!endpoint) return Promise.reject(new Error('Endpoint not configured'));
+    return apiClient.get(buildEndpoint(endpoint, { id: businessId }));
+  },
+  
   // Upload APIs
-  uploadProfileImage: (formData) => apiClient.post('/upload/profile', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
   uploadBusinessLogo: (formData) => apiClient.post('/upload/business/logo', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),

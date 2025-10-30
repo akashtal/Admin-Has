@@ -55,42 +55,27 @@ exports.initiateVerification = async (req, res, next) => {
       });
     }
 
-    // Update business with Didit session info
+    // Update business with Didit session info (both legacy and new nested fields)
     business.diditSessionId = verificationResult.sessionId;
     business.diditVerificationLink = verificationResult.verificationLink;
+    business.diditVerification = business.diditVerification || {};
+    business.diditVerification.sessionId = verificationResult.sessionId;
+    business.diditVerification.verificationLink = verificationResult.verificationLink;
+    business.diditVerification.status = 'pending';
     business.kycStatus = 'in_review';
     
     await business.save();
 
-    // Send verification link to business owner via email
-    try {
-      await sendEmail({
-        to: owner.email,
-        subject: 'Complete Your Business Verification - HashView',
-        html: `
-          <h2>Hi ${owner.name},</h2>
-          <p>Your business <strong>${business.name}</strong> requires document verification.</p>
-          <p>Please click the link below to complete your verification:</p>
-          <p><a href="${verificationResult.verificationLink}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Start Verification</a></p>
-          <p>You will need to upload:</p>
-          <ul>
-            <li>Your ID proof (passport, driver's license, or national ID)</li>
-            <li>Business license or registration certificate</li>
-            <li>Food safety certificate (if applicable)</li>
-          </ul>
-          <p>This link will expire in 7 days.</p>
-          <p>Best regards,<br>HashView Team</p>
-        `
-      });
-    } catch (emailError) {
-      logger.error('Failed to send verification email:', emailError);
-    }
-
-    logger.info(`Verification initiated for business ${business._id}`);
+    // No email needed - verification happens in-app
+    logger.info(`Verification session created for business ${business._id} - In-app verification enabled`);
 
     res.status(200).json({
       success: true,
       message: 'Verification session created successfully',
+      // Duplicate key fields at top-level for mobile compatibility
+      sessionId: verificationResult.sessionId,
+      verificationLink: verificationResult.verificationLink,
+      expiresAt: verificationResult.expiresAt,
       data: {
         sessionId: verificationResult.sessionId,
         verificationLink: verificationResult.verificationLink,
@@ -164,8 +149,12 @@ exports.getVerificationStatus = async (req, res, next) => {
         }
       });
 
-      business.kycStatus = 'approved';
+      // Documents verified by Didit, but still needs admin approval
+      business.kycStatus = 'in_review'; // Admin must manually approve
+      business.status = 'pending'; // Business not live until admin approves
       await business.save();
+      
+      logger.info(`✅ Didit verification complete for business ${business._id} - Awaiting admin approval`);
     }
 
     res.status(200).json({
@@ -257,9 +246,12 @@ exports.handleDiditWebhook = async (req, res, next) => {
 
         // Update overall KYC status
         if (status === 'verified') {
-          business.kycStatus = 'approved';
+          // Didit verified documents - now awaiting admin approval
+          business.kycStatus = 'in_review';
+          business.status = 'pending';
         } else if (status === 'rejected') {
           business.kycStatus = 'rejected';
+          business.status = 'rejected';
         }
 
         await business.save();
@@ -269,17 +261,25 @@ exports.handleDiditWebhook = async (req, res, next) => {
         if (owner && status === 'verified') {
           await sendEmail({
             to: owner.email,
-            subject: 'Business Verification Completed - HashView',
+            subject: 'Document Verification Completed - HashView',
             html: `
-              <h2>Congratulations ${owner.name}!</h2>
-              <p>Your business <strong>${business.name}</strong> has been successfully verified!</p>
-              <p>Your business is now active and visible to customers.</p>
+              <h2>Hi ${owner.name}!</h2>
+              <p>Great news! Your documents for <strong>${business.name}</strong> have been successfully verified!</p>
+              <p><strong>✅ Verified Documents:</strong></p>
+              <ul>
+                <li>ID Proof - Verified</li>
+                <li>Business License - Verified</li>
+                <li>Food Safety Certificate - Verified</li>
+                <li>Face Match - Verified</li>
+              </ul>
+              <p><strong>Next Step:</strong> Our admin team will review your business details and approve your account within 24-48 hours.</p>
+              <p>You will receive another email once your business is approved and live!</p>
               <p>Best regards,<br>HashView Team</p>
             `
           });
         }
 
-        logger.info(`Verification completed for business ${businessId}: ${status}`);
+        logger.info(`✅ Didit verification completed for business ${businessId}: ${status} - Awaiting admin approval`);
         break;
 
       default:

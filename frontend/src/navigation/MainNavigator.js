@@ -16,16 +16,14 @@ import CouponsScreen from '../screens/user/CouponsScreen';
 // Business Screens
 import BusinessDashboardScreen from '../screens/business/BusinessDashboardScreen';
 import BusinessRegistrationScreen from '../screens/business/BusinessRegistrationScreen';
+import VerifyBusinessScreen from '../screens/business/VerifyBusinessScreen';
 import ManageCouponsScreen from '../screens/business/ManageCouponsScreen';
 import ViewReviewsScreen from '../screens/business/ViewReviewsScreen';
 import AnalyticsDashboardScreen from '../screens/business/AnalyticsDashboardScreen';
 import EditBusinessInfoScreen from '../screens/business/EditBusinessInfoScreen';
 
-// Admin Screens
+// Admin Analytics Screen (Read-only)
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
-import UserManagementScreen from '../screens/admin/UserManagementScreen';
-import BusinessManagementScreen from '../screens/admin/BusinessManagementScreen';
-import ReviewManagementScreen from '../screens/admin/ReviewManagementScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -58,6 +56,7 @@ function BusinessStack() {
     >
       <Stack.Screen name="BusinessDashboard" component={BusinessDashboardScreen} />
       <Stack.Screen name="BusinessRegistration" component={BusinessRegistrationScreen} />
+      <Stack.Screen name="VerifyBusiness" component={VerifyBusinessScreen} />
       <Stack.Screen name="ManageCoupons" component={ManageCouponsScreen} />
       <Stack.Screen name="ViewReviews" component={ViewReviewsScreen} />
       <Stack.Screen name="AnalyticsDashboard" component={AnalyticsDashboardScreen} />
@@ -66,36 +65,19 @@ function BusinessStack() {
   );
 }
 
-// Admin Stack
-function AdminStack() {
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: '#4F46E5' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: 'bold' },
-      }}
-    >
-      <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ title: 'Admin Dashboard' }} />
-      <Stack.Screen name="UserManagement" component={UserManagementScreen} options={{ title: 'User Management' }} />
-      <Stack.Screen name="BusinessManagement" component={BusinessManagementScreen} options={{ title: 'Business Management' }} />
-      <Stack.Screen name="ReviewManagement" component={ReviewManagementScreen} options={{ title: 'Review Management' }} />
-    </Stack.Navigator>
-  );
-}
+// No separate admin stack needed - admins just see analytics + profile
 
 export default function MainNavigator() {
   const { user } = useSelector((state) => state.auth);
 
   if (user?.role === 'admin') {
+    // Admin sees only read-only analytics (all management on web dashboard)
     return (
       <Tab.Navigator
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {
             let iconName;
-            if (route.name === 'Dashboard') iconName = focused ? 'stats-chart' : 'stats-chart-outline';
-            else if (route.name === 'Users') iconName = focused ? 'people' : 'people-outline';
-            else if (route.name === 'Businesses') iconName = focused ? 'business' : 'business-outline';
+            if (route.name === 'Analytics') iconName = focused ? 'bar-chart' : 'bar-chart-outline';
             else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
             return <Icon name={iconName} size={size} color={color} />;
           },
@@ -104,8 +86,16 @@ export default function MainNavigator() {
           headerShown: false,
         })}
       >
-        <Tab.Screen name="Dashboard" component={AdminStack} />
-        <Tab.Screen name="Profile" component={ProfileScreen} />
+        <Tab.Screen 
+          name="Analytics" 
+          component={AdminDashboardScreen}
+          options={{ title: 'Platform Analytics' }}
+        />
+        <Tab.Screen 
+          name="Profile" 
+          component={ProfileScreen}
+          options={{ title: 'Profile' }}
+        />
       </Tab.Navigator>
     );
   }

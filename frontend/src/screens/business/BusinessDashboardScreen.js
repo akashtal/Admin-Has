@@ -87,6 +87,30 @@ export default function BusinessDashboardScreen({ navigation }) {
       <ScrollView className="flex-1 bg-gray-50">
 
       <View className="px-4 -mt-0 mb-0">
+        {/* Pending Verification Banner */}
+        {(business.kycStatus !== 'verified' && business.kycStatus !== 'approved') && (
+          <View className="bg-yellow-50 border-2 border-yellow-300 rounded-2xl p-4 mb-4">
+            <View className="flex-row items-start">
+              <Icon name="alert-circle" size={22} color="#D97706" />
+              <View className="ml-3 flex-1">
+                <Text className="text-yellow-900 font-semibold">Verification Pending</Text>
+                <Text className="text-yellow-800 text-sm mt-1">
+                  Your business is visible in dashboard, but verification is pending. Complete verification to go live.
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('VerifyBusiness', { businessId: business._id })}
+              activeOpacity={0.85}
+              className="mt-3 self-start"
+            >
+              <View className="flex-row items-center bg-yellow-600 px-4 py-2 rounded-xl">
+                <Icon name="shield-checkmark" size={18} color="#FFF" />
+                <Text className="text-white font-semibold ml-2">Continue Verification</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
         <View className="bg-white rounded-2xl p-6 shadow-lg mb-4">
           <View className="flex-row justify-between items-start mb-4">
             <View className="flex-1">
