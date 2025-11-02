@@ -86,6 +86,12 @@ if (process.env.NODE_ENV !== 'production') {
 const chatSocket = require('./sockets/chat.socket');
 chatSocket(io);
 
+// Initialize automatic sync jobs (cron)
+if (process.env.ENABLE_AUTO_SYNC !== 'false') {
+  const { initializeSyncJobs } = require('./utils/syncJobs');
+  initializeSyncJobs();
+}
+
 // Error handling middleware (must be last)
 app.use(errorHandler);
 

@@ -141,7 +141,7 @@ export default function AdminDashboardScreen({ navigation }) {
           <View className="rounded-xl p-3" style={{ backgroundColor: COLORS.primary + '10' }}>
             <Text className="text-xs font-medium text-gray-600 mb-1">📱 Local Network:</Text>
             <Text className="text-xs font-semibold" style={{ color: COLORS.primary }}>
-              http://192.168.108.239:3000
+              http://10.44.239.239:3000
             </Text>
           </View>
         </View>

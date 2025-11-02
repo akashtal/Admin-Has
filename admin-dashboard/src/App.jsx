@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import Businesses from './pages/Businesses';
 import BusinessDetails from './pages/BusinessDetails';
+import CreateBusiness from './pages/CreateBusiness';
 import Reviews from './pages/Reviews';
 import Notifications from './pages/Notifications';
 import Layout from './components/Layout';
@@ -62,6 +63,7 @@ function App() {
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/users" element={<Users />} />
                   <Route path="/businesses" element={<Businesses />} />
+                  <Route path="/businesses/create" element={<CreateBusiness />} />
                   <Route path="/businesses/:id" element={<BusinessDetails />} />
                   <Route path="/reviews" element={<Reviews />} />
                   <Route path="/notifications" element={<Notifications />} />

@@ -46,7 +46,7 @@ exports.uploadProfileImage = [
 ];
 
 // @desc    Upload business logo
-// @route   POST /api/upload/business/logo
+// @route   POST /api/upload/business/logo?businessId=xxx
 // @access  Private (Business Owner)
 exports.uploadBusinessLogo = [
   uploadBusinessLogo.single('logo'),
@@ -59,18 +59,35 @@ exports.uploadBusinessLogo = [
         });
       }
 
-      res.status(200).json({
+      // Ensure the response includes all necessary data
+      const responseData = {
         success: true,
         message: 'Business logo uploaded successfully',
         data: {
           url: req.file.path,
           publicId: req.file.filename,
           format: req.file.format
-        }
+        },
+        // Also include at top level for easier access
+        url: req.file.path,
+        publicId: req.file.filename
+      };
+
+      console.log('✅ Logo uploaded to Cloudinary:', {
+        url: req.file.path,
+        publicId: req.file.filename,
+        folder: req.file.folder || 'hashview/business/logos'
       });
+
+      res.status(200).json(responseData);
     } catch (error) {
+      console.error('❌ Error uploading business logo:', error);
       if (req.file?.filename) {
-        await cloudinary.uploader.destroy(req.file.filename);
+        try {
+          await cloudinary.uploader.destroy(req.file.filename);
+        } catch (destroyError) {
+          console.error('Error deleting failed upload:', destroyError);
+        }
       }
       next(error);
     }
@@ -78,7 +95,7 @@ exports.uploadBusinessLogo = [
 ];
 
 // @desc    Upload business cover image
-// @route   POST /api/upload/business/cover
+// @route   POST /api/upload/business/cover?businessId=xxx
 // @access  Private (Business Owner)
 exports.uploadBusinessCover = [
   uploadBusinessCover.single('coverImage'),
@@ -91,18 +108,33 @@ exports.uploadBusinessCover = [
         });
       }
 
-      res.status(200).json({
+      const responseData = {
         success: true,
         message: 'Business cover image uploaded successfully',
         data: {
           url: req.file.path,
           publicId: req.file.filename,
           format: req.file.format
-        }
+        },
+        url: req.file.path,
+        publicId: req.file.filename
+      };
+
+      console.log('✅ Cover image uploaded to Cloudinary:', {
+        url: req.file.path,
+        publicId: req.file.filename,
+        folder: req.file.folder || 'hashview/business/covers'
       });
+
+      res.status(200).json(responseData);
     } catch (error) {
+      console.error('❌ Error uploading business cover:', error);
       if (req.file?.filename) {
-        await cloudinary.uploader.destroy(req.file.filename);
+        try {
+          await cloudinary.uploader.destroy(req.file.filename);
+        } catch (destroyError) {
+          console.error('Error deleting failed upload:', destroyError);
+        }
       }
       next(error);
     }
@@ -149,7 +181,7 @@ exports.uploadBusinessDocuments = [
 ];
 
 // @desc    Upload business gallery photos
-// @route   POST /api/upload/business/gallery
+// @route   POST /api/upload/business/gallery?businessId=xxx
 // @access  Private (Business Owner)
 exports.uploadBusinessGallery = [
   uploadBusinessGallery.array('images', 10), // Max 10 images at once
@@ -168,6 +200,8 @@ exports.uploadBusinessGallery = [
         format: file.format
       }));
 
+      console.log(`✅ ${uploadedImages.length} gallery image(s) uploaded to Cloudinary`);
+
       res.status(200).json({
         success: true,
         message: `${uploadedImages.length} image(s) uploaded successfully`,
@@ -175,10 +209,15 @@ exports.uploadBusinessGallery = [
         images: uploadedImages
       });
     } catch (error) {
+      console.error('❌ Error uploading business gallery:', error);
       // Delete uploaded files if processing fails
       if (req.files && req.files.length > 0) {
         for (const file of req.files) {
-          await cloudinary.uploader.destroy(file.filename);
+          try {
+            await cloudinary.uploader.destroy(file.filename);
+          } catch (destroyError) {
+            console.error('Error deleting failed upload:', destroyError);
+          }
         }
       }
       next(error);

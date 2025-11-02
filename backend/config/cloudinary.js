@@ -22,52 +22,142 @@ const profileStorage = new CloudinaryStorage({
   }
 });
 
-// Business Logo Storage
+// Helper function to sanitize business name for folder names
+const sanitizeFolderName = (name) => {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single
+    .substring(0, 50); // Limit length
+};
+
+// Business Logo Storage - Dynamic folder based on business
 const businessLogoStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'hashview/business/logos',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'],
-    transformation: [
-      { width: 400, height: 400, crop: 'fill' },
-      { quality: 'auto' }
-    ]
+  params: async (req, file) => {
+    // Get business ID from query params or body
+    const businessId = req.query.businessId || req.body.businessId;
+    let folderPath = 'hashview/business/logos';
+    
+    if (businessId) {
+      try {
+        const Business = require('../models/Business.model');
+        const business = await Business.findById(businessId).select('name');
+        if (business && business.name) {
+          const folderName = sanitizeFolderName(business.name);
+          folderPath = `hashview/business/${folderName}/logo`;
+        }
+      } catch (err) {
+        console.error('Error getting business name for folder:', err);
+      }
+    }
+    
+    return {
+      folder: folderPath,
+      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'],
+      transformation: [
+        { width: 400, height: 400, crop: 'fill' },
+        { quality: 'auto', fetch_format: 'auto' }
+      ],
+      overwrite: false,
+      resource_type: 'image'
+    };
   }
 });
 
 // Business Cover Image Storage
 const businessCoverStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'hashview/business/covers',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-    transformation: [
-      { width: 1200, height: 600, crop: 'fill' },
-      { quality: 'auto' }
-    ]
+  params: async (req, file) => {
+    const businessId = req.query.businessId || req.body.businessId;
+    let folderPath = 'hashview/business/covers';
+    
+    if (businessId) {
+      try {
+        const Business = require('../models/Business.model');
+        const business = await Business.findById(businessId).select('name');
+        if (business && business.name) {
+          const folderName = sanitizeFolderName(business.name);
+          folderPath = `hashview/business/${folderName}/cover`;
+        }
+      } catch (err) {
+        console.error('Error getting business name for folder:', err);
+      }
+    }
+    
+    return {
+      folder: folderPath,
+      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+      transformation: [
+        { width: 1200, height: 600, crop: 'fill' },
+        { quality: 'auto', fetch_format: 'auto' }
+      ],
+      overwrite: false,
+      resource_type: 'image'
+    };
   }
 });
 
 // Business Documents Storage (KYC, licenses, etc.)
 const businessDocumentStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'hashview/business/documents',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'pdf'],
-    resource_type: 'auto' // Allows both images and PDFs
+  params: async (req, file) => {
+    const businessId = req.query.businessId || req.body.businessId;
+    let folderPath = 'hashview/business/documents';
+    
+    if (businessId) {
+      try {
+        const Business = require('../models/Business.model');
+        const business = await Business.findById(businessId).select('name');
+        if (business && business.name) {
+          const folderName = sanitizeFolderName(business.name);
+          folderPath = `hashview/business/${folderName}/documents`;
+        }
+      } catch (err) {
+        console.error('Error getting business name for folder:', err);
+      }
+    }
+    
+    return {
+      folder: folderPath,
+      allowed_formats: ['jpg', 'jpeg', 'png', 'pdf'],
+      resource_type: 'auto',
+      overwrite: false
+    };
   }
 });
 
-// Business Gallery Storage (multiple photos of restaurant/business)
+// Business Gallery Storage
 const businessGalleryStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'hashview/business/gallery',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-    transformation: [
-      { width: 1024, height: 768, crop: 'limit' }, // Limit max size but preserve aspect ratio
-      { quality: 'auto' }
-    ]
+  params: async (req, file) => {
+    const businessId = req.query.businessId || req.body.businessId;
+    let folderPath = 'hashview/business/gallery';
+    
+    if (businessId) {
+      try {
+        const Business = require('../models/Business.model');
+        const business = await Business.findById(businessId).select('name');
+        if (business && business.name) {
+          const folderName = sanitizeFolderName(business.name);
+          folderPath = `hashview/business/${folderName}/gallery`;
+        }
+      } catch (err) {
+        console.error('Error getting business name for folder:', err);
+      }
+    }
+    
+    return {
+      folder: folderPath,
+      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+      transformation: [
+        { width: 1024, height: 768, crop: 'limit' },
+        { quality: 'auto', fetch_format: 'auto' }
+      ],
+      overwrite: false,
+      resource_type: 'image'
+    };
   }
 });
 

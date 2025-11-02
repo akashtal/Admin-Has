@@ -8,6 +8,7 @@ import COLORS from '../../config/colors';
 export default function BusinessDashboardScreen({ navigation }) {
   const [business, setBusiness] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
+  const [syncing, setSyncing] = React.useState(false);
 
   useEffect(() => {
     fetchBusinessData();
@@ -24,6 +25,28 @@ export default function BusinessDashboardScreen({ navigation }) {
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncGoogleRatings = async () => {
+    if (!business?._id || syncing) return;
+    
+    try {
+      setSyncing(true);
+      const response = await ApiService.syncGoogleReviews(business._id);
+      
+      if (response.success) {
+        // Refresh business data to show updated ratings
+        await fetchBusinessData();
+        
+        // Show success message (you can replace with a toast notification)
+        alert(`✅ Ratings synced successfully!\nRating: ${response.data?.rating || 'N/A'}\nReview Count: ${response.data?.reviewCount || 0}`);
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+      alert(`Failed to sync ratings: ${error.response?.data?.message || error.message}`);
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -145,6 +168,48 @@ export default function BusinessDashboardScreen({ navigation }) {
               <Text className="text-xs text-gray-500">Total</Text>
             </View>
           </View>
+
+          {/* Google Rating Section */}
+          {business.externalProfiles?.googleBusiness?.businessName && (
+            <View className="mt-4 pt-4 border-t border-gray-100">
+              <View className="flex-row items-center justify-between mb-2">
+                <View className="flex-row items-center">
+                  <Icon name="logo-google" size={20} color="#4285F4" />
+                  <Text className="text-sm font-semibold text-gray-700 ml-2">Google Rating</Text>
+                </View>
+                {business.externalProfiles?.googleBusiness?.lastSynced && (
+                  <Text className="text-xs text-gray-400">
+                    Synced {new Date(business.externalProfiles.googleBusiness.lastSynced).toLocaleDateString()}
+                  </Text>
+                )}
+              </View>
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center">
+                  <Text className="text-xl font-bold text-gray-900 mr-2">
+                    {business.externalProfiles?.googleBusiness?.rating?.toFixed(1) || 'N/A'}
+                  </Text>
+                  <Icon name="star" size={16} color="#FFC107" />
+                  <Text className="text-sm text-gray-600 ml-2">
+                    ({business.externalProfiles?.googleBusiness?.reviewCount || 0} reviews)
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={handleSyncGoogleRatings}
+                  disabled={syncing}
+                  className="bg-blue-50 px-4 py-2 rounded-lg flex-row items-center"
+                >
+                  {syncing ? (
+                    <ActivityIndicator size="small" color="#4285F4" />
+                  ) : (
+                    <>
+                      <Icon name="refresh" size={16} color="#4285F4" />
+                      <Text className="text-xs font-semibold text-blue-600 ml-1">Sync</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Quick Actions */}

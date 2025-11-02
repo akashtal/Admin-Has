@@ -1,6 +1,159 @@
 const Business = require('../models/Business.model');
 const axios = require('axios');
 
+// Helper function to sync Google ratings (can be called from anywhere)
+const syncGoogleRatingsForBusiness = async (businessId, ratingsOnly = true) => {
+  try {
+    // Check if Google Places API key is configured
+    if (!process.env.GOOGLE_PLACES_API_KEY) {
+      console.error('❌ GOOGLE_PLACES_API_KEY is not configured in environment variables');
+      return { success: false, error: 'Google Places API key is not configured' };
+    }
+
+    const business = await Business.findById(businessId);
+    if (!business) {
+      console.error(`❌ Business not found: ${businessId}`);
+      return { success: false, error: 'Business not found' };
+    }
+
+    const googleBusinessName = business.externalProfiles?.googleBusiness?.businessName;
+    let googlePlaceId = business.externalProfiles?.googleBusiness?.placeId;
+
+    if (!googleBusinessName && !googlePlaceId) {
+      console.log(`⚠️  No Google Business name for business: ${businessId}`);
+      return { success: false, error: 'Google Business name not configured' };
+    }
+
+    let placeId = googlePlaceId;
+
+    // If no Place ID, search using business name
+    if (!placeId) {
+      const searchQuery = `${googleBusinessName} ${business.address?.fullAddress || ''}`;
+      console.log('🔍 Searching for business on Google:', searchQuery);
+      
+      try {
+        const findPlaceUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json`;
+        const findPlaceResponse = await axios.get(findPlaceUrl, {
+          params: {
+            input: searchQuery.trim(),
+            inputtype: 'textquery',
+            fields: 'place_id,name,formatted_address',
+            key: process.env.GOOGLE_PLACES_API_KEY
+          }
+        });
+
+        console.log('🔍 Google Places API Find Place response status:', findPlaceResponse.status);
+        
+        // Check for API errors
+        if (findPlaceResponse.data.status && findPlaceResponse.data.status !== 'OK' && findPlaceResponse.data.status !== 'ZERO_RESULTS') {
+          console.error('❌ Google Places API error:', findPlaceResponse.data.status, findPlaceResponse.data.error_message);
+          return { 
+            success: false, 
+            error: `Google Places API error: ${findPlaceResponse.data.error_message || findPlaceResponse.data.status}` 
+          };
+        }
+
+        if (!findPlaceResponse.data.candidates || findPlaceResponse.data.candidates.length === 0) {
+          console.error(`❌ Business not found on Google: "${googleBusinessName}"`);
+          return { success: false, error: `Business not found on Google: "${googleBusinessName}". Please verify the business name matches your Google Business listing exactly.` };
+        }
+
+        placeId = findPlaceResponse.data.candidates[0].place_id;
+        console.log('✅ Found Place ID:', placeId);
+      } catch (apiError) {
+        console.error('❌ Google Places API request failed:', apiError.response?.data || apiError.message);
+        return { 
+          success: false, 
+          error: `Google Places API request failed: ${apiError.response?.data?.error_message || apiError.message}` 
+        };
+      }
+    }
+
+    // Google Places API - Get Place Details (including reviews)
+    try {
+      const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json`;
+      const detailsResponse = await axios.get(detailsUrl, {
+        params: {
+          place_id: placeId,
+          fields: 'name,rating,user_ratings_total,reviews',
+          key: process.env.GOOGLE_PLACES_API_KEY
+        }
+      });
+
+      console.log('🔍 Google Places API Details response status:', detailsResponse.status);
+
+      // Check for API errors
+      if (detailsResponse.data.status && detailsResponse.data.status !== 'OK') {
+        console.error('❌ Google Places API Details error:', detailsResponse.data.status, detailsResponse.data.error_message);
+        return { 
+          success: false, 
+          error: `Google Places API error: ${detailsResponse.data.error_message || detailsResponse.data.status}` 
+        };
+      }
+
+      const placeDetails = detailsResponse.data.result;
+
+      if (!placeDetails) {
+        console.error('❌ No place details returned from Google Places API');
+        return { success: false, error: 'No place details returned from Google Places API' };
+      }
+
+      // Format Google reviews (only if not ratings-only)
+      const googleReviews = ratingsOnly ? [] : (placeDetails.reviews || []).map(review => ({
+        reviewId: review.time?.toString?.() || String(review.time || Date.now()),
+        author: review.author_name,
+        authorPhoto: review.profile_photo_url,
+        rating: review.rating,
+        text: review.text,
+        date: new Date((review.time || Math.floor(Date.now()/1000)) * 1000),
+        relativeTime: review.relative_time_description
+      }));
+
+      // Update business with Google data
+      business.externalProfiles.googleBusiness = {
+        businessName: googleBusinessName,
+        placeId: placeId,
+        rating: placeDetails.rating,
+        reviewCount: placeDetails.user_ratings_total,
+        lastSynced: new Date()
+      };
+
+      if (!ratingsOnly) {
+        business.externalReviews.google = googleReviews;
+      }
+
+      await business.save();
+
+      console.log(`✅ Google ratings synced for business: ${businessId} - Rating: ${placeDetails.rating}, Count: ${placeDetails.user_ratings_total}`);
+      
+      return {
+        success: true,
+        data: {
+          rating: placeDetails.rating,
+          reviewCount: placeDetails.user_ratings_total,
+          reviews: ratingsOnly ? undefined : googleReviews
+        }
+      };
+    } catch (apiError) {
+      console.error('❌ Google Places API Details request failed:', apiError.response?.data || apiError.message);
+      return { 
+        success: false, 
+        error: `Google Places API Details request failed: ${apiError.response?.data?.error_message || apiError.message}` 
+      };
+    }
+  } catch (error) {
+    console.error(`❌ Google Ratings sync error for business ${businessId}:`, error);
+    console.error('Error stack:', error.stack);
+    return { 
+      success: false, 
+      error: error.message || 'Unknown error occurred while syncing Google ratings' 
+    };
+  }
+};
+
+// Export helper function for use in other controllers
+exports.syncGoogleRatingsForBusiness = syncGoogleRatingsForBusiness;
+
 // @desc    Sync Google Reviews
 // @route   POST /api/business/:id/sync-google-reviews
 // @access  Private (Business Owner or Admin)
@@ -23,90 +176,40 @@ exports.syncGoogleReviews = async (req, res, next) => {
       });
     }
 
-    const googleBusinessName = business.externalProfiles?.googleBusiness?.businessName;
-    let googlePlaceId = business.externalProfiles?.googleBusiness?.placeId;
+    const ratingsOnly = (process.env.EXTERNAL_RATINGS_ONLY === 'true') || (req.query.ratingsOnly === 'true');
+    const result = await syncGoogleRatingsForBusiness(req.params.id, ratingsOnly);
 
-    if (!googleBusinessName && !googlePlaceId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Google Business name or Place ID not configured. Please provide your Google Business name (e.g., "Your Business Name, City") in business registration.'
-      });
-    }
-
-    let placeId = googlePlaceId;
-
-    // If no Place ID, search using business name
-    if (!placeId) {
-      console.log('🔍 Searching for business on Google:', googleBusinessName);
-      
-      const findPlaceUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json`;
-      const findPlaceResponse = await axios.get(findPlaceUrl, {
-        params: {
-          input: `${googleBusinessName} ${business.address?.fullAddress || ''}`,
-          inputtype: 'textquery',
-          fields: 'place_id,name,formatted_address',
-          key: process.env.GOOGLE_PLACES_API_KEY
-        }
-      });
-
-      console.log('🔍 Google Places API response:', findPlaceResponse.data);
-
-      if (!findPlaceResponse.data.candidates || findPlaceResponse.data.candidates.length === 0) {
+    if (!result.success) {
+      if (result.error === 'Business not found') {
         return res.status(404).json({
           success: false,
-          message: `Business not found on Google. Please check your Google Business name. Searched for: "${googleBusinessName}"`,
+          message: 'Business not found'
+        });
+      }
+      if (result.error === 'Google Business name not configured') {
+        return res.status(400).json({
+          success: false,
+          message: 'Google Business name or Place ID not configured. Please provide your Google Business name (e.g., "Your Business Name, City") in business registration.'
+        });
+      }
+      if (result.error.includes('Business not found on Google')) {
+        return res.status(404).json({
+          success: false,
+          message: result.error,
           suggestion: 'Try entering just your business name without address (e.g., "THAITASTIC" instead of full URL)'
         });
       }
-
-      placeId = findPlaceResponse.data.candidates[0].place_id;
-      console.log('✅ Found Place ID:', placeId);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to sync Google reviews',
+        error: result.error
+      });
     }
-
-    // Google Places API - Get Place Details (including reviews)
-    const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json`;
-    const detailsResponse = await axios.get(detailsUrl, {
-      params: {
-        place_id: placeId,
-        fields: 'name,rating,user_ratings_total,reviews',
-        key: process.env.GOOGLE_PLACES_API_KEY
-      }
-    });
-
-    const placeDetails = detailsResponse.data.result;
-
-    // Format Google reviews
-    const googleReviews = (placeDetails.reviews || []).map(review => ({
-      reviewId: review.time.toString(),
-      author: review.author_name,
-      authorPhoto: review.profile_photo_url,
-      rating: review.rating,
-      text: review.text,
-      date: new Date(review.time * 1000),
-      relativeTime: review.relative_time_description
-    }));
-
-    // Update business with Google data
-    business.externalProfiles.googleBusiness = {
-      businessName: googleBusinessName,
-      placeId: placeId,
-      rating: placeDetails.rating,
-      reviewCount: placeDetails.user_ratings_total,
-      lastSynced: new Date()
-    };
-
-    business.externalReviews.google = googleReviews;
-
-    await business.save();
 
     res.status(200).json({
       success: true,
-      message: 'Google reviews synced successfully',
-      data: {
-        rating: placeDetails.rating,
-        reviewCount: placeDetails.user_ratings_total,
-        reviews: googleReviews
-      }
+      message: ratingsOnly ? 'Google rating synced successfully' : 'Google reviews synced successfully',
+      data: result.data
     });
 
   } catch (error) {

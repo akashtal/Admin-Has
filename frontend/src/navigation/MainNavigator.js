@@ -12,6 +12,7 @@ import ProfileScreen from '../screens/user/ProfileScreen';
 import BusinessDetailScreen from '../screens/user/BusinessDetailScreen';
 import AddReviewScreen from '../screens/user/AddReviewScreen';
 import CouponsScreen from '../screens/user/CouponsScreen';
+import QRScannerScreen from '../screens/user/QRScannerScreen';
 
 // Business Screens
 import BusinessDashboardScreen from '../screens/business/BusinessDashboardScreen';
@@ -38,10 +39,11 @@ function UserStack() {
         headerTitleStyle: { fontWeight: 'bold' },
       }}
     >
-      <Stack.Screen name="UserHome" component={UserHomeScreen} options={{ title: 'HashView' }} />
+      <Stack.Screen name="UserHome" component={UserHomeScreen} options={{ headerShown: false }} />
       <Stack.Screen name="BusinessDetail" component={BusinessDetailScreen} options={{ title: 'Business Details' }} />
       <Stack.Screen name="AddReview" component={AddReviewScreen} options={{ title: 'Add Review' }} />
       <Stack.Screen name="Coupons" component={CouponsScreen} options={{ title: 'My Coupons' }} />
+      <Stack.Screen name="QRScanner" component={QRScannerScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

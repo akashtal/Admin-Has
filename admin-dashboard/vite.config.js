@@ -8,7 +8,8 @@ export default defineConfig({
     host: true, // Allow external access
     proxy: {
       '/api': {
-        target: 'http://192.168.108.239:5000', // Your backend URL (UPDATED!)
+        // Use localhost for development (more reliable than IP)
+        target: process.env.VITE_API_URL || 'http://localhost:5000',
         changeOrigin: true,
         secure: false
       }

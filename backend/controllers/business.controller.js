@@ -2,6 +2,8 @@ const Business = require('../models/Business.model');
 const Review = require('../models/Review.model');
 const { generateBusinessQRCode } = require('../utils/qrcode');
 const { getNearbyQuery } = require('../utils/geolocation');
+const { syncGoogleRatingsForBusiness } = require('../controllers/externalReviews.controller');
+const { cloudinary } = require('../config/cloudinary');
 
 // @desc    Create/Register new business
 // @route   POST /api/business/register
@@ -94,24 +96,96 @@ exports.registerBusiness = async (req, res, next) => {
       };
     }
 
-    // Handle logo upload (if using multipart/form-data)
-    if (req.files && req.files.logo) {
-      businessData.logo = {
-        url: `/uploads/${req.files.logo[0].filename}`
-      };
+    // Handle logo - can be URL from Cloudinary or file
+    if (req.body.logo) {
+      if (typeof req.body.logo === 'string') {
+        // URL provided (from Cloudinary)
+        businessData.logo = {
+          url: req.body.logo,
+          publicId: req.body.logoPublicId || null
+        };
+      } else if (req.files && req.files.logo) {
+        // File uploaded via multipart/form-data
+        businessData.logo = {
+          url: `/uploads/${req.files.logo[0].filename}`,
+          publicId: req.files.logo[0].filename
+        };
+      }
     }
 
-    // Handle cover image upload
-    if (req.files && req.files.coverImage) {
-      businessData.coverImage = {
-        url: `/uploads/${req.files.coverImage[0].filename}`
-      };
+    // Handle cover image - can be URL from Cloudinary or file
+    if (req.body.coverImage) {
+      if (typeof req.body.coverImage === 'string') {
+        // URL provided (from Cloudinary)
+        businessData.coverImage = {
+          url: req.body.coverImage,
+          publicId: req.body.coverImagePublicId || null
+        };
+      } else if (req.files && req.files.coverImage) {
+        // File uploaded via multipart/form-data
+        businessData.coverImage = {
+          url: `/uploads/${req.files.coverImage[0].filename}`,
+          publicId: req.files.coverImage[0].filename
+        };
+      }
+    }
+
+    // Handle business gallery images
+    if (req.body.images && Array.isArray(req.body.images)) {
+      businessData.images = req.body.images.map(img => {
+        if (typeof img === 'string') {
+          // URL provided (from Cloudinary)
+          return {
+            url: img,
+            publicId: null
+          };
+        } else if (img.url) {
+          // Object with url and publicId
+          return {
+            url: img.url,
+            publicId: img.publicId || null
+          };
+        }
+        return null;
+      }).filter(img => img !== null);
+    } else if (req.files && req.files.images) {
+      // Files uploaded via multipart/form-data
+      businessData.images = req.files.images.map(file => ({
+        url: `/uploads/${file.filename}`,
+        publicId: file.filename
+      }));
     }
 
     // Create business
     console.log('Creating business with data:', JSON.stringify(businessData, null, 2));
     const business = await Business.create(businessData);
     console.log('✅ Business created successfully:', business._id);
+
+    // Log image data to verify it's saved
+    console.log('📸 Business images after creation:', {
+      logo: business.logo ? '✅ Present' : '❌ Missing',
+      coverImage: business.coverImage ? '✅ Present' : '❌ Missing',
+      galleryCount: business.images?.length || 0,
+      logoUrl: business.logo?.url?.substring(0, 50) || 'N/A',
+      coverUrl: business.coverImage?.url?.substring(0, 50) || 'N/A'
+    });
+
+    // Auto-sync Google ratings in background (if Google Business name is provided)
+    if (googleBusinessName && googleBusinessName.trim()) {
+      console.log(`🔄 Auto-syncing Google ratings for business: ${business._id}`);
+      // Call sync in background without blocking the response
+      syncGoogleRatingsForBusiness(business._id.toString(), true)
+        .then(result => {
+          if (result.success) {
+            console.log(`✅ Auto-sync completed for business: ${business._id} - Rating: ${result.data.rating}, Count: ${result.data.reviewCount}`);
+          } else {
+            console.log(`⚠️  Auto-sync failed for business: ${business._id} - ${result.error}`);
+          }
+        })
+        .catch(err => {
+          console.error(`❌ Auto-sync error for business: ${business._id}`, err.message);
+        });
+    }
 
     res.status(201).json({
       success: true,
@@ -209,10 +283,11 @@ exports.getNearbyBusinesses = async (req, res, next) => {
       });
     }
 
-    const maxDistance = parseInt(radius) || 5000; // Default 5km
+    const maxDistance = parseInt(radius) || 50000; // Default 50km to show more businesses
 
+    // Show only active businesses on user home page
     const query = {
-      status: 'active',
+      status: 'active', // Only show active businesses
       location: {
         $near: {
           $geometry: {
@@ -242,6 +317,34 @@ exports.getNearbyBusinesses = async (req, res, next) => {
   }
 };
 
+// @desc    Get all active businesses (without location filter)
+// @route   GET /api/business/all
+// @access  Public
+exports.getAllActiveBusinesses = async (req, res, next) => {
+  try {
+    const { category, limit } = req.query;
+    
+    const query = { status: 'active' };
+    
+    if (category) {
+      query.category = category;
+    }
+
+    const businesses = await Business.find(query)
+      .select('-documents')
+      .limit(parseInt(limit) || 100)
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: businesses.length,
+      businesses
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Search businesses
 // @route   GET /api/business/search
 // @access  Public
@@ -249,6 +352,7 @@ exports.searchBusinesses = async (req, res, next) => {
   try {
     const { query, category, city } = req.query;
     
+    // Show only active businesses for user search
     const searchQuery = { status: 'active' };
 
     if (query) {
@@ -399,6 +503,184 @@ exports.generateQRCode = async (req, res, next) => {
   }
 };
 
+// @desc    Get business by QR code data (Public endpoint for mobile app)
+// @route   POST /api/business/qr/scan
+// @access  Public
+exports.getBusinessByQRCode = async (req, res, next) => {
+  try {
+    const { qrData } = req.body;
+
+    if (!qrData) {
+      return res.status(400).json({
+        success: false,
+        message: 'QR code data is required'
+      });
+    }
+
+    const { parseQRCodeData } = require('../utils/qrcode');
+    
+    // Parse QR code data
+    const parsed = parseQRCodeData(qrData);
+    
+    if (!parsed.valid || !parsed.businessId) {
+      return res.status(400).json({
+        success: false,
+        message: parsed.error || 'Invalid QR code'
+      });
+    }
+
+    // Find business by ID
+    const business = await Business.findById(parsed.businessId)
+      .populate('owner', 'name email phone')
+      .select('-qrCode'); // Don't send QR code back to mobile
+
+    if (!business) {
+      return res.status(404).json({
+        success: false,
+        message: 'Business not found'
+      });
+    }
+
+    // Only return active businesses
+    if (business.status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: 'This business is not active'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      business
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update business images (logo, cover, gallery)
+// @route   PUT /api/business/:id/images
+// @access  Private (Business owner)
+exports.updateBusinessImages = async (req, res, next) => {
+  try {
+    const business = await Business.findById(req.params.id);
+
+    if (!business) {
+      return res.status(404).json({
+        success: false,
+        message: 'Business not found'
+      });
+    }
+
+    // Verify ownership
+    if (business.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this business'
+      });
+    }
+
+    const updateData = {};
+
+    // Update logo
+    if (req.body.logo) {
+      // Delete old logo if exists
+      if (business.logo?.publicId) {
+        try {
+          await cloudinary.uploader.destroy(business.logo.publicId);
+        } catch (err) {
+          console.error('Error deleting old logo:', err);
+        }
+      }
+
+      if (typeof req.body.logo === 'string') {
+        updateData.logo = {
+          url: req.body.logo,
+          publicId: req.body.logoPublicId || null
+        };
+      }
+    }
+
+    // Update cover image
+    if (req.body.coverImage) {
+      // Delete old cover if exists
+      if (business.coverImage?.publicId) {
+        try {
+          await cloudinary.uploader.destroy(business.coverImage.publicId);
+        } catch (err) {
+          console.error('Error deleting old cover:', err);
+        }
+      }
+
+      if (typeof req.body.coverImage === 'string') {
+        updateData.coverImage = {
+          url: req.body.coverImage,
+          publicId: req.body.coverImagePublicId || null
+        };
+      }
+    }
+
+    // Update gallery images
+    if (req.body.images !== undefined) {
+      // Delete old gallery images
+      if (business.images && business.images.length > 0) {
+        for (const img of business.images) {
+          if (img.publicId) {
+            try {
+              await cloudinary.uploader.destroy(img.publicId);
+            } catch (err) {
+              console.error('Error deleting old gallery image:', err);
+            }
+          }
+        }
+      }
+
+      if (Array.isArray(req.body.images)) {
+        updateData.images = req.body.images.map(img => {
+          if (typeof img === 'string') {
+            return {
+              url: img,
+              publicId: null
+            };
+          } else if (img.url) {
+            return {
+              url: img.url,
+              publicId: img.publicId || null
+            };
+          }
+          return null;
+        }).filter(img => img !== null);
+      } else {
+        updateData.images = [];
+      }
+    }
+
+    // Update business
+    Object.assign(business, updateData);
+    await business.save();
+
+    // Refresh business data to ensure all fields are populated
+    const updatedBusiness = await Business.findById(req.params.id)
+      .populate('owner', 'name email')
+      .lean();
+
+    console.log('✅ Business images updated in database:', {
+      businessId: business._id,
+      logo: updatedBusiness.logo ? 'present' : 'missing',
+      coverImage: updatedBusiness.coverImage ? 'present' : 'missing',
+      galleryCount: updatedBusiness.images?.length || 0
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Business images updated successfully',
+      business: updatedBusiness
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Update business
 // @route   PUT /api/business/:id
 // @access  Private (Business owner)
@@ -420,7 +702,7 @@ exports.updateBusiness = async (req, res, next) => {
       });
     }
 
-    const allowedUpdates = ['description', 'phone', 'openingHours', 'socialMedia'];
+    const allowedUpdates = ['name', 'description', 'email', 'phone', 'address', 'category', 'openingHours', 'socialMedia', 'website'];
     const updates = {};
 
     allowedUpdates.forEach(field => {
@@ -428,6 +710,23 @@ exports.updateBusiness = async (req, res, next) => {
         updates[field] = req.body[field];
       }
     });
+
+    // Handle address if provided as string
+    if (req.body.address && typeof req.body.address === 'string') {
+      updates.address = {
+        fullAddress: req.body.address
+      };
+    } else if (req.body.address && typeof req.body.address === 'object') {
+      updates.address = req.body.address;
+    }
+
+    // Handle socialMedia website separately
+    if (req.body.website !== undefined) {
+      if (!updates.socialMedia) {
+        updates.socialMedia = business.socialMedia || {};
+      }
+      updates.socialMedia.website = req.body.website;
+    }
 
     const updatedBusiness = await Business.findByIdAndUpdate(
       req.params.id,

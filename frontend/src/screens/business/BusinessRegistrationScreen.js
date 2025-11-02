@@ -19,6 +19,7 @@ import * as Location from 'expo-location';
 import { Picker } from '@react-native-picker/picker';
 import { registerBusiness } from '../../store/slices/businessSlice';
 import SimpleLocationPicker from '../../components/SimpleLocationPicker';
+import ApiService from '../../services/api.service';
 import COLORS from '../../config/colors';
 
 export default function BusinessRegistrationScreen({ navigation }) {
@@ -41,7 +42,19 @@ export default function BusinessRegistrationScreen({ navigation }) {
 
   const [images, setImages] = useState({
     logo: null,
-    coverImage: null
+    coverImage: null,
+    gallery: [] // Gallery images array
+  });
+  const [uploadedImages, setUploadedImages] = useState({
+    logo: null,
+    coverImage: null,
+    gallery: []
+  });
+  const [uploading, setUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState({
+    logo: false,
+    coverImage: false,
+    gallery: false
   });
 
   const [location, setLocation] = useState({
@@ -286,16 +299,113 @@ export default function BusinessRegistrationScreen({ navigation }) {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: type === 'logo' ? [1, 1] : [16, 9],
+        allowsEditing: type !== 'gallery',
+        aspect: type === 'logo' ? [1, 1] : type === 'coverImage' ? [16, 9] : undefined,
         quality: 0.8,
+        allowsMultipleSelection: type === 'gallery'
       });
 
       if (!result.canceled) {
-        setImages({ ...images, [type]: result.assets[0] });
+        if (type === 'gallery') {
+          // For gallery, add multiple images
+          setImages({ ...images, gallery: [...images.gallery, ...result.assets] });
+        } else {
+          // For logo and cover, single image
+          setImages({ ...images, [type]: result.assets[0] });
+        }
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const removeGalleryImage = (index) => {
+    const newGallery = images.gallery.filter((_, i) => i !== index);
+    setImages({ ...images, gallery: newGallery });
+  };
+
+  // Upload image to Cloudinary via backend
+  const uploadImageToCloudinary = async (imageUri, imageType, businessId = null) => {
+    try {
+      const formData = new FormData();
+      const filename = imageUri.split('/').pop() || `image_${Date.now()}.jpg`;
+      const match = /\.(\w+)$/.exec(filename);
+      const extension = match ? match[1].toLowerCase() : 'jpg';
+      const mimeType = `image/${extension === 'jpg' ? 'jpeg' : extension}`;
+
+      const fieldName = imageType === 'logo' ? 'logo' : imageType === 'coverImage' ? 'coverImage' : 'images';
+      
+      formData.append(fieldName, {
+        uri: imageUri,
+        name: filename,
+        type: mimeType
+      });
+
+      let response;
+      if (imageType === 'logo') {
+        response = await ApiService.uploadBusinessLogo(formData, businessId);
+      } else if (imageType === 'coverImage') {
+        response = await ApiService.uploadBusinessCover(formData, businessId);
+      } else {
+        response = await ApiService.uploadBusinessGallery(formData, businessId);
+      }
+
+      if (response.success || response.data) {
+        // Handle response format
+        const data = response.data || response;
+        
+        // For gallery, response has images array
+        if (imageType === 'gallery' && response.images && response.images.length > 0) {
+          return response.images[0]; // Return first image from array
+        }
+        
+        return {
+          url: data.url || data.imageUrl,
+          publicId: data.publicId || data.public_id
+        };
+      }
+      throw new Error(response.message || 'Upload failed');
+    } catch (error) {
+      console.error(`Error uploading ${imageType}:`, error);
+      throw error;
+    }
+  };
+
+  // Upload multiple gallery images at once
+  const uploadGalleryImages = async (galleryImages, businessId = null) => {
+    if (!galleryImages || galleryImages.length === 0) return [];
+
+    try {
+      const formData = new FormData();
+      
+      // Append all gallery images to formData
+      galleryImages.forEach((img, index) => {
+        const filename = img.uri.split('/').pop() || `gallery_${Date.now()}_${index}.jpg`;
+        const match = /\.(\w+)$/.exec(filename);
+        const extension = match ? match[1].toLowerCase() : 'jpg';
+        const mimeType = `image/${extension === 'jpg' ? 'jpeg' : extension}`;
+        
+        formData.append('images', {
+          uri: img.uri,
+          name: filename,
+          type: mimeType
+        });
+      });
+
+      const response = await ApiService.uploadBusinessGallery(formData, businessId);
+      
+      if (response.success && response.images && response.images.length > 0) {
+        return response.images.map((img, index) => ({
+          url: img.url,
+          publicId: img.publicId,
+          originalUri: galleryImages[index]?.uri // Store original URI for matching
+        }));
+      }
+      
+      throw new Error(response.message || 'Gallery upload failed');
+    } catch (error) {
+      console.error('Error uploading gallery images:', error);
+      throw error;
     }
   };
 
@@ -351,41 +461,146 @@ export default function BusinessRegistrationScreen({ navigation }) {
     }
 
     try {
+      setUploading(true);
+
+      // Register business FIRST (without blocking on image uploads)
+      // Images will be uploaded after registration in the background
       const businessData = {
-        name: formData.businessName,
-        ownerName: `${formData.firstName} ${formData.lastName}`,
-        email: formData.email,
-        phone: formData.phone,
-        address: formData.address,
-        description: formData.description,
-        website: formData.website,
-        tripAdvisorLink: formData.tripAdvisorLink,
-        googleBusinessName: formData.googleBusinessName,
-        category: formData.category,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        openingHours: openHours,
-        logo: images.logo,
-        coverImage: images.coverImage
+        name: formData.businessName?.trim() || '',
+        ownerName: `${formData.firstName || ''} ${formData.lastName || ''}`.trim(),
+        email: formData.email?.trim() || '',
+        phone: formData.phone?.trim() || '',
+        address: formData.address?.trim() || '',
+        category: formData.category || '',
+        latitude: parseFloat(location.latitude),
+        longitude: parseFloat(location.longitude),
+        // Optional fields - only include if they have values
+        ...(formData.description?.trim() && { description: formData.description.trim() }),
+        ...(formData.website?.trim() && { website: formData.website.trim() }),
+        ...(formData.tripAdvisorLink?.trim() && { tripAdvisorLink: formData.tripAdvisorLink.trim() }),
+        ...(formData.googleBusinessName?.trim() && { googleBusinessName: formData.googleBusinessName.trim() }),
+        ...(openHours && Object.keys(openHours).length > 0 && { openingHours: openHours }),
+        // Images will be null initially, uploaded later
+        logo: null,
+        logoPublicId: null,
+        coverImage: null,
+        coverImagePublicId: null,
+        images: []
       };
 
-      console.log('📝 Submitting business registration...');
+      console.log('📝 Submitting business registration (images will be uploaded separately)...');
       const result = await dispatch(registerBusiness(businessData)).unwrap();
       
       console.log('✅ Registration successful:', result);
+      const businessId = result.business._id;
+
+      // Upload images AFTER registration (non-blocking, with timeout)
+      if (images.logo || images.coverImage || (images.gallery && images.gallery.length > 0)) {
+        console.log('📸 Starting background image uploads...');
+        
+        // Upload images in parallel with timeout
+        const uploadPromises = [];
+        
+        // Upload logo with timeout
+        if (images.logo) {
+          uploadPromises.push(
+            Promise.race([
+              uploadImageToCloudinary(images.logo.uri, 'logo', businessId).then(logoData => {
+                console.log('✅ Logo uploaded:', logoData.url);
+                // Update business with logo
+                return ApiService.updateBusinessImages(businessId, {
+                  logo: logoData.url,
+                  logoPublicId: logoData.publicId
+                }).catch(err => console.error('Failed to update logo:', err));
+              }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Logo upload timeout')), 30000))
+            ]).catch(error => {
+              console.error('⚠️ Logo upload failed or timed out:', error.message);
+              setUploadStatus(prev => ({ ...prev, logo: false }));
+            })
+          );
+        }
+
+        // Upload cover image with timeout
+        if (images.coverImage) {
+          uploadPromises.push(
+            Promise.race([
+              uploadImageToCloudinary(images.coverImage.uri, 'coverImage', businessId).then(coverData => {
+                console.log('✅ Cover image uploaded:', coverData.url);
+                // Update business with cover image
+                return ApiService.updateBusinessImages(businessId, {
+                  coverImage: coverData.url,
+                  coverImagePublicId: coverData.publicId
+                }).catch(err => console.error('Failed to update cover image:', err));
+              }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Cover upload timeout')), 30000))
+            ]).catch(error => {
+              console.error('⚠️ Cover image upload failed or timed out:', error.message);
+              setUploadStatus(prev => ({ ...prev, coverImage: false }));
+            })
+          );
+        }
+
+        // Upload gallery images with timeout
+        if (images.gallery && images.gallery.length > 0) {
+          uploadPromises.push(
+            Promise.race([
+              uploadGalleryImages(images.gallery, businessId).then(uploadedGallery => {
+                console.log(`✅ Gallery images uploaded: ${uploadedGallery.length} images`);
+                // Update business with gallery images
+                const galleryUrls = uploadedGallery.map(img => ({
+                  url: img.url,
+                  publicId: img.publicId
+                }));
+                return ApiService.updateBusinessImages(businessId, {
+                  images: galleryUrls
+                }).catch(err => console.error('Failed to update gallery images:', err));
+              }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Gallery upload timeout')), 60000))
+            ]).catch(error => {
+              console.error('⚠️ Gallery upload failed or timed out:', error.message);
+              setUploadStatus(prev => ({ ...prev, gallery: false }));
+            })
+          );
+        }
+
+        // Wait for all uploads (but don't block navigation)
+        Promise.allSettled(uploadPromises).then(() => {
+          console.log('📸 All image uploads completed');
+        });
+      }
       
-      // Navigate directly to verification screen (no popup)
-      // Use setTimeout to ensure navigation happens after state updates
+      // Navigate immediately (don't wait for image uploads)
       setTimeout(() => {
-        navigation.navigate('VerifyBusiness', { businessId: result.business._id });
+        navigation.navigate('VerifyBusiness', { businessId });
       }, 100);
+      
     } catch (error) {
       console.error('❌ Registration failed:', error);
-      const errorMessage = typeof error === 'string' 
-        ? error 
-        : (error?.message || 'Failed to register business. Please check your internet connection and try again.');
       
-      Alert.alert('Registration Failed', errorMessage);
+      // Handle error object from Redux thunk
+      let errorMessage = 'Failed to register business. Please check your internet connection and try again.';
+      let errorDetails = [];
+      
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.message) {
+        errorMessage = error.message;
+        errorDetails = error.errors || [];
+      } else if (error?.response?.data) {
+        errorMessage = error.response.data.message || errorMessage;
+        errorDetails = error.response.data.errors || [];
+      }
+      
+      // Show detailed validation errors if available
+      if (errorDetails.length > 0) {
+        const detailedMessage = `${errorMessage}\n\n${errorDetails.join('\n')}`;
+        Alert.alert('Registration Failed', detailedMessage);
+      } else {
+        Alert.alert('Registration Failed', errorMessage);
+      }
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -717,17 +932,38 @@ export default function BusinessRegistrationScreen({ navigation }) {
 
         {/* Logo Upload */}
         <View className="mb-4">
-          <Text className="text-gray-900 font-semibold mb-2">Logo</Text>
+          <View className="flex-row justify-between items-center mb-2">
+            <Text className="text-gray-900 font-semibold">Logo</Text>
+            {uploadedImages.logo && (
+              <View className="flex-row items-center bg-green-100 px-3 py-1 rounded-full">
+                <Icon name="checkmark-circle" size={16} color="#10B981" />
+                <Text className="text-green-700 text-xs font-semibold ml-1">Uploaded</Text>
+              </View>
+            )}
+          </View>
           <TouchableOpacity
             onPress={() => pickImage('logo')}
-            className="bg-white rounded-xl border-2 border-dashed border-gray-300 py-12 items-center justify-center"
+            className="bg-white rounded-xl border-2 border-dashed border-gray-300 py-12 items-center justify-center relative"
+            disabled={uploading}
           >
             {images.logo ? (
-              <Image 
-                source={{ uri: images.logo.uri }} 
-                className="w-24 h-24 rounded-lg"
-                resizeMode="cover"
-              />
+              <View className="items-center">
+                <Image 
+                  source={{ uri: images.logo.uri }} 
+                  className="w-24 h-24 rounded-lg"
+                  resizeMode="cover"
+                />
+                {uploadedImages.logo && (
+                  <View className="absolute top-2 right-2 bg-green-500 rounded-full p-1">
+                    <Icon name="checkmark" size={16} color="#FFF" />
+                  </View>
+                )}
+                {uploadStatus.logo && !uploadedImages.logo && (
+                  <View className="absolute top-2 right-2">
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                  </View>
+                )}
+              </View>
             ) : (
               <>
                 <Icon name="image-outline" size={48} color="#D1D5DB" />
@@ -739,23 +975,108 @@ export default function BusinessRegistrationScreen({ navigation }) {
 
         {/* Business Cover Image */}
         <View className="mb-4">
-          <Text className="text-gray-900 font-semibold mb-2">Business Cover Image</Text>
+          <View className="flex-row justify-between items-center mb-2">
+            <Text className="text-gray-900 font-semibold">Business Cover Image</Text>
+            {uploadedImages.coverImage && (
+              <View className="flex-row items-center bg-green-100 px-3 py-1 rounded-full">
+                <Icon name="checkmark-circle" size={16} color="#10B981" />
+                <Text className="text-green-700 text-xs font-semibold ml-1">Uploaded</Text>
+              </View>
+            )}
+          </View>
           <TouchableOpacity
             onPress={() => pickImage('coverImage')}
-            className="bg-white rounded-xl border-2 border-dashed border-gray-300 py-12 items-center justify-center"
+            className="bg-white rounded-xl border-2 border-dashed border-gray-300 py-12 items-center justify-center relative"
+            disabled={uploading}
           >
             {images.coverImage ? (
-              <Image 
-                source={{ uri: images.coverImage.uri }} 
-                className="w-full h-32 rounded-lg"
-                resizeMode="cover"
-              />
+              <View className="w-full relative">
+                <Image 
+                  source={{ uri: images.coverImage.uri }} 
+                  className="w-full h-32 rounded-lg"
+                  resizeMode="cover"
+                />
+                {uploadedImages.coverImage && (
+                  <View className="absolute top-2 right-2 bg-green-500 rounded-full p-1">
+                    <Icon name="checkmark" size={16} color="#FFF" />
+                  </View>
+                )}
+                {uploadStatus.coverImage && !uploadedImages.coverImage && (
+                  <View className="absolute top-2 right-2 bg-white rounded-full p-1">
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                  </View>
+                )}
+              </View>
             ) : (
               <>
                 <Icon name="image-outline" size={48} color="#D1D5DB" />
                 <Text className="text-gray-500 mt-2">Select File</Text>
               </>
             )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Business Gallery Images */}
+        <View className="mb-4">
+          <View className="flex-row justify-between items-center mb-2">
+            <Text className="text-gray-900 font-semibold">Business Gallery Images</Text>
+            <View className="flex-row items-center">
+              {uploadedImages.gallery.length > 0 && (
+                <View className="flex-row items-center bg-green-100 px-3 py-1 rounded-full mr-2">
+                  <Icon name="checkmark-circle" size={16} color="#10B981" />
+                  <Text className="text-green-700 text-xs font-semibold ml-1">
+                    {uploadedImages.gallery.length} Uploaded
+                  </Text>
+                </View>
+              )}
+              <Text className="text-xs text-gray-500">Optional</Text>
+            </View>
+          </View>
+          
+          {/* Gallery Images Grid */}
+          {images.gallery.length > 0 && (
+            <View className="flex-row flex-wrap mb-3">
+              {images.gallery.map((img, index) => {
+                const isUploaded = uploadedImages.gallery.some(uploaded => uploaded.url === img.uri || uploaded.originalUri === img.uri);
+                const isUploading = uploadStatus.gallery && !isUploaded;
+                
+                return (
+                  <View key={index} className="relative mr-2 mb-2">
+                    <Image 
+                      source={{ uri: img.uri }} 
+                      className="w-20 h-20 rounded-lg"
+                      resizeMode="cover"
+                    />
+                    {isUploaded && (
+                      <View className="absolute top-1 right-1 bg-green-500 rounded-full p-1">
+                        <Icon name="checkmark" size={12} color="#FFF" />
+                      </View>
+                    )}
+                    {isUploading && (
+                      <View className="absolute inset-0 bg-black/30 rounded-lg items-center justify-center">
+                        <ActivityIndicator size="small" color="#FFF" />
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      onPress={() => removeGalleryImage(index)}
+                      className="absolute -top-2 -right-2 bg-red-500 rounded-full w-6 h-6 items-center justify-center"
+                    >
+                      <Icon name="close" size={14} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          <TouchableOpacity
+            onPress={() => pickImage('gallery')}
+            className="bg-white rounded-xl border-2 border-dashed border-gray-300 py-8 items-center justify-center"
+          >
+            <Icon name="images-outline" size={32} color="#D1D5DB" />
+            <Text className="text-gray-500 mt-2">
+              {images.gallery.length > 0 ? `Add More Images (${images.gallery.length} selected)` : 'Add Gallery Images'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -790,16 +1111,19 @@ export default function BusinessRegistrationScreen({ navigation }) {
         {/* Google Business Name */}
         <View className="mb-4">
           <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-gray-900 font-semibold">Google Business Name</Text>
-            <Text className="text-xs text-gray-500">Please ensure you provide exact name</Text>
+            <Text className="text-gray-900 font-semibold">Google Business Name *</Text>
+            <Text className="text-xs text-gray-500">Required for ratings</Text>
           </View>
           <TextInput
             className="bg-white rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
-            placeholder="My Google Business Name"
+            placeholder="e.g., My Restaurant, New York"
             placeholderTextColor="#9CA3AF"
             value={formData.googleBusinessName}
             onChangeText={(value) => handleInputChange('googleBusinessName', value)}
           />
+          <Text className="text-xs text-gray-400 mt-1 ml-1">
+            Enter your exact Google Business name (same as on Google Maps). Not a URL link.
+          </Text>
         </View>
 
         {/* Open Hours */}
@@ -862,7 +1186,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
         {/* Submit Button */}
         <TouchableOpacity
           onPress={handleSubmit}
-          disabled={loading}
+          disabled={loading || uploading}
           activeOpacity={0.8}
           className="mb-8"
         >
@@ -870,8 +1194,13 @@ export default function BusinessRegistrationScreen({ navigation }) {
             colors={[COLORS.secondary, COLORS.secondaryDark]}
             className="rounded-xl py-4 items-center"
           >
-            {loading ? (
-              <ActivityIndicator color="#FFF" />
+            {(loading || uploading) ? (
+              <View className="flex-row items-center">
+                <ActivityIndicator color="#FFF" size="small" />
+                <Text className="text-white font-bold text-lg ml-3">
+                  {uploading ? 'Uploading Images...' : 'Creating Business...'}
+                </Text>
+              </View>
             ) : (
               <Text className="text-white font-bold text-lg">Create Business</Text>
             )}

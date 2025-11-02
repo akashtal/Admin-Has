@@ -1,6 +1,18 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import ApiService from '../../services/api.service';
 
+export const getAllActiveBusinesses = createAsyncThunk(
+  'business/getAllActiveBusinesses',
+  async (params, { rejectWithValue }) => {
+    try {
+      const response = await ApiService.getAllActiveBusinesses(params);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 export const getNearbyBusinesses = createAsyncThunk(
   'business/getNearbyBusinesses',
   async (params, { rejectWithValue }) => {
@@ -47,11 +59,16 @@ export const registerBusiness = createAsyncThunk(
       return response;
     } catch (error) {
       console.error('❌ Business registration error:', error);
-      const errorMessage = error?.response?.data?.message || 
+      const errorData = error?.response?.data;
+      const errorMessage = errorData?.message || 
                           error?.message || 
                           'Failed to register business. Please check your connection and try again.';
-      console.error('Error message:', errorMessage);
-      return rejectWithValue(errorMessage);
+      const errorDetails = errorData?.errors || [];
+      console.error('Error details:', { message: errorMessage, errors: errorDetails });
+      return rejectWithValue({
+        message: errorMessage,
+        errors: errorDetails
+      });
     }
   }
 );
@@ -60,6 +77,7 @@ const businessSlice = createSlice({
   name: 'business',
   initialState: {
     businesses: [],
+    nearbyBusinesses: [],
     selectedBusiness: null,
     myBusiness: null,
     loading: false,
@@ -75,13 +93,25 @@ const businessSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(getAllActiveBusinesses.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getAllActiveBusinesses.fulfilled, (state, action) => {
+        state.loading = false;
+        state.businesses = action.payload.businesses;
+      })
+      .addCase(getAllActiveBusinesses.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
       .addCase(getNearbyBusinesses.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(getNearbyBusinesses.fulfilled, (state, action) => {
         state.loading = false;
-        state.businesses = action.payload.businesses;
+        state.nearbyBusinesses = action.payload.businesses;
       })
       .addCase(getNearbyBusinesses.rejected, (state, action) => {
         state.loading = false;

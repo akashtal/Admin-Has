@@ -14,8 +14,15 @@ export const adminApi = {
   
   // Businesses
   getAllBusinesses: (params) => api.get('/admin/businesses', { params }),
+  getBusinessById: (businessId) => api.get(`/admin/businesses/${businessId}`),
+  createBusiness: (data) => api.post('/admin/businesses', data),
+  updateBusiness: (businessId, data) => api.put(`/admin/businesses/${businessId}`, data),
   updateBusinessKYC: (businessId, action, reason) => 
     api.put(`/admin/businesses/${businessId}/kyc`, { action, reason }),
+  updateBusinessRadius: (businessId, radius) => 
+    api.put(`/admin/businesses/${businessId}/radius`, { radius }),
+  generateBusinessQRCode: (businessId) => 
+    api.post(`/admin/businesses/${businessId}/generate-qr`),
   deleteBusiness: (businessId) => api.delete(`/admin/businesses/${businessId}`),
   
   // Reviews

@@ -96,6 +96,7 @@ const ApiService = {
     
     return apiClient.post(API_CONFIG.ENDPOINTS.REGISTER_BUSINESS, businessData);
   },
+  getAllActiveBusinesses: (params) => apiClient.get('/business/all', { params }),
   getNearbyBusinesses: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_NEARBY_BUSINESSES, { params }),
   searchBusinesses: (params) => apiClient.get(API_CONFIG.ENDPOINTS.SEARCH_BUSINESSES, { params }),
   getBusiness: (id) => apiClient.get(`${API_CONFIG.ENDPOINTS.GET_BUSINESS}/${id}`),
@@ -158,7 +159,7 @@ const ApiService = {
   syncGoogleReviews: (businessId) => {
     const endpoint = API_CONFIG.ENDPOINTS.SYNC_GOOGLE_REVIEWS;
     if (!endpoint) return Promise.reject(new Error('Endpoint not configured'));
-    return apiClient.post(buildEndpoint(endpoint, { id: businessId }));
+    return apiClient.post(buildEndpoint(endpoint, { id: businessId }) + '?ratingsOnly=true');
   },
   syncTripAdvisorReviews: (businessId) => {
     const endpoint = API_CONFIG.ENDPOINTS.SYNC_TRIPADVISOR_REVIEWS;
@@ -172,20 +173,38 @@ const ApiService = {
   },
   
   // Upload APIs
-  uploadBusinessLogo: (formData) => apiClient.post('/upload/business/logo', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
-  uploadBusinessCover: (formData) => apiClient.post('/upload/business/cover', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
-  uploadBusinessDocuments: (formData) => apiClient.post('/upload/business/documents', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
-  uploadBusinessGallery: (formData) => apiClient.post('/upload/business/gallery', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
+  uploadBusinessLogo: (formData, businessId) => {
+    const url = businessId ? `/upload/business/logo?businessId=${businessId}` : '/upload/business/logo';
+    return apiClient.post(url, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  uploadBusinessCover: (formData, businessId) => {
+    const url = businessId ? `/upload/business/cover?businessId=${businessId}` : '/upload/business/cover';
+    return apiClient.post(url, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  uploadBusinessDocuments: (formData, businessId) => {
+    const url = businessId ? `/upload/business/documents?businessId=${businessId}` : '/upload/business/documents';
+    return apiClient.post(url, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  uploadBusinessGallery: (formData, businessId) => {
+    const url = businessId ? `/upload/business/gallery?businessId=${businessId}` : '/upload/business/gallery';
+    return apiClient.post(url, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
   deleteUploadedFile: (publicId) => apiClient.delete(`/upload/${publicId}`),
   getUploadStats: () => apiClient.get('/upload/stats'),
+  
+  // Business image management
+  updateBusinessImages: (businessId, data) => apiClient.put(
+    buildEndpoint(API_CONFIG.ENDPOINTS.UPDATE_BUSINESS_IMAGES, { id: businessId }), 
+    data
+  ),
 };
 
 export default ApiService;

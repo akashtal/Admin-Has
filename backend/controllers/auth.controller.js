@@ -1,5 +1,6 @@
 const User = require('../models/User.model');
 const BusinessOwner = require('../models/BusinessOwner.model');
+const SuspendedAccount = require('../models/SuspendedAccount.model');
 const { generateToken } = require('../utils/jwt');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
@@ -35,45 +36,128 @@ exports.register = async (req, res, next) => {
     // Validate role
     const allowedRoles = ['customer', 'business'];
     const userRole = role && allowedRoles.includes(role) ? role : 'customer';
+    
+    console.log(`\n📋 Registration Role Check:`);
+    console.log(`   - Requested role: ${role}`);
+    console.log(`   - Final userRole: ${userRole}`);
 
-    // Check if email exists in BOTH collections (email must be unique across all)
-    const existingUserByEmail = await User.findOne({ email });
-    const existingBusinessOwnerByEmail = await BusinessOwner.findOne({ email });
+    // Check if email is suspended
+    const suspendedAccount = await SuspendedAccount.findOne({ 
+      email: email.toLowerCase(), 
+      status: 'suspended' 
+    });
 
-    // Email must be unique across both collections
-    if (existingUserByEmail || existingBusinessOwnerByEmail) {
-      const existingRole = existingUserByEmail ? 'customer' : 'business owner';
-      console.log(`❌ Email already registered as ${existingRole}`);
-      
-      return res.status(400).json({
+    if (suspendedAccount) {
+      console.log(`❌ Registration blocked: Email is suspended`);
+      return res.status(403).json({
         success: false,
-        message: `This email is already registered as a ${existingRole}. Please login or use a different email.`,
-        field: 'email'
+        message: 'This account has been suspended. Please contact support for assistance.',
+        reason: suspendedAccount.reason
       });
     }
 
-    // Check if phone exists in SAME ROLE collection only (allow same phone for different roles)
-    let existingPhoneInSameRole = null;
+    // Check if email exists in SAME ROLE collection only (allow same email for different roles)
+    console.log(`\n📧 Email Validation for role: ${userRole}`);
+    const normalizedEmail = email.toLowerCase();
     
     if (userRole === 'business') {
-      existingPhoneInSameRole = await BusinessOwner.findOne({ phone });
-      if (existingPhoneInSameRole) {
-        console.log(`❌ Phone number already registered as business owner`);
+      // Check if email already exists as business owner (SAME ROLE - BLOCK)
+      const existingBusinessOwnerByEmail = await BusinessOwner.findOne({ email: normalizedEmail });
+      if (existingBusinessOwnerByEmail) {
+        console.log(`❌ Email ${normalizedEmail} already registered as business owner`);
         return res.status(400).json({
           success: false,
-          message: 'This phone number is already registered as a business owner. Please login or use a different phone number.',
-          field: 'phone'
+          message: 'This email is already registered as a business owner. Please login or use a different email.',
+          field: 'email'
         });
       }
+      // Allow if email exists as customer (DIFFERENT ROLE - ALLOW)
+      const existingUserByEmail = await User.findOne({ email: normalizedEmail });
+      if (existingUserByEmail) {
+        console.log(`✅ Email ${normalizedEmail} exists as customer, but allowing business account creation (different role)`);
+      } else {
+        console.log(`✅ Email ${normalizedEmail} is available for business registration`);
+      }
     } else {
-      existingPhoneInSameRole = await User.findOne({ phone });
-      if (existingPhoneInSameRole) {
-        console.log(`❌ Phone number already registered as customer`);
+      // Check if email already exists as customer (SAME ROLE - BLOCK)
+      const existingUserByEmail = await User.findOne({ email: normalizedEmail });
+      if (existingUserByEmail) {
+        console.log(`❌ Email ${normalizedEmail} already registered as customer`);
         return res.status(400).json({
           success: false,
-          message: 'This phone number is already registered as a customer. Please login or use a different phone number.',
-          field: 'phone'
+          message: 'This email is already registered as a customer. Please login or use a different email.',
+          field: 'email'
         });
+      }
+      // Allow if email exists as business owner (DIFFERENT ROLE - ALLOW)
+      const existingBusinessOwnerByEmail = await BusinessOwner.findOne({ email: normalizedEmail });
+      if (existingBusinessOwnerByEmail) {
+        console.log(`✅ Email ${normalizedEmail} exists as business owner, but allowing customer account creation (different role)`);
+      } else {
+        console.log(`✅ Email ${normalizedEmail} is available for customer registration`);
+      }
+    }
+
+    // Check if phone exists in SAME ROLE collection only (allow same phone for different roles)
+    console.log(`\n📱 Phone Validation for role: ${userRole}`);
+    
+    if (userRole === 'business') {
+      // Check if phone already exists as business owner (SAME ROLE - BLOCK duplicate)
+      const existingBusinessOwnerByPhone = await BusinessOwner.findOne({ phone });
+      if (existingBusinessOwnerByPhone) {
+        console.log(`❌ Phone ${phone} already registered as business owner (duplicate business account blocked)`);
+        // Check if they also have a customer account with same phone
+        const existingCustomerByPhone = await User.findOne({ phone });
+        if (existingCustomerByPhone) {
+          return res.status(400).json({
+            success: false,
+            message: 'You already have a business account with this phone number. You cannot create duplicate business accounts. Please login to your existing business account.',
+            field: 'phone',
+            hasBothAccounts: true
+          });
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: 'This phone number is already registered as a business owner. Please login to your existing account or use a different phone number to create a new business account.',
+            field: 'phone'
+          });
+        }
+      }
+      // Allow if phone exists as customer (DIFFERENT ROLE - ALLOW)
+      const existingUserByPhone = await User.findOne({ phone });
+      if (existingUserByPhone) {
+        console.log(`✅ Phone ${phone} exists as customer, allowing business account creation (different role - same user)`);
+      } else {
+        console.log(`✅ Phone ${phone} is available for business registration`);
+      }
+    } else {
+      // Check if phone already exists as customer (SAME ROLE - BLOCK duplicate)
+      const existingUserByPhone = await User.findOne({ phone });
+      if (existingUserByPhone) {
+        console.log(`❌ Phone ${phone} already registered as customer (duplicate customer account blocked)`);
+        // Check if they also have a business account with same phone
+        const existingBusinessByPhone = await BusinessOwner.findOne({ phone });
+        if (existingBusinessByPhone) {
+          return res.status(400).json({
+            success: false,
+            message: 'You already have a customer account with this phone number. You cannot create duplicate customer accounts. Please login to your existing customer account.',
+            field: 'phone',
+            hasBothAccounts: true
+          });
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: 'This phone number is already registered as a customer. Please login to your existing account or use a different phone number to create a new customer account.',
+            field: 'phone'
+          });
+        }
+      }
+      // Allow if phone exists as business owner (DIFFERENT ROLE - ALLOW)
+      const existingBusinessOwnerByPhone = await BusinessOwner.findOne({ phone });
+      if (existingBusinessOwnerByPhone) {
+        console.log(`✅ Phone ${phone} exists as business owner, allowing customer account creation (different role - same user)`);
+      } else {
+        console.log(`✅ Phone ${phone} is available for customer registration`);
       }
     }
 
@@ -87,7 +171,7 @@ exports.register = async (req, res, next) => {
       console.log('Creating business owner with data:', { name, email, phone, role: userRole });
       user = await BusinessOwner.create({
         name,
-        email,
+        email: email.toLowerCase(),
         phone,
         passwordHash: password,
         role: 'business'
@@ -101,7 +185,7 @@ exports.register = async (req, res, next) => {
       console.log('Creating customer with data:', { name, email, phone, role: userRole });
       user = await User.create({
         name,
-        email,
+        email: email.toLowerCase(),
         phone,
         passwordHash: password,
         role: userRole
@@ -172,6 +256,21 @@ exports.login = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
+      });
+    }
+
+    // Check if email is suspended
+    const suspendedAccount = await SuspendedAccount.findOne({ 
+      email: email.toLowerCase(), 
+      status: 'suspended' 
+    });
+
+    if (suspendedAccount) {
+      console.log(`❌ Login blocked: Account is suspended`);
+      return res.status(403).json({
+        success: false,
+        message: 'This account has been suspended. Please contact support for assistance.',
+        reason: suspendedAccount.reason
       });
     }
 

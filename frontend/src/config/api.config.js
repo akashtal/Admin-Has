@@ -4,11 +4,11 @@ export const API_CONFIG = {
   // IMPORTANT: For Expo Go on phone, use your computer's IP address
   // To find your IP: Run "ipconfig" in PowerShell and look for IPv4 Address
   BASE_URL: __DEV__ 
-    ? 'http://192.168.108.239:5000/api'  // ← YOUR COMPUTER'S IP (change if different)
+    ? 'http://10.44.239.239:5000/api'  // ← YOUR COMPUTER'S IP (Updated to current IP)
     : 'https://your-backend-api.com/api',
   
   SOCKET_URL: __DEV__
-    ? 'http://192.168.108.239:5000'      // ← YOUR COMPUTER'S IP (change if different)
+    ? 'http://10.44.239.239:5000'      // ← YOUR COMPUTER'S IP (Updated to current IP)
     : 'https://your-backend-api.com',
   
   TIMEOUT: 30000, // 30 seconds
@@ -44,6 +44,8 @@ export const API_CONFIG = {
     GET_BUSINESS_DASHBOARD: '/business/:id/dashboard',
     UPLOAD_DOCUMENTS: '/business/:id/documents',
     GENERATE_QR: '/business/:id/generate-qr',
+    SCAN_QR_CODE: '/business/qr/scan',
+    UPDATE_BUSINESS_IMAGES: '/business/:id/images',
     GET_MY_BUSINESSES: '/business/my/businesses',
     
     // Reviews
