@@ -6,23 +6,31 @@ const {
   getUserReviews,
   getUserCoupons,
   getRewardHistory,
+  changePassword,
   uploadProfileImage,
+  updateAccountSettings,
+  exportUserData,
+  deactivateAccount,
   deleteAccount
 } = require('../controllers/user.controller');
 const { protect } = require('../middleware/auth.middleware');
-const { validate, schemas } = require('../middleware/validation');
-const upload = require('../middleware/upload');
+const { uploadProfile } = require('../config/cloudinary');
 
-// All routes are protected
+// All routes require authentication
 router.use(protect);
 
 router.get('/profile', getProfile);
-router.put('/profile', validate(schemas.updateProfile), updateProfile);
+router.put('/profile', updateProfile);
 router.get('/reviews', getUserReviews);
 router.get('/coupons', getUserCoupons);
 router.get('/rewards', getRewardHistory);
-router.post('/upload-image', upload.single('image'), uploadProfileImage);
+
+// New profile management routes
+router.post('/change-password', changePassword);
+router.post('/upload-profile-image', uploadProfile.single('profileImage'), uploadProfileImage);
+router.put('/account-settings', updateAccountSettings);
+router.post('/export-data', exportUserData);
+router.put('/deactivate', deactivateAccount);
 router.delete('/account', deleteAccount);
 
 module.exports = router;
-

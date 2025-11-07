@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   getCoupons,
   getCoupon,
+  createCoupon,
   verifyCoupon,
   redeemCoupon,
   getBusinessCoupons,
@@ -14,6 +15,7 @@ const { protect, authorize } = require('../middleware/auth.middleware');
 router.use(protect);
 
 router.get('/', getCoupons);
+router.post('/', authorize('business', 'admin'), createCoupon);
 router.get('/:id', getCoupon);
 router.post('/verify', authorize('business', 'admin'), verifyCoupon);
 router.post('/:id/redeem', authorize('business', 'admin'), redeemCoupon);

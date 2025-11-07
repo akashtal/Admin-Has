@@ -274,7 +274,7 @@ exports.uploadDocuments = async (req, res, next) => {
 // @access  Public
 exports.getNearbyBusinesses = async (req, res, next) => {
   try {
-    const { latitude, longitude, radius, category } = req.query;
+    const { latitude, longitude, radius, category, ratingSource, minRating, distance } = req.query;
 
     if (!latitude || !longitude) {
       return res.status(400).json({
@@ -283,7 +283,22 @@ exports.getNearbyBusinesses = async (req, res, next) => {
       });
     }
 
-    const maxDistance = parseInt(radius) || 50000; // Default 50km to show more businesses
+    // Distance filter options (in meters)
+    // distance can be: '1km', '5km', '10km', '25km', 'nearme', or custom radius
+    let maxDistance;
+    if (distance === 'nearme') {
+      maxDistance = 5000; // 5km for "Near Me"
+    } else if (distance === '1km') {
+      maxDistance = 1000;
+    } else if (distance === '5km') {
+      maxDistance = 5000;
+    } else if (distance === '10km') {
+      maxDistance = 10000;
+    } else if (distance === '25km') {
+      maxDistance = 25000;
+    } else {
+      maxDistance = parseInt(radius) || 50000; // Default 50km
+    }
 
     // Show only active businesses on user home page
     const query = {
@@ -299,8 +314,22 @@ exports.getNearbyBusinesses = async (req, res, next) => {
       }
     };
 
-    if (category) {
+    if (category && category !== 'all') {
       query.category = category;
+    }
+
+    // Server-side star-based rating filters
+    if (ratingSource && minRating) {
+      const minRatingValue = parseFloat(minRating);
+      
+      // Filter by specific rating source and star level
+      if (ratingSource === 'hashview') {
+        query['rating.average'] = { $gte: minRatingValue };
+      } else if (ratingSource === 'google') {
+        query['externalProfiles.googleBusiness.rating'] = { $gte: minRatingValue };
+      } else if (ratingSource === 'tripadvisor') {
+        query['externalProfiles.tripAdvisor.rating'] = { $gte: minRatingValue };
+      }
     }
 
     const businesses = await Business.find(query)
@@ -310,7 +339,14 @@ exports.getNearbyBusinesses = async (req, res, next) => {
     res.status(200).json({
       success: true,
       count: businesses.length,
-      businesses
+      businesses,
+      filters: {
+        ratingSource: ratingSource || null,
+        minRating: minRating || null,
+        category: category || null,
+        distance: distance || null,
+        maxDistance: `${maxDistance / 1000}km`
+      }
     });
   } catch (error) {
     next(error);
@@ -322,23 +358,42 @@ exports.getNearbyBusinesses = async (req, res, next) => {
 // @access  Public
 exports.getAllActiveBusinesses = async (req, res, next) => {
   try {
-    const { category, limit } = req.query;
+    const { category, limit, ratingSource, minRating } = req.query;
     
     const query = { status: 'active' };
     
-    if (category) {
+    if (category && category !== 'all') {
       query.category = category;
+    }
+
+    // Server-side star-based rating filters
+    if (ratingSource && minRating) {
+      const minRatingValue = parseFloat(minRating);
+      
+      // Filter by specific rating source and star level
+      if (ratingSource === 'hashview') {
+        query['rating.average'] = { $gte: minRatingValue };
+      } else if (ratingSource === 'google') {
+        query['externalProfiles.googleBusiness.rating'] = { $gte: minRatingValue };
+      } else if (ratingSource === 'tripadvisor') {
+        query['externalProfiles.tripAdvisor.rating'] = { $gte: minRatingValue };
+      }
     }
 
     const businesses = await Business.find(query)
       .select('-documents')
       .limit(parseInt(limit) || 100)
-      .sort({ createdAt: -1 });
+      .sort({ 'rating.average': -1 }); // Sort by highest rated first
 
     res.status(200).json({
       success: true,
       count: businesses.length,
-      businesses
+      businesses,
+      filters: {
+        ratingSource: ratingSource || null,
+        minRating: minRating || null,
+        category: category || null
+      }
     });
   } catch (error) {
     next(error);
@@ -350,7 +405,7 @@ exports.getAllActiveBusinesses = async (req, res, next) => {
 // @access  Public
 exports.searchBusinesses = async (req, res, next) => {
   try {
-    const { query, category, city } = req.query;
+    const { query, category, city, ratingSource, minRating } = req.query;
     
     // Show only active businesses for user search
     const searchQuery = { status: 'active' };
@@ -362,7 +417,7 @@ exports.searchBusinesses = async (req, res, next) => {
       ];
     }
 
-    if (category) {
+    if (category && category !== 'all') {
       searchQuery.category = category;
     }
 
@@ -370,14 +425,34 @@ exports.searchBusinesses = async (req, res, next) => {
       searchQuery['address.city'] = { $regex: city, $options: 'i' };
     }
 
+    // Server-side star-based rating filters
+    if (ratingSource && minRating) {
+      const minRatingValue = parseFloat(minRating);
+      
+      // Filter by specific rating source and star level
+      if (ratingSource === 'hashview') {
+        searchQuery['rating.average'] = { $gte: minRatingValue };
+      } else if (ratingSource === 'google') {
+        searchQuery['externalProfiles.googleBusiness.rating'] = { $gte: minRatingValue };
+      } else if (ratingSource === 'tripadvisor') {
+        searchQuery['externalProfiles.tripAdvisor.rating'] = { $gte: minRatingValue };
+      }
+    }
+
     const businesses = await Business.find(searchQuery)
       .select('-documents')
+      .sort({ 'rating.average': -1 }) // Sort by highest rated first
       .limit(50);
 
     res.status(200).json({
       success: true,
       count: businesses.length,
-      businesses
+      businesses,
+      filters: {
+        ratingSource: ratingSource || null,
+        minRating: minRating || null,
+        category: category || null
+      }
     });
   } catch (error) {
     next(error);
@@ -755,6 +830,80 @@ exports.getMyBusinesses = async (req, res, next) => {
       success: true,
       count: businesses.length,
       businesses
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Manually update TripAdvisor rating and review count
+// @route   PUT /api/business/:id/tripadvisor-rating
+// @access  Private (Business owner, Admin)
+exports.updateTripAdvisorRating = async (req, res, next) => {
+  try {
+    const { rating, reviewCount, profileUrl } = req.body;
+
+    // Validation
+    if (rating !== undefined && rating !== null && (rating < 0 || rating > 5)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rating must be between 0 and 5'
+      });
+    }
+
+    if (reviewCount !== undefined && reviewCount !== null && reviewCount < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Review count must be a positive number'
+      });
+    }
+
+    const business = await Business.findById(req.params.id);
+    if (!business) {
+      return res.status(404).json({
+        success: false,
+        message: 'Business not found'
+      });
+    }
+
+    // Authorization check - must be business owner or admin
+    if (business.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this business'
+      });
+    }
+
+    // Update TripAdvisor rating
+    if (!business.externalProfiles) {
+      business.externalProfiles = {};
+    }
+    if (!business.externalProfiles.tripAdvisor) {
+      business.externalProfiles.tripAdvisor = {};
+    }
+
+    if (rating !== undefined && rating !== null) {
+      business.externalProfiles.tripAdvisor.rating = parseFloat(rating);
+    }
+    if (reviewCount !== undefined && reviewCount !== null) {
+      business.externalProfiles.tripAdvisor.reviewCount = parseInt(reviewCount);
+    }
+    if (profileUrl !== undefined && profileUrl !== null) {
+      business.externalProfiles.tripAdvisor.profileUrl = profileUrl;
+    }
+    business.externalProfiles.tripAdvisor.lastSynced = new Date();
+
+    await business.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'TripAdvisor rating updated successfully',
+      data: {
+        rating: business.externalProfiles.tripAdvisor.rating,
+        reviewCount: business.externalProfiles.tripAdvisor.reviewCount,
+        profileUrl: business.externalProfiles.tripAdvisor.profileUrl,
+        lastSynced: business.externalProfiles.tripAdvisor.lastSynced
+      }
     });
   } catch (error) {
     next(error);

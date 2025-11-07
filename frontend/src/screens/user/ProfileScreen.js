@@ -1,14 +1,55 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, StatusBar } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, StatusBar, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { logout } from '../../store/slices/authSlice';
+import ApiService from '../../services/api.service';
 import COLORS from '../../config/colors';
 
 export default function ProfileScreen({ navigation }) {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
+  const [businessId, setBusinessId] = React.useState(null);
+  const [loadingBusiness, setLoadingBusiness] = React.useState(false);
+
+  // Fetch business ID for business owners
+  React.useEffect(() => {
+    if (user?.role === 'business') {
+      fetchBusinessId();
+    }
+  }, [user]);
+
+  const fetchBusinessId = async () => {
+    try {
+      setLoadingBusiness(true);
+      console.log('🔍 User object for business ID:', JSON.stringify(user, null, 2));
+      
+      // Check if already in user object
+      if (user?.businesses?.[0]?._id) {
+        setBusinessId(user.businesses[0]._id);
+        console.log('✅ Business ID from user object:', user.businesses[0]._id);
+      } else if (user?.businesses?.[0]) {
+        setBusinessId(user.businesses[0]);
+        console.log('✅ Business ID from user object (string):', user.businesses[0]);
+      } else {
+        // Fetch from API if not in user object
+        console.log('⚠️  No businesses in user object, fetching from API...');
+        const response = await ApiService.getMyBusinesses();
+        console.log('📦 API Response:', response);
+        if (response.businesses && response.businesses.length > 0) {
+          setBusinessId(response.businesses[0]._id);
+          console.log('✅ Business ID from API:', response.businesses[0]._id);
+        } else {
+          console.log('❌ No businesses found - user may need to register business');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to get business ID:', error);
+    } finally {
+      setLoadingBusiness(false);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -25,38 +66,117 @@ export default function ProfileScreen({ navigation }) {
     );
   };
 
-  const menuItems = [
-    {
-      title: 'Personal Information',
-      icon: 'person-outline',
-      onPress: () => Alert.alert('Coming Soon', 'This feature is under development')
-    },
-    {
-      title: 'My Reviews',
-      icon: 'chatbubbles-outline',
-      onPress: () => navigation.navigate('History')
-    },
-    {
-      title: 'My Coupons',
-      icon: 'gift-outline',
-      onPress: () => navigation.navigate('Coupons')
-    },
-    {
-      title: 'Notifications',
-      icon: 'notifications-outline',
-      onPress: () => Alert.alert('Coming Soon', 'This feature is under development')
-    },
-    {
-      title: 'Settings',
-      icon: 'settings-outline',
-      onPress: () => Alert.alert('Coming Soon', 'This feature is under development')
-    },
-    {
-      title: 'Help & Support',
-      icon: 'help-circle-outline',
-      onPress: () => Alert.alert('Coming Soon', 'This feature is under development')
-    },
-  ];
+  // Role-based menu items for better UX
+  const getMenuItems = () => {
+    const commonItems = [
+      {
+        title: 'Personal Information',
+        icon: 'person-outline',
+        onPress: () => navigation.navigate('EditProfile')
+      },
+      {
+        title: 'Notifications',
+        icon: 'notifications-outline',
+        onPress: () => navigation.navigate('Notifications')
+      },
+      {
+        title: 'Settings',
+        icon: 'settings-outline',
+        onPress: () => navigation.navigate('Settings')
+      },
+      {
+        title: 'Help & Support',
+        icon: 'help-circle-outline',
+        onPress: () => navigation.navigate('HelpSupport')
+      },
+    ];
+
+    // Customer-specific menu items
+    if (user?.role === 'customer') {
+      return [
+        {
+          title: 'Personal Information',
+          icon: 'person-outline',
+          onPress: () => navigation.navigate('EditProfile')
+        },
+        {
+          title: 'My Reviews',
+          icon: 'chatbubbles-outline',
+          onPress: () => navigation.navigate('History')
+        },
+        {
+          title: 'My Coupons',
+          icon: 'gift-outline',
+          onPress: () => navigation.navigate('Coupons')
+        },
+        {
+          title: 'Notifications',
+          icon: 'notifications-outline',
+          onPress: () => navigation.navigate('Notifications')
+        },
+        {
+          title: 'Settings',
+          icon: 'settings-outline',
+          onPress: () => navigation.navigate('Settings')
+        },
+        {
+          title: 'Help & Support',
+          icon: 'help-circle-outline',
+          onPress: () => navigation.navigate('HelpSupport')
+        },
+      ];
+    }
+
+    // Business-specific menu items
+    if (user?.role === 'business') {
+      return [
+        {
+          title: 'My Business Dashboard',
+          icon: 'business-outline',
+          onPress: () => navigation.navigate('BusinessDashboard')
+        },
+        {
+          title: 'My Reviews',
+          icon: 'star-outline',
+          onPress: () => {
+            if (businessId) {
+              navigation.navigate('ViewReviews', { businessId });
+            } else {
+              Alert.alert('No Business', 'Please register your business first', [
+                { text: 'OK' },
+                { text: 'Register', onPress: () => navigation.navigate('BusinessRegistration') }
+              ]);
+            }
+          }
+        },
+        {
+          title: 'My Coupons',
+          icon: 'gift-outline',
+          onPress: () => {
+            if (businessId) {
+              navigation.navigate('ManageCouponsNew', { businessId });
+            } else {
+              Alert.alert('No Business', 'Please register your business first', [
+                { text: 'OK' },
+                { text: 'Register', onPress: () => navigation.navigate('BusinessRegistration') }
+              ]);
+            }
+          }
+        },
+        ...commonItems
+      ];
+    }
+
+    // Admin menu items
+    if (user?.role === 'admin') {
+      return commonItems;
+    }
+
+    // Default fallback
+    return commonItems;
+  };
+
+  const menuItems = getMenuItems();
 
   return (
     <ScrollView className="flex-1 bg-gray-50">
@@ -69,11 +189,19 @@ export default function ProfileScreen({ navigation }) {
         
         <View className="bg-white rounded-2xl p-6 shadow-lg -mb-16">
           <View className="items-center">
-            <View className="w-20 h-20 rounded-full items-center justify-center mb-3" style={{ backgroundColor: '#FFF9F0' }}>
-              <Text className="text-3xl font-bold" style={{ color: COLORS.secondary }}>
-                {user?.name?.charAt(0) || 'U'}
-              </Text>
-            </View>
+            {user?.profileImage ? (
+              <Image
+                source={{ uri: user.profileImage }}
+                className="w-20 h-20 rounded-full mb-3"
+                style={{ borderWidth: 3, borderColor: COLORS.secondary }}
+              />
+            ) : (
+              <View className="w-20 h-20 rounded-full items-center justify-center mb-3" style={{ backgroundColor: '#FFF9F0' }}>
+                <Text className="text-3xl font-bold" style={{ color: COLORS.secondary }}>
+                  {user?.name?.charAt(0) || 'U'}
+                </Text>
+              </View>
+            )}
             <Text className="text-xl font-bold text-gray-900">{user?.name}</Text>
             <Text className="text-sm text-gray-500 mb-2">{user?.email}</Text>
             

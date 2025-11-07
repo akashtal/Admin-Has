@@ -60,6 +60,32 @@ const businessOwnerSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  settings: {
+    twoFactorAuth: {
+      type: Boolean,
+      default: false
+    },
+    loginAlerts: {
+      type: Boolean,
+      default: true
+    },
+    dataSharing: {
+      type: Boolean,
+      default: false
+    },
+    marketingEmails: {
+      type: Boolean,
+      default: true
+    },
+    pushNotifications: {
+      type: Boolean,
+      default: true
+    },
+    emailNotifications: {
+      type: Boolean,
+      default: true
+    }
+  },
   createdAt: {
     type: Date,
     default: Date.now

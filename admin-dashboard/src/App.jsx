@@ -8,6 +8,9 @@ import BusinessDetails from './pages/BusinessDetails';
 import CreateBusiness from './pages/CreateBusiness';
 import Reviews from './pages/Reviews';
 import Notifications from './pages/Notifications';
+import Categories from './pages/Categories';
+import Coupons from './pages/Coupons';
+import TripAdvisor from './pages/TripAdvisor';
 import Layout from './components/Layout';
 
 function App() {
@@ -61,11 +64,14 @@ function App() {
               <Layout onLogout={handleLogout}>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
+                  <Route path="/categories" element={<Categories />} />
                   <Route path="/users" element={<Users />} />
                   <Route path="/businesses" element={<Businesses />} />
                   <Route path="/businesses/create" element={<CreateBusiness />} />
                   <Route path="/businesses/:id" element={<BusinessDetails />} />
+                  <Route path="/coupons" element={<Coupons />} />
                   <Route path="/reviews" element={<Reviews />} />
+                  <Route path="/tripadvisor" element={<TripAdvisor />} />
                   <Route path="/notifications" element={<Notifications />} />
                 </Routes>
               </Layout>

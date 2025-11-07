@@ -12,7 +12,8 @@ const {
   updateBusiness,
   updateBusinessImages,
   getMyBusinesses,
-  getBusinessByQRCode
+  getBusinessByQRCode,
+  updateTripAdvisorRating
 } = require('../controllers/business.controller');
 const { protect, authorize } = require('../middleware/auth.middleware');
 const { validate, schemas } = require('../middleware/validation');
@@ -36,6 +37,7 @@ router.get('/:id/dashboard', protect, getBusinessDashboard);
 router.post('/:id/generate-qr', protect, authorize('business'), generateQRCode);
 router.put('/:id', protect, authorize('business'), updateBusiness);
 router.put('/:id/images', protect, authorize('business'), updateBusinessImages);
+router.put('/:id/tripadvisor-rating', protect, authorize('business', 'admin'), updateTripAdvisorRating);
 router.get('/my/businesses', protect, authorize('business'), getMyBusinesses);
 
 module.exports = router;

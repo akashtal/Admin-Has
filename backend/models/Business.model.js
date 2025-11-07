@@ -230,7 +230,9 @@ const businessSchema = new mongoose.Schema({
       profileUrl: String,
       rating: Number,
       reviewCount: Number,
-      lastSynced: Date
+      lastSynced: Date,
+      commonNinjaWidgetId: String, // Common Ninja widget ID for TripAdvisor reviews
+      commonNinjaWidgetUrl: String // Widget URL for embedding
     },
     googleBusiness: {
       businessName: String,
@@ -244,10 +246,13 @@ const businessSchema = new mongoose.Schema({
     tripAdvisor: [{
       reviewId: String,
       author: String,
+      authorPhoto: String,
       rating: Number,
       text: String,
+      title: String,
       date: Date,
-      url: String
+      url: String,
+      helpful: Number
     }],
     google: [{
       reviewId: String,

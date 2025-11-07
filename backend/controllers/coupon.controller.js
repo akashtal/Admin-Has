@@ -1,6 +1,7 @@
 const Coupon = require('../models/Coupon.model');
 const Business = require('../models/Business.model');
-const { isCouponValid, calculateDiscount } = require('../utils/coupon');
+const { isCouponValid, calculateDiscount, generateCouponCode } = require('../utils/coupon');
+const crypto = require('crypto');
 
 // @desc    Get user coupons
 // @route   GET /api/coupons
@@ -20,6 +21,94 @@ exports.getCoupons = async (req, res, next) => {
       success: true,
       count: coupons.length,
       coupons
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Create new coupon
+// @route   POST /api/coupons
+// @access  Private (Business owner, Admin)
+exports.createCoupon = async (req, res, next) => {
+  try {
+    const {
+      businessId,
+      userId,
+      reviewId,
+      rewardType,
+      rewardValue,
+      description,
+      validUntil,
+      minPurchaseAmount,
+      maxDiscountAmount,
+      termsAndConditions
+    } = req.body;
+
+    // Verify business exists
+    const business = await Business.findById(businessId);
+    if (!business) {
+      return res.status(404).json({
+        success: false,
+        message: 'Business not found'
+      });
+    }
+
+    // Check authorization - must be business owner or admin
+    if (business.owner.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to create coupons for this business'
+      });
+    }
+
+    // Find user by phone number if userId looks like a phone number
+    let targetUserId = userId;
+    if (userId && /^\d+$/.test(userId)) {
+      // It's a phone number, look up the user
+      const User = require('../models/User.model');
+      const user = await User.findOne({ phone: userId });
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: `No user found with phone number: ${userId}`
+        });
+      }
+      targetUserId = user._id;
+    }
+
+    // Generate unique coupon code using utility function
+    let code;
+    let isUnique = false;
+    while (!isUnique) {
+      code = generateCouponCode(); // Uses HASH- prefix for consistency
+      const existing = await Coupon.findOne({ code });
+      if (!existing) isUnique = true;
+    }
+
+    // Create coupon
+    const coupon = await Coupon.create({
+      business: businessId,
+      user: targetUserId,
+      review: reviewId,
+      code,
+      rewardType,
+      rewardValue,
+      description,
+      validUntil,
+      minPurchaseAmount: minPurchaseAmount || 0,
+      maxDiscountAmount: maxDiscountAmount || null,
+      termsAndConditions
+    });
+
+    // Populate for response
+    await coupon.populate('business', 'name logo address');
+    await coupon.populate('user', 'name email phone');
+
+    res.status(201).json({
+      success: true,
+      message: 'Coupon created successfully',
+      coupon
     });
   } catch (error) {
     next(error);

@@ -8,7 +8,8 @@ import {
   StatusBar,
   Alert,
   Modal,
-  TextInput
+  TextInput,
+  Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -21,9 +22,11 @@ export default function ManageCouponsScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [formData, setFormData] = useState({
-    rewardValue: '',
-    description: '',
-    validityHours: '2'
+    discountType: 'percentage',
+    discountValue: '',
+    minCartValue: '',
+    maxDiscount: '',
+    description: ''
   });
 
   useEffect(() => {
@@ -44,25 +47,37 @@ export default function ManageCouponsScreen({ navigation, route }) {
   };
 
   const handleCreateCoupon = async () => {
-    if (!formData.rewardValue || !formData.description) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (!formData.discountValue) {
+      Alert.alert('Error', 'Please enter discount value');
       return;
     }
 
     try {
-      await ApiService.createCoupon({
+      await ApiService.createCouponTemplate({
         businessId,
-        rewardValue: parseInt(formData.rewardValue),
-        description: formData.description,
-        validityHours: parseInt(formData.validityHours)
+        rewardType: formData.discountType,
+        rewardValue: parseFloat(formData.discountValue),
+        description: formData.description || `${formData.discountValue}${formData.discountType === 'percentage' ? '%' : '₹'} off on your next visit`,
+        minPurchaseAmount: parseFloat(formData.minCartValue) || 0,
+        maxDiscountAmount: parseFloat(formData.maxDiscount) || null
       });
 
-      Alert.alert('Success', 'Coupon created successfully');
+      Alert.alert(
+        'Success', 
+        'Coupon template created! Customers will receive this coupon when they review your business.',
+        [{ text: 'OK' }]
+      );
       setModalVisible(false);
-      setFormData({ rewardValue: '', description: '', validityHours: '2' });
+      setFormData({
+        discountType: 'percentage',
+        discountValue: '',
+        minCartValue: '',
+        maxDiscount: '',
+        description: ''
+      });
       fetchCoupons();
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to create coupon');
+      Alert.alert('Error', error.message || 'Failed to create coupon template');
     }
   };
 
@@ -75,32 +90,87 @@ export default function ManageCouponsScreen({ navigation, route }) {
     return { text: 'Active', color: 'bg-blue-100 text-blue-700' };
   };
 
+  const getDiscountDisplay = (coupon) => {
+    switch (coupon.rewardType) {
+      case 'percentage':
+        return `${coupon.rewardValue}%`;
+      case 'fixed':
+        return `₹${coupon.rewardValue}`;
+      case 'buy1get1':
+        return 'B1G1';
+      case 'free_drink':
+        return 'FREE';
+      default:
+        return `${coupon.rewardValue}%`;
+    }
+  };
+
+  const getDiscountLabel = (coupon) => {
+    switch (coupon.rewardType) {
+      case 'percentage':
+        return 'OFF';
+      case 'fixed':
+        return 'OFF';
+      case 'buy1get1':
+        return 'Buy 1 Get 1';
+      case 'free_drink':
+        return 'Drink';
+      default:
+        return 'OFF';
+    }
+  };
+
   const renderCoupon = (coupon) => {
     const status = getCouponStatus(coupon);
-    const hoursLeft = Math.max(0, Math.floor((new Date(coupon.validUntil) - new Date()) / (1000 * 60 * 60)));
+    const now = new Date();
+    const validUntil = new Date(coupon.validUntil);
+    const hoursLeft = Math.max(0, Math.floor((validUntil - now) / (1000 * 60 * 60)));
+    const minutesLeft = Math.max(0, Math.floor(((validUntil - now) % (1000 * 60 * 60)) / (1000 * 60)));
 
     return (
       <View key={coupon._id} className="bg-white rounded-2xl p-5 mb-3 shadow-sm">
         <View className="flex-row justify-between items-start mb-3">
           <View className="flex-1">
-            <View className="flex-row items-center mb-2">
-              <View className="rounded-full px-3 py-1" style={{ backgroundColor: '#FFF9F0' }}>
+            <View className="flex-row items-center mb-2 flex-wrap">
+              <View className="rounded-full px-3 py-1 mr-2 mb-2" style={{ backgroundColor: '#FFF9F0' }}>
                 <Text className="text-xs font-bold" style={{ color: COLORS.secondary }}>
                   {coupon.code}
                 </Text>
               </View>
-              <View className={`ml-2 rounded-full px-3 py-1 ${status.color}`}>
+              <View className={`rounded-full px-3 py-1 mb-2 ${status.color}`}>
                 <Text className="text-xs font-semibold">{status.text}</Text>
               </View>
             </View>
             <Text className="text-sm text-gray-700 mb-2">{coupon.description}</Text>
-            <Text className="text-xs text-gray-500">
-              Awarded to: {coupon.user?.name || 'User'}
-            </Text>
+            <View className="flex-row items-center mb-1">
+              <Icon name="person-outline" size={14} color="#6B7280" />
+              <Text className="text-xs text-gray-500 ml-1">
+                {coupon.user?.name || 'User'}
+              </Text>
+            </View>
+            {coupon.minPurchaseAmount > 0 && (
+              <View className="flex-row items-center">
+                <Icon name="cart-outline" size={14} color="#6B7280" />
+                <Text className="text-xs text-gray-500 ml-1">
+                  Min. ₹{coupon.minPurchaseAmount}
+                </Text>
+              </View>
+            )}
+            {coupon.redeemedAt && (
+              <View className="flex-row items-center mt-1">
+                <Icon name="checkmark-circle" size={14} color="#10B981" />
+                <Text className="text-xs text-green-600 ml-1">
+                  Redeemed on {new Date(coupon.redeemedAt).toLocaleDateString()}
+                </Text>
+              </View>
+            )}
           </View>
-          <View className="w-16 h-16 rounded-full items-center justify-center" style={{ backgroundColor: '#FFF9F0' }}>
+          <View className="w-20 h-20 rounded-2xl items-center justify-center" style={{ backgroundColor: '#FFF9F0' }}>
             <Text className="text-2xl font-bold" style={{ color: COLORS.secondary }}>
-              {coupon.rewardValue}%
+              {getDiscountDisplay(coupon)}
+            </Text>
+            <Text className="text-xs font-semibold mt-1" style={{ color: COLORS.secondary }}>
+              {getDiscountLabel(coupon)}
             </Text>
           </View>
         </View>
@@ -109,12 +179,20 @@ export default function ManageCouponsScreen({ navigation, route }) {
           <View className="flex-row items-center">
             <Icon name="time-outline" size={14} color={COLORS.secondary} />
             <Text className="text-xs text-gray-600 ml-1">
-              {status.text === 'Active' ? `${hoursLeft}h remaining` : 
-               status.text === 'Expired' ? 'Expired' : 'Used'}
+              {status.text === 'Active' 
+                ? `${hoursLeft}h ${minutesLeft}m left` 
+                : status.text === 'Expired' 
+                ? 'Expired' 
+                : 'Redeemed'}
             </Text>
           </View>
           <Text className="text-xs text-gray-500">
-            Created: {new Date(coupon.createdAt).toLocaleDateString()}
+            {new Date(coupon.createdAt).toLocaleTimeString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
           </Text>
         </View>
       </View>
@@ -195,48 +273,87 @@ export default function ManageCouponsScreen({ navigation, route }) {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Discount Type Dropdown */}
+              <View className="mb-4">
+                <Text className="text-gray-900 font-semibold mb-2">Discount Type *</Text>
+                <View className="flex-row flex-wrap">
+                  {['percentage', 'fixed', 'buy1get1', 'free_drink'].map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      onPress={() => setFormData({ ...formData, discountType: type })}
+                      className={`rounded-xl px-4 py-2 mr-2 mb-2 border-2 ${
+                        formData.discountType === type ? 'border-orange-500' : 'border-gray-200'
+                      }`}
+                      style={{ backgroundColor: formData.discountType === type ? '#FFF9F0' : '#F9FAFB' }}
+                    >
+                      <Text className={`font-semibold ${
+                        formData.discountType === type ? 'text-orange-600' : 'text-gray-700'
+                      }`}>
+                        {type === 'percentage' ? 'Percentage' :
+                         type === 'fixed' ? 'Fixed' :
+                         type === 'buy1get1' ? 'Buy 1 Get 1' : 'Free Drink'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
               {/* Discount Value */}
               <View className="mb-4">
-                <Text className="text-gray-900 font-semibold mb-2">Discount Percentage (%)</Text>
+                <Text className="text-gray-900 font-semibold mb-2">
+                  Discount Value * {formData.discountType === 'percentage' ? '(%)' : '(₹)'}
+                </Text>
                 <TextInput
                   className="bg-gray-50 rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
-                  placeholder="e.g., 10, 20, 50"
+                  placeholder={formData.discountType === 'percentage' ? 'e.g., 20' : 'e.g., 100'}
                   placeholderTextColor="#9CA3AF"
-                  keyboardType="number-pad"
-                  value={formData.rewardValue}
-                  onChangeText={(value) => setFormData({ ...formData, rewardValue: value })}
+                  keyboardType="numeric"
+                  value={formData.discountValue}
+                  onChangeText={(value) => setFormData({ ...formData, discountValue: value })}
                 />
               </View>
 
+              {/* Min Cart Value */}
+              <View className="mb-4">
+                <Text className="text-gray-900 font-semibold mb-2">Min Cart Value (₹)</Text>
+                <TextInput
+                  className="bg-gray-50 rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
+                  placeholder="e.g., 200"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="numeric"
+                  value={formData.minCartValue}
+                  onChangeText={(value) => setFormData({ ...formData, minCartValue: value })}
+                />
+              </View>
+
+              {/* Max Discount */}
+              {formData.discountType === 'percentage' && (
+                <View className="mb-4">
+                  <Text className="text-gray-900 font-semibold mb-2">Max Discount (₹)</Text>
+                  <TextInput
+                    className="bg-gray-50 rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
+                    placeholder="e.g., 500"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    value={formData.maxDiscount}
+                    onChangeText={(value) => setFormData({ ...formData, maxDiscount: value })}
+                  />
+                </View>
+              )}
+
               {/* Description */}
               <View className="mb-4">
-                <Text className="text-gray-900 font-semibold mb-2">Description</Text>
+                <Text className="text-gray-900 font-semibold mb-2">Description (Optional)</Text>
                 <TextInput
                   className="bg-gray-50 rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
                   placeholder="e.g., Thank you for your review!"
                   placeholderTextColor="#9CA3AF"
                   multiline
-                  numberOfLines={3}
+                  numberOfLines={2}
                   textAlignVertical="top"
                   value={formData.description}
                   onChangeText={(value) => setFormData({ ...formData, description: value })}
                 />
-              </View>
-
-              {/* Validity Hours */}
-              <View className="mb-6">
-                <Text className="text-gray-900 font-semibold mb-2">Valid For (hours)</Text>
-                <TextInput
-                  className="bg-gray-50 rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
-                  placeholder="2"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="number-pad"
-                  value={formData.validityHours}
-                  onChangeText={(value) => setFormData({ ...formData, validityHours: value })}
-                />
-                <Text className="text-xs text-gray-500 mt-1">
-                  Default: 2 hours (coupon will expire after this time)
-                </Text>
               </View>
 
               {/* Info Box */}
@@ -244,11 +361,14 @@ export default function ManageCouponsScreen({ navigation, route }) {
                 <View className="flex-row items-center mb-2">
                   <Icon name="information-circle" size={20} color={COLORS.secondary} />
                   <Text className="text-sm font-bold ml-2" style={{ color: COLORS.secondary }}>
-                    About Coupons
+                    How Coupons Work
                   </Text>
                 </View>
                 <Text className="text-xs text-gray-600">
-                  Coupons are automatically generated when customers leave reviews. You can also create manual coupons here for special promotions.
+                  • Create coupon template here{'\n'}
+                  • Customers get this coupon when they review your business{'\n'}
+                  • Coupons are valid for 2 hours from time of issue{'\n'}
+                  • Customers must be within your business radius to review (set by admin)
                 </Text>
               </View>
 

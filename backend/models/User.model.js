@@ -67,6 +67,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  businesses: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Business'
+  }],
   resetPasswordToken: String,
   resetPasswordExpire: Date,
   emailVerificationToken: String,
@@ -74,6 +78,32 @@ const userSchema = new mongoose.Schema({
   lastLogin: {
     type: Date,
     default: null
+  },
+  settings: {
+    twoFactorAuth: {
+      type: Boolean,
+      default: false
+    },
+    loginAlerts: {
+      type: Boolean,
+      default: true
+    },
+    dataSharing: {
+      type: Boolean,
+      default: false
+    },
+    marketingEmails: {
+      type: Boolean,
+      default: true
+    },
+    pushNotifications: {
+      type: Boolean,
+      default: true
+    },
+    emailNotifications: {
+      type: Boolean,
+      default: true
+    }
   }
 }, {
   timestamps: true

@@ -17,8 +17,11 @@ exports.calculateDistance = (lat1, lon1, lat2, lon2) => {
 
 // Check if user is within geofence
 exports.isWithinGeofence = (userLat, userLon, businessLat, businessLon, radius) => {
-  const distance = this.calculateDistance(userLat, userLon, businessLat, businessLon);
-  return distance <= radius;
+  const distance = exports.calculateDistance(userLat, userLon, businessLat, businessLon);
+  console.log(`   🔍 Distance calculation: ${distance.toFixed(2)}m vs ${radius}m radius`);
+  const isWithin = distance <= radius;
+  console.log(`   📍 Result: ${isWithin ? '✅ Within radius' : '❌ Outside radius'}`);
+  return isWithin;
 };
 
 // Get nearby locations using MongoDB geospatial query

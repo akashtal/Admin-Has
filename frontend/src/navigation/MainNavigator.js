@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { COLORS } from '../config/colors';
 
 // User Screens
 import UserHomeScreen from '../screens/user/UserHomeScreen';
@@ -13,6 +14,14 @@ import BusinessDetailScreen from '../screens/user/BusinessDetailScreen';
 import AddReviewScreen from '../screens/user/AddReviewScreen';
 import CouponsScreen from '../screens/user/CouponsScreen';
 import QRScannerScreen from '../screens/user/QRScannerScreen';
+import SettingsScreen from '../screens/user/SettingsScreen';
+import EditProfileScreen from '../screens/user/EditProfileScreen';
+import NotificationsScreen from '../screens/user/NotificationsScreen';
+import HelpSupportScreen from '../screens/user/HelpSupportScreen';
+import AccountSettingsScreen from '../screens/user/AccountSettingsScreen';
+import ChangePasswordScreen from '../screens/user/ChangePasswordScreen';
+import DeleteAccountScreen from '../screens/user/DeleteAccountScreen';
+import VerifyEmailScreen from '../screens/user/VerifyEmailScreen';
 
 // Business Screens
 import BusinessDashboardScreen from '../screens/business/BusinessDashboardScreen';
@@ -22,9 +31,20 @@ import ManageCouponsScreen from '../screens/business/ManageCouponsScreen';
 import ViewReviewsScreen from '../screens/business/ViewReviewsScreen';
 import AnalyticsDashboardScreen from '../screens/business/AnalyticsDashboardScreen';
 import EditBusinessInfoScreen from '../screens/business/EditBusinessInfoScreen';
+import BusinessProfileScreen from '../screens/business/BusinessProfileScreen';
+import BusinessReviewsScreen from '../screens/business/BusinessReviewsScreen';
+import BusinessAnalyticsScreen from '../screens/business/BusinessAnalyticsScreen';
+import CouponManagementScreen from '../screens/business/CouponManagementScreen';
+import ManageCouponsNew from '../screens/business/ManageCouponsNew';
 
-// Admin Analytics Screen (Read-only)
+// Admin Screens - Full Management
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
+import CategoryManagementScreen from '../screens/admin/CategoryManagementScreen';
+import BusinessManagementScreen from '../screens/admin/BusinessManagementScreen';
+import UserManagementScreen from '../screens/admin/UserManagementScreen';
+import ReviewManagementScreen from '../screens/admin/ReviewManagementScreen';
+import AdminCouponManagementScreen from '../screens/admin/AdminCouponManagementScreen';
+import TripAdvisorManagementScreen from '../screens/admin/TripAdvisorManagementScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -34,16 +54,22 @@ function UserStack() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: '#4F46E5' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: 'bold' },
+        headerShown: false,  // Hide navigator header, screens have their own
       }}
     >
-      <Stack.Screen name="UserHome" component={UserHomeScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="BusinessDetail" component={BusinessDetailScreen} options={{ title: 'Business Details' }} />
-      <Stack.Screen name="AddReview" component={AddReviewScreen} options={{ title: 'Add Review' }} />
-      <Stack.Screen name="Coupons" component={CouponsScreen} options={{ title: 'My Coupons' }} />
-      <Stack.Screen name="QRScanner" component={QRScannerScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="UserHome" component={UserHomeScreen} />
+      <Stack.Screen name="BusinessDetail" component={BusinessDetailScreen} />
+      <Stack.Screen name="AddReview" component={AddReviewScreen} />
+      <Stack.Screen name="Coupons" component={CouponsScreen} />
+      <Stack.Screen name="QRScanner" component={QRScannerScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+      <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+      <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
+      <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
     </Stack.Navigator>
   );
 }
@@ -63,6 +89,11 @@ function BusinessStack() {
       <Stack.Screen name="ViewReviews" component={ViewReviewsScreen} />
       <Stack.Screen name="AnalyticsDashboard" component={AnalyticsDashboardScreen} />
       <Stack.Screen name="EditBusinessInfo" component={EditBusinessInfoScreen} />
+      <Stack.Screen name="BusinessProfile" component={BusinessProfileScreen} />
+      <Stack.Screen name="BusinessReviews" component={BusinessReviewsScreen} />
+      <Stack.Screen name="BusinessAnalytics" component={BusinessAnalyticsScreen} />
+      <Stack.Screen name="CouponManagement" component={CouponManagementScreen} />
+      <Stack.Screen name="ManageCouponsNew" component={ManageCouponsNew} />
     </Stack.Navigator>
   );
 }
@@ -72,33 +103,89 @@ function BusinessStack() {
 export default function MainNavigator() {
   const { user } = useSelector((state) => state.auth);
 
+  // Admin Stack with navigation screens
+  function AdminDashboardStack() {
+    return (
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
+        <Stack.Screen name="DashboardHome" component={AdminDashboardScreen} />
+        <Stack.Screen name="CategoryManagement" component={CategoryManagementScreen} />
+        <Stack.Screen name="BusinessManagement" component={BusinessManagementScreen} />
+        <Stack.Screen name="UserManagement" component={UserManagementScreen} />
+        <Stack.Screen name="AdminCouponManagement" component={AdminCouponManagementScreen} />
+        <Stack.Screen name="ReviewManagement" component={ReviewManagementScreen} />
+        <Stack.Screen name="TripAdvisorManagement" component={TripAdvisorManagementScreen} />
+      </Stack.Navigator>
+    );
+  }
+
+  function AdminProfileStack() {
+    return (
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,  // Hide navigator header, screens have their own
+        }}
+      >
+        <Stack.Screen name="ProfileHome" component={ProfileScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+        <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+      </Stack.Navigator>
+    );
+  }
+
   if (user?.role === 'admin') {
-    // Admin sees only read-only analytics (all management on web dashboard)
+    // Admin has full management capabilities
     return (
       <Tab.Navigator
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {
             let iconName;
-            if (route.name === 'Analytics') iconName = focused ? 'bar-chart' : 'bar-chart-outline';
+            if (route.name === 'Dashboard') iconName = focused ? 'grid' : 'grid-outline';
             else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
             return <Icon name={iconName} size={size} color={color} />;
           },
-          tabBarActiveTintColor: '#4F46E5',
+          tabBarActiveTintColor: COLORS.primary,
           tabBarInactiveTintColor: 'gray',
           headerShown: false,
         })}
       >
         <Tab.Screen 
-          name="Analytics" 
-          component={AdminDashboardScreen}
-          options={{ title: 'Platform Analytics' }}
+          name="Dashboard" 
+          component={AdminDashboardStack}
+          options={{ title: 'Admin Panel' }}
         />
         <Tab.Screen 
           name="Profile" 
-          component={ProfileScreen}
+          component={AdminProfileStack}
           options={{ title: 'Profile' }}
         />
       </Tab.Navigator>
+    );
+  }
+
+  // Business Profile Stack with navigation screens
+  function BusinessProfileStack() {
+    return (
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,  // Hide navigator header, screens have their own
+        }}
+      >
+        <Stack.Screen name="ProfileHome" component={ProfileScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+        <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+      </Stack.Navigator>
     );
   }
 
@@ -118,7 +205,7 @@ export default function MainNavigator() {
         })}
       >
         <Tab.Screen name="Business" component={BusinessStack} />
-        <Tab.Screen name="Profile" component={ProfileScreen} />
+        <Tab.Screen name="Profile" component={BusinessProfileStack} />
       </Tab.Navigator>
     );
   }

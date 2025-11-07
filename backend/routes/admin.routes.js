@@ -19,7 +19,10 @@ const {
   suspendBusiness,
   unsuspendAccount,
   getAllSuspendedAccounts,
-  generateBusinessQRCode
+  generateBusinessQRCode,
+  getAllCoupons,
+  toggleCouponStatus,
+  deleteCoupon
 } = require('../controllers/admin.controller');
 const { protect, authorize } = require('../middleware/auth.middleware');
 
@@ -47,6 +50,11 @@ router.post('/users/:id/suspend', suspendUser);
 router.post('/businesses/:id/suspend', suspendBusiness);
 router.post('/suspended/:id/unsuspend', unsuspendAccount);
 router.get('/suspended', getAllSuspendedAccounts);
+
+// Coupon Management routes
+router.get('/coupons', getAllCoupons);
+router.put('/coupons/:id/status', toggleCouponStatus);
+router.delete('/coupons/:id', deleteCoupon);
 
 module.exports = router;
 

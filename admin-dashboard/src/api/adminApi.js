@@ -32,6 +32,21 @@ export const adminApi = {
   
   // Notifications
   sendNotification: (data) => api.post('/admin/notifications/send', data),
+  
+  // Categories
+  getAllCategories: () => api.get('/categories'),
+  createCategory: (data) => api.post('/categories', data),
+  updateCategory: (categoryId, data) => api.put(`/categories/${categoryId}`, data),
+  deleteCategory: (categoryId) => api.delete(`/categories/${categoryId}`),
+  
+  // Coupons
+  getAllCoupons: () => api.get('/admin/coupons'),
+  toggleCouponStatus: (couponId, isActive) => api.put(`/admin/coupons/${couponId}/status`, { isActive }),
+  deleteCoupon: (couponId) => api.delete(`/admin/coupons/${couponId}`),
+  
+  // TripAdvisor
+  updateTripAdvisorRating: (businessId, rating, reviewCount) => 
+    api.put(`/business/${businessId}/tripadvisor-rating`, { rating, reviewCount }),
 };
 
 export default adminApi;

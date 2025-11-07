@@ -72,7 +72,8 @@
     "extra": {
       "eas": {
         "projectId": "your-eas-project-id"
-      }
+      },
+      "sentryDSN": null
     },
     "owner": "your-expo-username"
   }

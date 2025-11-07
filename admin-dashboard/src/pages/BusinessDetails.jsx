@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, XCircle, MapPin, Phone, Mail, Globe, Star, Edit2, Save, X, Image as ImageIcon, QrCode, Download } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, MapPin, Phone, Mail, Globe, Star, Edit2, Save, X, Image as ImageIcon, QrCode, Download, Plane } from 'lucide-react';
 import { adminApi } from '../api/adminApi';
 import { format } from 'date-fns';
 
@@ -18,6 +18,13 @@ const BusinessDetails = () => {
   const [editFormData, setEditFormData] = useState({});
   const [updateLoading, setUpdateLoading] = useState(false);
   const [qrGenerating, setQrGenerating] = useState(false);
+  const [tripAdvisorEditing, setTripAdvisorEditing] = useState(false);
+  const [tripAdvisorLoading, setTripAdvisorLoading] = useState(false);
+  const [tripAdvisorData, setTripAdvisorData] = useState({
+    rating: '',
+    reviewCount: '',
+    profileUrl: ''
+  });
 
   const categories = [
     'restaurant', 'cafe', 'retail', 'services', 'healthcare',
@@ -31,6 +38,12 @@ const BusinessDetails = () => {
   useEffect(() => {
     if (business) {
       setRadius(business.radius || 50);
+      // Initialize TripAdvisor data
+      setTripAdvisorData({
+        rating: business.externalProfiles?.tripAdvisor?.rating || '',
+        reviewCount: business.externalProfiles?.tripAdvisor?.reviewCount || '',
+        profileUrl: business.externalProfiles?.tripAdvisor?.profileUrl || ''
+      });
     }
   }, [business]);
 
@@ -172,6 +185,61 @@ const BusinessDetails = () => {
     } finally {
       setRadiusLoading(false);
     }
+  };
+
+  const handleTripAdvisorEdit = () => {
+    setTripAdvisorEditing(true);
+  };
+
+  const handleTripAdvisorCancel = () => {
+    setTripAdvisorEditing(false);
+    // Reset to original data
+    setTripAdvisorData({
+      rating: business.externalProfiles?.tripAdvisor?.rating || '',
+      reviewCount: business.externalProfiles?.tripAdvisor?.reviewCount || '',
+      profileUrl: business.externalProfiles?.tripAdvisor?.profileUrl || ''
+    });
+  };
+
+  const handleTripAdvisorSave = async () => {
+    // Validate data
+    const rating = parseFloat(tripAdvisorData.rating);
+    const reviewCount = parseInt(tripAdvisorData.reviewCount);
+
+    if (rating && (isNaN(rating) || rating < 1 || rating > 5)) {
+      alert('Rating must be between 1 and 5');
+      return;
+    }
+
+    if (reviewCount && (isNaN(reviewCount) || reviewCount < 0)) {
+      alert('Review count must be a positive number');
+      return;
+    }
+
+    setTripAdvisorLoading(true);
+    try {
+      await adminApi.updateTripAdvisorRating(id, {
+        rating: rating || null,
+        reviewCount: reviewCount || null,
+        profileUrl: tripAdvisorData.profileUrl || null
+      });
+      alert('TripAdvisor rating updated successfully!');
+      fetchBusinessDetails();
+      setTripAdvisorEditing(false);
+    } catch (error) {
+      console.error('Error updating TripAdvisor rating:', error);
+      alert(error.response?.data?.message || 'Error updating TripAdvisor rating');
+    } finally {
+      setTripAdvisorLoading(false);
+    }
+  };
+
+  const handleTripAdvisorChange = (e) => {
+    const { name, value } = e.target;
+    setTripAdvisorData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   if (loading) {
@@ -554,6 +622,141 @@ const BusinessDetails = () => {
                 {!business.socialMedia?.facebook && !business.socialMedia?.instagram && !business.socialMedia?.twitter && !business.externalProfiles?.tripAdvisor?.profileUrl && !business.externalProfiles?.googleBusiness?.businessName && (
                   <p className="text-gray-500 text-sm">No social media or external links configured</p>
                 )}
+              </div>
+            )}
+          </div>
+
+          {/* TripAdvisor Rating Management - PROMINENT */}
+          <div className="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-xl shadow-md border-2 border-orange-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center">
+                <div className="bg-orange-600 rounded-lg p-2 mr-3">
+                  <Plane className="text-white" size={24} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">TripAdvisor Rating Management</h2>
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    Manually set TripAdvisor rating and review count for this business
+                  </p>
+                </div>
+              </div>
+              {!tripAdvisorEditing && (
+                <button
+                  onClick={handleTripAdvisorEdit}
+                  className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg transition shadow-sm flex items-center"
+                >
+                  <Edit2 size={16} className="mr-2" />
+                  Manage Rating
+                </button>
+              )}
+            </div>
+            {tripAdvisorEditing ? (
+              <div className="bg-white rounded-lg p-4 border border-orange-200">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Rating (1-5)
+                    </label>
+                    <input
+                      type="number"
+                      name="rating"
+                      min="1"
+                      max="5"
+                      step="0.1"
+                      value={tripAdvisorData.rating}
+                      onChange={handleTripAdvisorChange}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-lg font-semibold"
+                      placeholder="e.g., 4.5"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Review Count
+                    </label>
+                    <input
+                      type="number"
+                      name="reviewCount"
+                      min="0"
+                      value={tripAdvisorData.reviewCount}
+                      onChange={handleTripAdvisorChange}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-lg font-semibold"
+                      placeholder="e.g., 250"
+                    />
+                  </div>
+                  <div className="md:col-span-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Profile URL
+                    </label>
+                    <input
+                      type="url"
+                      name="profileUrl"
+                      value={tripAdvisorData.profileUrl}
+                      onChange={handleTripAdvisorChange}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
+                      placeholder="https://tripadvisor.com/..."
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={handleTripAdvisorCancel}
+                    disabled={tripAdvisorLoading}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleTripAdvisorSave}
+                    disabled={tripAdvisorLoading}
+                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg transition disabled:opacity-50"
+                  >
+                    {tripAdvisorLoading ? 'Saving...' : 'Save TripAdvisor Data'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg p-6 border border-orange-200">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <p className="text-sm text-gray-500 mb-1">Current Rating</p>
+                    {business.externalProfiles?.tripAdvisor?.rating ? (
+                      <div className="flex items-center">
+                        <Star className="text-orange-500 fill-current mr-2" size={24} />
+                        <span className="text-3xl font-bold text-gray-900">
+                          {business.externalProfiles.tripAdvisor.rating.toFixed(1)}
+                        </span>
+                        <span className="text-gray-500 ml-1">/5</span>
+                      </div>
+                    ) : (
+                      <p className="text-gray-400 text-lg">Not set</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 mb-1">Review Count</p>
+                    {business.externalProfiles?.tripAdvisor?.reviewCount ? (
+                      <p className="text-3xl font-bold text-gray-900">
+                        {business.externalProfiles.tripAdvisor.reviewCount}
+                      </p>
+                    ) : (
+                      <p className="text-gray-400 text-lg">Not set</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 mb-1">Profile URL</p>
+                    {business.externalProfiles?.tripAdvisor?.profileUrl ? (
+                      <a
+                        href={business.externalProfiles.tripAdvisor.profileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-orange-600 hover:underline text-sm break-all"
+                      >
+                        View Profile →
+                      </a>
+                    ) : (
+                      <p className="text-gray-400 text-sm">Not set</p>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>

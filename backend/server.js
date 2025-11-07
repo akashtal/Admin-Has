@@ -7,6 +7,7 @@ const compression = require('compression');
 const morgan = require('morgan');
 const http = require('http');
 const socketIO = require('socket.io');
+const { initializeSentry, Sentry } = require('./config/sentry');
 
 // Import routes
 const authRoutes = require('./routes/auth.routes');
@@ -14,6 +15,8 @@ const userRoutes = require('./routes/user.routes');
 const businessRoutes = require('./routes/business.routes');
 const reviewRoutes = require('./routes/review.routes');
 const couponRoutes = require('./routes/coupon.routes');
+const businessCouponRoutes = require('./routes/businessCoupon.routes');
+const categoryRoutes = require('./routes/category.routes');
 const adminRoutes = require('./routes/admin.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const chatRoutes = require('./routes/chat.routes');
@@ -25,12 +28,23 @@ const webhookRoutes = require('./routes/webhook.routes');
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
+const { initializeRedis, closeRedis } = require('./config/redis');
 
 // Import models
 const User = require('./models/User.model');
 
 // Initialize Express
 const app = express();
+
+// Initialize Sentry BEFORE other middleware
+initializeSentry(app);
+
+// Sentry request handler must be the first middleware on the app
+if (process.env.SENTRY_DSN && process.env.NODE_ENV === 'production') {
+  app.use(Sentry.Handlers.requestHandler());
+  app.use(Sentry.Handlers.tracingHandler());
+}
+
 const server = http.createServer(app);
 const io = socketIO(server, {
   cors: {
@@ -63,11 +77,15 @@ app.get('/health', (req, res) => {
 });
 
 // API Routes
+const supportRoutes = require('./routes/support.routes');
+
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/business', businessRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/coupons', couponRoutes);
+app.use('/api/business-coupons', businessCouponRoutes);
+app.use('/api/categories', categoryRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/chat', chatRoutes);
@@ -75,6 +93,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/external-reviews', externalReviewsRoutes);
 app.use('/api/verification', verificationRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/support', supportRoutes);
 
 // Test route for Didit API (Development only)
 if (process.env.NODE_ENV !== 'production') {
@@ -90,6 +109,11 @@ chatSocket(io);
 if (process.env.ENABLE_AUTO_SYNC !== 'false') {
   const { initializeSyncJobs } = require('./utils/syncJobs');
   initializeSyncJobs();
+}
+
+// Sentry error handler must be before other error handlers
+if (process.env.SENTRY_DSN && process.env.NODE_ENV === 'production') {
+  app.use(Sentry.Handlers.errorHandler());
 }
 
 // Error handling middleware (must be last)
@@ -146,6 +170,9 @@ mongoose.connect(process.env.MONGODB_URI, {
   logger.info('✅ MongoDB Connected Successfully');
   console.log('✅ MongoDB Connected Successfully');
   
+  // Initialize Redis (optional)
+  await initializeRedis();
+  
   // Create default admin account
   await createDefaultAdmin();
 })
@@ -163,10 +190,15 @@ server.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   logger.info('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
+  server.close(async () => {
     logger.info('HTTP server closed');
+    
+    // Close Redis
+    await closeRedis();
+    
+    // Close MongoDB
     mongoose.connection.close(false, () => {
       logger.info('MongoDB connection closed');
       process.exit(0);

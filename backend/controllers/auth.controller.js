@@ -234,21 +234,42 @@ exports.register = async (req, res, next) => {
 // @access  Public
 exports.login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
+
+    console.log('\n🔐 Login attempt:', { email, requestedRole: role });
 
     let user = null;
     let userType = null;
 
-    // Try to find user in User collection (customers, admin)
-    user = await User.findOne({ email }).select('+passwordHash');
-    
-    if (user) {
-      userType = user.role === 'admin' ? 'admin' : 'customer';
-    } else {
-      // Try to find in BusinessOwner collection
-      user = await BusinessOwner.findOne({ email }).select('+passwordHash');
+    // If role is specified, search in the appropriate collection first
+    if (role === 'business') {
+      // Try BusinessOwner collection first (with businesses populated)
+      user = await BusinessOwner.findOne({ email }).select('+passwordHash').populate('businesses');
       if (user) {
         userType = 'business';
+        console.log(`✅ Found business account for ${email}`);
+      } else {
+        // Fallback to User collection (in case admin/customer trying business login)
+        user = await User.findOne({ email }).select('+passwordHash');
+        if (user) {
+          userType = user.role === 'admin' ? 'admin' : 'customer';
+          console.log(`⚠️  Found ${userType} account for ${email}, but business login was requested`);
+        }
+      }
+    } else {
+      // Try User collection first (customer or admin)
+      user = await User.findOne({ email }).select('+passwordHash');
+      
+      if (user) {
+        userType = user.role === 'admin' ? 'admin' : 'customer';
+        console.log(`✅ Found ${userType} account for ${email}`);
+      } else {
+        // Fallback to BusinessOwner collection (with businesses populated)
+        user = await BusinessOwner.findOne({ email }).select('+passwordHash').populate('businesses');
+        if (user) {
+          userType = 'business';
+          console.log(`⚠️  Found business account for ${email}, but customer login was requested`);
+        }
       }
     }
 
@@ -311,7 +332,8 @@ exports.login = async (req, res, next) => {
         role: user.role,
         profileImage: user.profileImage,
         emailVerified: user.emailVerified,
-        phoneVerified: user.phoneVerified
+        phoneVerified: user.phoneVerified,
+        ...(user.role === 'business' && user.businesses && { businesses: user.businesses })
       }
     });
   } catch (error) {

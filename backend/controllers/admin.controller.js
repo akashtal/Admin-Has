@@ -1158,3 +1158,76 @@ exports.getAllSuspendedAccounts = async (req, res, next) => {
   }
 };
 
+// @desc    Get all coupons (admin)
+// @route   GET /api/admin/coupons
+// @access  Private (Admin)
+exports.getAllCoupons = async (req, res, next) => {
+  try {
+    const coupons = await Coupon.find()
+      .populate('business', 'name logo')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: coupons.length,
+      data: coupons
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Toggle coupon status (admin)
+// @route   PUT /api/admin/coupons/:id/status
+// @access  Private (Admin)
+exports.toggleCouponStatus = async (req, res, next) => {
+  try {
+    const { isActive } = req.body;
+
+    const coupon = await Coupon.findById(req.params.id);
+
+    if (!coupon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Coupon not found'
+      });
+    }
+
+    coupon.isActive = isActive;
+    await coupon.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Coupon ${isActive ? 'activated' : 'deactivated'} successfully`,
+      data: coupon
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete coupon (admin)
+// @route   DELETE /api/admin/coupons/:id
+// @access  Private (Admin)
+exports.deleteCoupon = async (req, res, next) => {
+  try {
+    const coupon = await Coupon.findById(req.params.id);
+
+    if (!coupon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Coupon not found'
+      });
+    }
+
+    await coupon.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: 'Coupon deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

@@ -8,7 +8,9 @@ import {
   Bell,
   LogOut,
   Menu,
-  X
+  X,
+  Grid,
+  Tag
 } from 'lucide-react';
 
 const Layout = ({ children, onLogout }) => {
@@ -17,8 +19,10 @@ const Layout = ({ children, onLogout }) => {
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Categories', href: '/categories', icon: Grid },
     { name: 'Users', href: '/users', icon: Users },
     { name: 'Businesses', href: '/businesses', icon: Building2 },
+    { name: 'Coupons', href: '/coupons', icon: Tag },
     { name: 'Reviews', href: '/reviews', icon: Star },
     { name: 'Notifications', href: '/notifications', icon: Bell },
   ];

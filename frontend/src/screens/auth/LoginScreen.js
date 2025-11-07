@@ -53,7 +53,13 @@ export default function LoginScreen({ navigation, route }) {
     }
 
     try {
-      const result = await dispatch(login(formData)).unwrap();
+      // Include the role in login data
+      const loginData = {
+        ...formData,
+        role: role  // Add the role from route params
+      };
+      
+      const result = await dispatch(login(loginData)).unwrap();
       
       // Check if user role matches selected role (except for admin)
       if (result.user.role === 'admin') {

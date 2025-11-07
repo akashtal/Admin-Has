@@ -1,5 +1,5 @@
-// Generate random coupon code
-exports.generateCouponCode = (length = 8) => {
+// Generate random coupon code with HASH- prefix
+exports.generateCouponCode = (length = 6) => {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let code = '';
   
@@ -7,7 +7,7 @@ exports.generateCouponCode = (length = 8) => {
     code += characters.charAt(Math.floor(Math.random() * characters.length));
   }
   
-  return code;
+  return `HASH-${code}`;
 };
 
 // Calculate coupon expiry (2 hours from now)
@@ -28,19 +28,26 @@ exports.calculateDiscount = (coupon, purchaseAmount) => {
   let discount = 0;
 
   switch (coupon.rewardType) {
-    case 'discount_percentage':
+    case 'percentage':
       discount = (purchaseAmount * coupon.rewardValue) / 100;
       if (coupon.maxDiscountAmount && discount > coupon.maxDiscountAmount) {
         discount = coupon.maxDiscountAmount;
       }
       break;
     
-    case 'discount_fixed':
+    case 'fixed':
       discount = Math.min(coupon.rewardValue, purchaseAmount);
       break;
     
-    case 'cashback':
+    case 'buy1get1':
+      // For buy1get1, typically discount is 50% or based on rewardValue
       discount = (purchaseAmount * coupon.rewardValue) / 100;
+      break;
+    
+    case 'free_drink':
+    case 'free_item':
+      // For free items, rewardValue represents the item's price
+      discount = Math.min(coupon.rewardValue, purchaseAmount);
       break;
     
     default:

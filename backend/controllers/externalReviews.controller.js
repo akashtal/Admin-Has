@@ -226,8 +226,8 @@ exports.syncGoogleReviews = async (req, res, next) => {
   }
 };
 
-// @desc    Sync TripAdvisor Reviews (Manual or via API if available)
-// @route   POST /api/business/:id/sync-tripadvisor-reviews
+// @desc    Sync TripAdvisor Reviews using Common Ninja (with 6-12 hour caching)
+// @route   POST /api/external-reviews/:id/sync-tripadvisor-reviews
 // @access  Private (Business Owner or Admin)
 exports.syncTripAdvisorReviews = async (req, res, next) => {
   try {
@@ -257,19 +257,100 @@ exports.syncTripAdvisorReviews = async (req, res, next) => {
       });
     }
 
-    // NOTE: TripAdvisor Content API requires partnership
-    // For now, this is a placeholder for manual entry or web scraping (not recommended)
+    // Check if widget ID is configured
+    const widgetId = business.externalProfiles?.tripAdvisor?.commonNinjaWidgetId;
     
-    // Option 1: Manual entry via admin panel
-    // Option 2: TripAdvisor API (requires Content API access)
-    // Option 3: Web scraping (against TOS, not recommended)
+    if (!widgetId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Common Ninja widget ID not configured. Please create a TripAdvisor widget in Common Ninja dashboard and add the widget ID to business settings.',
+        instructions: {
+          step1: 'Go to https://www.commoninja.com/dashboard',
+          step2: 'Create a new TripAdvisor Reviews widget',
+          step3: 'Get the widget ID from the widget settings',
+          step4: 'Add widget ID to business externalProfiles.tripAdvisor.commonNinjaWidgetId'
+        }
+      });
+    }
+
+    // ============================================
+    // CACHING LOGIC (6-12 hours as per user requirement)
+    // ============================================
+    const CACHE_HOURS = parseInt(process.env.TRIPADVISOR_CACHE_HOURS || '6'); // Default: 6 hours
+    const forceRefresh = req.query.force === 'true'; // Allow manual force refresh
+    const lastSynced = business.externalProfiles?.tripAdvisor?.lastSynced;
+
+    if (!forceRefresh && lastSynced) {
+      const hoursSinceSync = (Date.now() - new Date(lastSynced).getTime()) / (1000 * 60 * 60);
+      
+      if (hoursSinceSync < CACHE_HOURS) {
+        console.log(`✅ Using cached TripAdvisor data for: ${business.name}`);
+        console.log(`   Last synced: ${hoursSinceSync.toFixed(1)} hours ago`);
+        console.log(`   Cache valid for: ${CACHE_HOURS} hours`);
+        
+        return res.status(200).json({
+          success: true,
+          message: 'Using cached TripAdvisor data',
+          cached: true,
+          data: {
+            rating: business.externalProfiles.tripAdvisor.rating,
+            reviewCount: business.externalProfiles.tripAdvisor.reviewCount,
+            lastSynced: business.externalProfiles.tripAdvisor.lastSynced,
+            widgetId: business.externalProfiles.tripAdvisor.commonNinjaWidgetId,
+            widgetUrl: business.externalProfiles.tripAdvisor.commonNinjaWidgetUrl,
+            cacheExpiresIn: `${(CACHE_HOURS - hoursSinceSync).toFixed(1)} hours`
+          }
+        });
+      }
+    }
+
+    // ============================================
+    // FETCH FRESH DATA FROM COMMON NINJA API
+    // ============================================
+    console.log(`🔄 Fetching fresh data from Common Ninja for: ${business.name}`);
+    if (forceRefresh) console.log('   (Force refresh requested)');
+    
+    const { fetchTripAdvisorReviews, getWidgetUrl } = require('../utils/commonNinja');
+    
+    const result = await fetchTripAdvisorReviews(widgetId);
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        message: result.error || 'Failed to fetch TripAdvisor reviews',
+        details: result.details
+      });
+    }
+
+    // Update business with rating and count (NO review text as per user requirement)
+    business.externalProfiles.tripAdvisor.rating = result.rating;
+    business.externalProfiles.tripAdvisor.reviewCount = result.reviewCount;
+    business.externalProfiles.tripAdvisor.lastSynced = result.lastSynced;
+    business.externalProfiles.tripAdvisor.commonNinjaWidgetId = result.widgetId;
+    business.externalProfiles.tripAdvisor.commonNinjaWidgetUrl = getWidgetUrl(result.widgetId);
+
+    // DO NOT store review text (user only wants rating + count)
+    // business.externalReviews.tripAdvisor = []; // Cleared
+
+    await business.save();
+
+    console.log(`✅ TripAdvisor rating synced for business: ${business.name}`);
+    console.log(`   Rating: ${result.rating}/5`);
+    console.log(`   Review Count: ${result.reviewCount}`);
+    console.log(`   Widget ID: ${result.widgetId}`);
+    console.log(`   Cached for: ${CACHE_HOURS} hours`);
 
     return res.status(200).json({
       success: true,
-      message: 'TripAdvisor integration is under development. Please contact admin for manual review import.',
+      message: `Successfully synced TripAdvisor rating`,
+      cached: false,
       data: {
-        profileUrl: tripAdvisorUrl,
-        note: 'TripAdvisor API access requires partnership. Reviews can be manually added by admin.'
+        rating: result.rating,
+        reviewCount: result.reviewCount,
+        widgetId: result.widgetId,
+        widgetUrl: business.externalProfiles.tripAdvisor.commonNinjaWidgetUrl,
+        lastSynced: result.lastSynced,
+        cacheExpiresIn: `${CACHE_HOURS} hours`
       }
     });
 

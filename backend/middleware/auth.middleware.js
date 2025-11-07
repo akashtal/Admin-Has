@@ -2,6 +2,46 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User.model');
 const BusinessOwner = require('../models/BusinessOwner.model');
 
+// Optional auth - Try to attach user if token exists, but don't fail if not
+exports.optionalAuth = async (req, res, next) => {
+  try {
+    let token;
+
+    // Check for token in headers
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+
+    // If no token, just continue without setting req.user
+    if (!token) {
+      return next();
+    }
+
+    try {
+      // Verify token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+      // Get user from appropriate collection based on userType
+      if (decoded.userType === 'business') {
+        req.user = await BusinessOwner.findById(decoded.id).select('-passwordHash').populate('businesses');
+      } else {
+        req.user = await User.findById(decoded.id).select('-passwordHash');
+        
+        if (!req.user) {
+          req.user = await BusinessOwner.findById(decoded.id).select('-passwordHash').populate('businesses');
+        }
+      }
+    } catch (error) {
+      // Invalid token, but continue anyway
+      console.log('Invalid token in optional auth:', error.message);
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Protect routes - Verify JWT token
 exports.protect = async (req, res, next) => {
   try {
@@ -26,14 +66,14 @@ exports.protect = async (req, res, next) => {
 
       // Get user from appropriate collection based on userType
       if (decoded.userType === 'business') {
-        req.user = await BusinessOwner.findById(decoded.id).select('-passwordHash');
+        req.user = await BusinessOwner.findById(decoded.id).select('-passwordHash').populate('businesses');
       } else {
         // For customer, admin, or old tokens without userType
         req.user = await User.findById(decoded.id).select('-passwordHash');
         
         // If not found in User collection, try BusinessOwner (for backward compatibility)
         if (!req.user) {
-          req.user = await BusinessOwner.findById(decoded.id).select('-passwordHash');
+          req.user = await BusinessOwner.findById(decoded.id).select('-passwordHash').populate('businesses');
         }
       }
 
@@ -91,13 +131,13 @@ exports.optionalAuth = async (req, res, next) => {
         
         // Get user from appropriate collection based on userType
         if (decoded.userType === 'business') {
-          req.user = await BusinessOwner.findById(decoded.id).select('-passwordHash');
+          req.user = await BusinessOwner.findById(decoded.id).select('-passwordHash').populate('businesses');
         } else {
           req.user = await User.findById(decoded.id).select('-passwordHash');
           
           // If not found in User collection, try BusinessOwner
           if (!req.user) {
-            req.user = await BusinessOwner.findById(decoded.id).select('-passwordHash');
+            req.user = await BusinessOwner.findById(decoded.id).select('-passwordHash').populate('businesses');
           }
         }
       } catch (error) {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StatusBar, Image, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StatusBar, Image, Dimensions, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -33,6 +33,42 @@ export default function BusinessDetailScreen({ navigation, route }) {
 
   const handleAddReview = () => {
     navigation.navigate('AddReview', { business: displayBusiness });
+  };
+
+  const handleOpenTripAdvisor = () => {
+    const url = displayBusiness?.externalProfiles?.tripAdvisor?.profileUrl;
+    if (url) {
+      Linking.openURL(url).catch(() => {
+        Alert.alert('Error', 'Could not open TripAdvisor profile');
+      });
+    }
+  };
+
+  const handleOpenGoogleBusiness = () => {
+    const googleProfile = displayBusiness?.externalProfiles?.googleBusiness;
+    if (!googleProfile) return;
+
+    // Try to open profile URL if available (direct link to Google Business)
+    if (googleProfile.profileUrl) {
+      Linking.openURL(googleProfile.profileUrl).catch(() => {
+        Alert.alert('Error', 'Could not open Google Business profile');
+      });
+    } else if (googleProfile.placeId) {
+      // If placeId is available, open Google Business reviews page in browser
+      const url = `https://search.google.com/local/reviews?placeid=${googleProfile.placeId}`;
+      Linking.openURL(url).catch(() => {
+        Alert.alert('Error', 'Could not open Google Business profile');
+      });
+    } else if (displayBusiness.name && displayBusiness.address?.fullAddress) {
+      // Fallback: Open Google Search for the business (opens in browser)
+      const searchQuery = encodeURIComponent(`${displayBusiness.name} ${displayBusiness.address.fullAddress}`);
+      const url = `https://www.google.com/search?q=${searchQuery}`;
+      Linking.openURL(url).catch(() => {
+        Alert.alert('Error', 'Could not open Google Search');
+      });
+    } else {
+      Alert.alert('Info', 'Google Business profile link not available');
+    }
   };
 
   if ((!fromQR && loading) || !displayBusiness) {
@@ -103,16 +139,61 @@ export default function BusinessDetailScreen({ navigation, route }) {
 
         {/* Google Rating Display */}
         {displayBusiness.externalProfiles?.googleBusiness?.rating && (
-          <View className="flex-row items-center mb-3 bg-blue-50 rounded-lg px-4 py-2">
-            <Icon name="logo-google" size={18} color="#4285F4" />
-            <Text className="text-base font-semibold text-gray-700 ml-2">
-              Google: {displayBusiness.externalProfiles.googleBusiness.rating.toFixed(1)}
-            </Text>
-            <Icon name="star" size={16} color="#FFC107" style={{ marginLeft: 4 }} />
-            <Text className="text-sm text-gray-500 ml-2">
-              ({displayBusiness.externalProfiles.googleBusiness.reviewCount || 0} reviews)
-            </Text>
-          </View>
+          <TouchableOpacity
+            onPress={handleOpenGoogleBusiness}
+            activeOpacity={0.7}
+            className="flex-row items-center mb-3 rounded-xl px-4 py-3"
+            style={{ backgroundColor: '#E8F4FD', borderWidth: 1, borderColor: '#4285F420' }}
+          >
+            <Icon name="logo-google" size={24} color="#4285F4" />
+            
+            <View className="flex-1 ml-3">
+              <Text className="text-sm font-bold" style={{ color: '#4285F4' }}>Google Reviews</Text>
+              <View className="flex-row items-center mt-0.5">
+                <Text className="text-base font-bold text-gray-900 mr-1">
+                  {displayBusiness.externalProfiles.googleBusiness.rating.toFixed(1)}
+                </Text>
+                <Icon name="star" size={14} color="#FFC107" />
+                <Text className="text-xs text-gray-500 ml-1">
+                  ({displayBusiness.externalProfiles.googleBusiness.reviewCount || 0} reviews)
+                </Text>
+              </View>
+            </View>
+            
+            <Icon name="open-outline" size={18} color="#4285F4" />
+          </TouchableOpacity>
+        )}
+
+        {/* TripAdvisor Rating Display */}
+        {displayBusiness.externalProfiles?.tripAdvisor?.rating && displayBusiness.externalProfiles?.tripAdvisor?.profileUrl && (
+          <TouchableOpacity
+            onPress={handleOpenTripAdvisor}
+            activeOpacity={0.7}
+            className="flex-row items-center mb-3 rounded-xl px-4 py-3"
+            style={{ backgroundColor: '#E8F5F1', borderWidth: 1, borderColor: '#00AA6C20' }}
+          >
+            {/* TripAdvisor Official Logo */}
+            <Image
+              source={require('../../../assets/pngwing.com.png')}
+              style={{ width: 32, height: 32, marginRight: 6 }}
+              resizeMode="contain"
+            />
+            
+            <View className="flex-1">
+              <Text className="text-sm font-bold" style={{ color: '#00AA6C' }}>TripAdvisor</Text>
+              <View className="flex-row items-center mt-0.5">
+                <Text className="text-base font-bold text-gray-900 mr-1">
+                  {displayBusiness.externalProfiles.tripAdvisor.rating.toFixed(1)}
+                </Text>
+                <Icon name="star" size={14} color="#00AA6C" />
+                <Text className="text-xs text-gray-500 ml-1">
+                  ({displayBusiness.externalProfiles.tripAdvisor.reviewCount || 0} reviews)
+                </Text>
+              </View>
+            </View>
+            
+            <Icon name="open-outline" size={18} color="#00AA6C" />
+          </TouchableOpacity>
         )}
 
         <View className="rounded-full px-4 py-2 self-start mb-4" style={{ backgroundColor: '#FFF9F0' }}>

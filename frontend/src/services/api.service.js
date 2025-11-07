@@ -78,6 +78,10 @@ const ApiService = {
   // User APIs
   getProfile: () => apiClient.get(API_CONFIG.ENDPOINTS.GET_PROFILE),
   updateProfile: (data) => apiClient.put(API_CONFIG.ENDPOINTS.UPDATE_PROFILE, data),
+  uploadProfileImage: (formData) => apiClient.post('/users/upload-profile-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  changePassword: (data) => apiClient.post('/users/change-password', data),
   getUserReviews: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_USER_REVIEWS, { params }),
   getUserCoupons: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_USER_COUPONS, { params }),
   getRewardHistory: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_REWARD_HISTORY, { params }),
@@ -99,6 +103,10 @@ const ApiService = {
   getAllActiveBusinesses: (params) => apiClient.get('/business/all', { params }),
   getNearbyBusinesses: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_NEARBY_BUSINESSES, { params }),
   searchBusinesses: (params) => apiClient.get(API_CONFIG.ENDPOINTS.SEARCH_BUSINESSES, { params }),
+  
+  // Category APIs
+  getCategories: () => apiClient.get('/categories'),
+  getCategory: (id) => apiClient.get(`/categories/${id}`),
   getBusiness: (id) => apiClient.get(`${API_CONFIG.ENDPOINTS.GET_BUSINESS}/${id}`),
   getBusinessDashboard: (id) => apiClient.get(buildEndpoint(API_CONFIG.ENDPOINTS.GET_BUSINESS_DASHBOARD, { id })),
   uploadDocuments: (id, formData) => apiClient.post(
@@ -118,7 +126,7 @@ const ApiService = {
   deleteReview: (id) => apiClient.delete(buildEndpoint(API_CONFIG.ENDPOINTS.DELETE_REVIEW, { id })),
   markHelpful: (id) => apiClient.post(buildEndpoint(API_CONFIG.ENDPOINTS.MARK_HELPFUL, { id })),
   
-  // Coupon APIs
+  // Coupon APIs (Review-reward coupons)
   getCoupons: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_COUPONS, { params }),
   getCoupon: (id) => apiClient.get(buildEndpoint(API_CONFIG.ENDPOINTS.GET_COUPON, { id })),
   verifyCoupon: (data) => apiClient.post(API_CONFIG.ENDPOINTS.VERIFY_COUPON, data),
@@ -126,6 +134,18 @@ const ApiService = {
   getBusinessCoupons: (businessId) => 
     apiClient.get(buildEndpoint(API_CONFIG.ENDPOINTS.GET_BUSINESS_COUPONS, { businessId })),
   createCoupon: (data) => apiClient.post(API_CONFIG.ENDPOINTS.CREATE_COUPON, data),
+  
+  // Business Promotional Coupon APIs
+  getBusinessCouponsList: (businessId) => apiClient.get(`/business-coupons/business/${businessId}`),
+  createBusinessCoupon: (data) => apiClient.post('/business-coupons', data),
+  updateBusinessCoupon: (id, data) => apiClient.put(`/business-coupons/${id}`, data),
+  deleteBusinessCoupon: (id) => apiClient.delete(`/business-coupons/${id}`),
+  toggleCouponStatus: (id) => apiClient.patch(`/business-coupons/${id}/toggle-status`),
+  
+  // Coupon Template APIs (for review rewards)
+  getBusinessCouponTemplate: (businessId) => apiClient.get(`/coupons/template/${businessId}`),
+  createCouponTemplate: (data) => apiClient.post('/coupons/template', data),
+  
   updateBusiness: (id, data) => apiClient.put(`/business/${id}`, data),
   
   // Notification APIs
@@ -133,11 +153,35 @@ const ApiService = {
   markAsRead: (id) => apiClient.put(buildEndpoint(API_CONFIG.ENDPOINTS.MARK_AS_READ, { id })),
   markAllRead: () => apiClient.put(API_CONFIG.ENDPOINTS.MARK_ALL_READ),
   
-  // Admin APIs (Read-only analytics for mobile app)
-  // Management features (users, businesses, reviews) are only available on Web Dashboard
+  // Admin APIs - Full management capabilities
   getDashboardStats: () => apiClient.get(API_CONFIG.ENDPOINTS.GET_DASHBOARD_STATS),
   
-  // Management APIs removed from mobile app - Use Web Dashboard instead
+  // Category Management
+  createCategory: (data) => apiClient.post('/categories', data),
+  updateCategory: (id, data) => apiClient.put(`/categories/${id}`, data),
+  deleteCategory: (id) => apiClient.delete(`/categories/${id}`),
+  
+  // Business Management
+  adminGetAllBusinesses: () => apiClient.get('/admin/businesses'),
+  adminGetBusiness: (id) => apiClient.get(`/admin/businesses/${id}`),
+  adminUpdateBusiness: (id, data) => apiClient.put(`/admin/businesses/${id}`, data),
+  adminUpdateBusinessKYC: (id, data) => apiClient.put(`/admin/businesses/${id}/kyc`, data),
+  adminDeleteBusiness: (id) => apiClient.delete(`/admin/businesses/${id}`),
+  
+  // User Management
+  adminGetAllUsers: () => apiClient.get('/admin/users'),
+  adminUpdateUserStatus: (id, data) => apiClient.put(`/admin/users/${id}/status`, data),
+  adminDeleteUser: (id) => apiClient.delete(`/admin/users/${id}`),
+  adminSuspendUser: (id, data) => apiClient.post(`/admin/users/${id}/suspend`, data),
+  
+  // Review Management
+  adminGetAllReviews: () => apiClient.get('/admin/reviews'),
+  adminUpdateReviewStatus: (id, data) => apiClient.put(`/admin/reviews/${id}/status`, data),
+  
+  // Coupon Management (Admin)
+  adminGetAllCoupons: () => apiClient.get('/admin/coupons'),
+  adminToggleCouponStatus: (id, data) => apiClient.put(`/admin/coupons/${id}/status`, data),
+  adminDeleteCoupon: (id) => apiClient.delete(`/admin/coupons/${id}`),
   // getAllUsers: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_ALL_USERS, { params }),
   // getAllBusinesses: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_ALL_BUSINESSES, { params }),
   // updateBusinessKYC: (id, data) => apiClient.put(API_CONFIG.ENDPOINTS.UPDATE_BUSINESS_KYC.replace(':id', id), data),
@@ -161,11 +205,21 @@ const ApiService = {
     if (!endpoint) return Promise.reject(new Error('Endpoint not configured'));
     return apiClient.post(buildEndpoint(endpoint, { id: businessId }) + '?ratingsOnly=true');
   },
+  
   syncTripAdvisorReviews: (businessId) => {
     const endpoint = API_CONFIG.ENDPOINTS.SYNC_TRIPADVISOR_REVIEWS;
     if (!endpoint) return Promise.reject(new Error('Endpoint not configured'));
     return apiClient.post(buildEndpoint(endpoint, { id: businessId }));
   },
+  
+  // Manually update TripAdvisor rating
+  updateTripAdvisorRating: (businessId, rating, reviewCount) => {
+    return apiClient.put(`/business/${businessId}/tripadvisor-rating`, {
+      rating: parseFloat(rating),
+      reviewCount: parseInt(reviewCount)
+    });
+  },
+  
   getAllBusinessReviews: (businessId) => {
     const endpoint = API_CONFIG.ENDPOINTS.GET_ALL_BUSINESS_REVIEWS;
     if (!endpoint) return Promise.reject(new Error('Endpoint not configured'));
@@ -205,6 +259,15 @@ const ApiService = {
     buildEndpoint(API_CONFIG.ENDPOINTS.UPDATE_BUSINESS_IMAGES, { id: businessId }), 
     data
   ),
+  
+  // Support & Help APIs
+  submitSupportTicket: (data) => apiClient.post('/support/ticket', data),
+  
+  // Account Settings APIs
+  updateAccountSettings: (settings) => apiClient.put('/users/account-settings', settings),
+  exportUserData: () => apiClient.post('/users/export-data'),
+  deactivateAccount: () => apiClient.put('/users/deactivate'),
+  deleteAccount: (data) => apiClient.delete('/users/account', { data }),
 };
 
 export default ApiService;
