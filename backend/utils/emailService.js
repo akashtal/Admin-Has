@@ -279,9 +279,3 @@ exports.sendPasswordResetEmail = async (to, otp, name = 'User') => {
     throw error;
   }
 };
-
-module.exports = {
-  sendOTPEmail: exports.sendOTPEmail,
-  sendPasswordResetEmail: exports.sendPasswordResetEmail
-};
-
