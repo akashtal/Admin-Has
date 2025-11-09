@@ -73,8 +73,11 @@ export default function AddReviewScreen({ navigation, route }) {
         Alert.alert(
           'Too Far Away',
           `You must be within ${business.radius}m of the business to post a review. You are currently ${Math.round(distance)}m away.`,
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
+          [{ text: 'OK', onPress: () => navigation.goBack() }],
+          { cancelable: false } // Prevent dismissing by tapping outside
         );
+        // Don't set checkingLocation to false - force user to go back
+        return;
       }
 
       setCheckingLocation(false);
