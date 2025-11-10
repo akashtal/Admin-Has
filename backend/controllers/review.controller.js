@@ -47,15 +47,10 @@ exports.createReview = async (req, res, next) => {
       comment, 
       latitude, 
       longitude, 
-      images,
-      // Security metadata from frontend
-      locationAccuracy,
-      verificationTime,
-      motionDetected,
-      isMockLocation,
-      locationHistoryCount,
-      devicePlatform
+      images
     } = req.body;
+    
+    // Security metadata no longer sent from frontend - we do ALL checks here!
 
     // Get business
     const business = await Business.findById(businessId);
@@ -112,64 +107,7 @@ exports.createReview = async (req, res, next) => {
       });
     }
 
-    // SECURITY CHECK #3: Mock Location Detection
-    if (isMockLocation === true) {
-      console.warn(`⚠️ MOCK LOCATION: User ${req.user.id} attempted review with mock GPS`);
-      
-      await logSuspiciousBehavior(req.user.id, 'MOCK_LOCATION_DETECTED', {
-        businessId: businessId,
-        latitude: latitude,
-        longitude: longitude,
-        platform: devicePlatform
-      });
-      
-      return res.status(403).json({
-        success: false,
-        message: 'Mock location detected. Please disable "Fake GPS" apps and use your real location.',
-        errorCode: 'MOCK_LOCATION'
-      });
-    }
-
-    // SECURITY CHECK #4: GPS Accuracy Validation
-    const MAX_ACCURACY = 50; // 50 meters
-    if (locationAccuracy && locationAccuracy > MAX_ACCURACY) {
-      console.warn(`⚠️ POOR GPS: User ${req.user.id} accuracy: ${locationAccuracy}m`);
-      
-      await logSuspiciousBehavior(req.user.id, 'POOR_GPS_ACCURACY', {
-        businessId: businessId,
-        accuracy: locationAccuracy,
-        threshold: MAX_ACCURACY
-      });
-      
-      return res.status(400).json({
-        success: false,
-        message: `GPS accuracy too low (${Math.round(locationAccuracy)}m). Please move to an open area for better signal.`,
-        errorCode: 'POOR_ACCURACY'
-      });
-    }
-
-    // SECURITY CHECK #5: Verification Time Check (optional, just log if suspicious)
-    if (verificationTime && verificationTime < 10) {
-      console.warn(`⚠️ QUICK REVIEW: User ${req.user.id} verification time: ${verificationTime}s`);
-      
-      await logSuspiciousBehavior(req.user.id, 'QUICK_SUBMISSION', {
-        businessId: businessId,
-        verificationTime: verificationTime,
-        flagForReview: true
-      });
-      // Don't block, but flag for manual review
-    }
-
-    // SECURITY CHECK #6: Location History Check
-    if (!locationHistoryCount || locationHistoryCount < 2) {
-      console.warn(`⚠️ SINGLE LOCATION: User ${req.user.id} submitted with minimal location updates`);
-      
-      await logSuspiciousBehavior(req.user.id, 'MINIMAL_LOCATION_HISTORY', {
-        businessId: businessId,
-        historyCount: locationHistoryCount
-      });
-      // Don't block, but flag
-    }
+    // Frontend metadata removed - doing real validation on backend now!
 
     // Verify geofencing - user must be within business radius
     const businessLat = business.location.coordinates[1];
@@ -207,7 +145,7 @@ exports.createReview = async (req, res, next) => {
     console.log(`   ✅ ALLOWED: User is within geofence`);
 
 
-    // Create review with security metadata
+    // Create review (lightweight - no client metadata!)
     const review = await Review.create({
       user: req.user.id,
       business: businessId,
@@ -218,17 +156,7 @@ exports.createReview = async (req, res, next) => {
         coordinates: [longitude, latitude]
       },
       images: images || [],
-      verified: true,
-      // Store security metadata for audit trail
-      metadata: {
-        locationAccuracy: locationAccuracy,
-        verificationTime: verificationTime,
-        motionDetected: motionDetected,
-        isMockLocation: isMockLocation,
-        locationHistoryCount: locationHistoryCount,
-        devicePlatform: devicePlatform,
-        submittedAt: new Date()
-      }
+      verified: true
     });
     
     // Log successful review submission
@@ -237,8 +165,7 @@ exports.createReview = async (req, res, next) => {
       userId: req.user.id,
       businessId: businessId,
       distance: actualDistance.toFixed(2),
-      accuracy: locationAccuracy,
-      verificationTime: verificationTime
+      businessRadius: business.radius
     });
 
     // Update business rating
