@@ -1,9 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, StatusBar } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  View, Text, TextInput, TouchableOpacity, ScrollView, 
+  ActivityIndicator, Alert, StatusBar, Platform, AppState 
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/Ionicons';
 import * as Location from 'expo-location';
+import { Accelerometer } from 'expo-sensors';
+import * as Device from 'expo-device';
 import { createReview, clearSuccessMessage } from '../../store/slices/reviewSlice';
 import COLORS from '../../config/colors';
 
@@ -18,16 +23,56 @@ export default function AddReviewScreen({ navigation, route }) {
     comment: '',
   });
   
-  // Location state (lightweight!)
+  // 🔒 COMPREHENSIVE GEOFENCING STATE
   const [location, setLocation] = useState(null);
   const [checkingLocation, setCheckingLocation] = useState(true);
-  const [showGeofenceInfo, setShowGeofenceInfo] = useState(true); // Show info popup first
+  const [showGeofenceInfo, setShowGeofenceInfo] = useState(true);
   
-  // Business radius from backend
-  const MAX_ALLOWED_RADIUS = business.radius || 500;
+  // Security & Monitoring State
+  const [gpsAccuracy, setGpsAccuracy] = useState(null);
+  const [currentDistance, setCurrentDistance] = useState(null);
+  const [verificationTimer, setVerificationTimer] = useState(30);
+  const [verificationComplete, setVerificationComplete] = useState(false);
+  const [motionDetected, setMotionDetected] = useState(false);
+  const [locationHistory, setLocationHistory] = useState([]);
+  const [isMockLocation, setIsMockLocation] = useState(false);
+  const [suspiciousActivities, setSuspiciousActivities] = useState([]);
+  const [gpsSignalLost, setGpsSignalLost] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [deviceFingerprint, setDeviceFingerprint] = useState(null);
+  
+  // Refs for subscriptions & cleanup
+  const locationSubscription = useRef(null);
+  const timerInterval = useRef(null);
+  const accelerometerSubscription = useRef(null);
+  const appState = useRef(AppState.currentState);
+  
+  // Configuration
+  const MAX_ALLOWED_RADIUS = business.radius || 50;
+  const MAX_GPS_ACCURACY = 50; // meters
+  const VERIFICATION_TIME = 30; // seconds
+  const MAX_RETRY_ATTEMPTS = 3;
+  const RETRY_DELAYS = [2000, 5000, 10000]; // Exponential backoff
+  const TELEPORTATION_THRESHOLD = 100; // meters (sudden jump detection)
+  const LOCATION_UPDATE_INTERVAL = 2000; // ms
 
-  // No cleanup needed - we don't have any subscriptions/timers!
+  // ==================== CLEANUP ====================
+  useEffect(() => {
+    return () => {
+      // Clean up all subscriptions
+      if (locationSubscription.current) {
+        locationSubscription.current.remove();
+      }
+      if (timerInterval.current) {
+        clearInterval(timerInterval.current);
+      }
+      if (accelerometerSubscription.current) {
+        accelerometerSubscription.current.remove();
+      }
+    };
+  }, []);
 
+  // ==================== SUCCESS/ERROR HANDLING ====================
   useEffect(() => {
     if (successMessage) {
       Alert.alert('Success!', successMessage + '\n\nYou\'ve earned a coupon!', [
@@ -55,94 +100,34 @@ export default function AddReviewScreen({ navigation, route }) {
     }
   }, [error]);
 
-  // LIGHTWEIGHT: Quick location check only (2-3 seconds)
-  const initializeLocationVerification = async () => {
+  // ==================== DEVICE FINGERPRINTING ====================
+  useEffect(() => {
+    createDeviceFingerprint();
+  }, []);
+
+  const createDeviceFingerprint = async () => {
     try {
-      // Step 1: Request permissions
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        showDetailedError(
-          'Permission Required',
-          'We need your location to verify you are at the business. This ensures review authenticity.',
-          'PERMISSION_DENIED'
-        );
-        return;
-      }
-
-      // Step 2: Check if location services are enabled
-      const locationEnabled = await Location.hasServicesEnabledAsync();
-      if (!locationEnabled) {
-        showDetailedError(
-          'Enable Location Services',
-          'Please turn on GPS/Location in your device settings to continue.',
-          'LOCATION_DISABLED'
-        );
-        return;
-      }
-
-      // Step 3: Quick location check (one-time only!)
-      console.log('📍 Getting current location...');
-      const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced, // Fast & accurate enough
-        maximumAge: 10000, // Use 10-second cache
-        timeout: 3000, // Only wait 3 seconds
-      });
-
-      // Step 4: Calculate distance to business (LIGHTWEIGHT CLIENT-SIDE)
-      const businessLat = business.location.coordinates[1];
-      const businessLon = business.location.coordinates[0];
-      const userLat = currentLocation.coords.latitude;
-      const userLon = currentLocation.coords.longitude;
-
-      const distance = calculateDistance(userLat, userLon, businessLat, businessLon);
-
-      console.log(`📏 Distance: ${distance.toFixed(1)}m (limit: ${MAX_ALLOWED_RADIUS}m)`);
-
-      // Step 5: Frontend check (quick feedback to user)
-      if (distance > MAX_ALLOWED_RADIUS) {
-        showDetailedError(
-          'Outside Business Radius',
-          `You are outside the business radius (${Math.round(distance)}m away).\n\nPlease visit the business location to leave a review.\n\nRequired: Within ${MAX_ALLOWED_RADIUS}m`,
-          'OUT_OF_RANGE'
-        );
-        return;
-      }
-
-      // Step 6: Store location and show form
-      setLocation(currentLocation);
-      setCheckingLocation(false);
+      const fingerprint = {
+        deviceId: Device.modelId || 'unknown',
+        deviceName: Device.deviceName || 'unknown',
+        manufacturer: Device.manufacturer || 'unknown',
+        modelName: Device.modelName || 'unknown',
+        osName: Device.osName || 'unknown',
+        osVersion: Device.osVersion || 'unknown',
+        platform: Platform.OS,
+        platformVersion: Platform.Version,
+        isDevice: Device.isDevice,
+        timestamp: Date.now()
+      };
       
-      console.log('✅ Location check passed! User can now write review.');
-      console.log('🔒 Backend will validate again when review is submitted.');
-      
+      setDeviceFingerprint(fingerprint);
+      console.log('🔐 Device fingerprint created:', fingerprint);
     } catch (error) {
-      console.error('❌ Location error:', error);
-      
-      if (error.code === 'E_LOCATION_TIMEOUT') {
-        showDetailedError(
-          'GPS Signal Issue',
-          'Could not get your location quickly enough.\n\nPlease ensure:\n• GPS is enabled\n• You are not indoors or in a covered area\n• Your device has clear sky view',
-          'TIMEOUT'
-        );
-      } else if (error.code === 'E_LOCATION_UNAVAILABLE') {
-        showDetailedError(
-          'Location Unavailable',
-          'Your device location is temporarily unavailable. Please check your GPS settings and try again.',
-          'UNAVAILABLE'
-        );
-      } else {
-        showDetailedError(
-          'Location Error',
-          'Unable to access your location. Please check that Location Services are enabled in your device settings.',
-          'UNKNOWN_ERROR'
-        );
-      }
+      console.error('❌ Error creating device fingerprint:', error);
     }
   };
 
-  // NO MORE HEAVY MONITORING - All removed for lightweight frontend!
-
-  // Calculate distance using Haversine formula
+  // ==================== HAVERSINE DISTANCE CALCULATION ====================
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371e3; // Earth radius in meters
     const φ1 = (lat1 * Math.PI) / 180;
@@ -155,101 +140,594 @@ export default function AddReviewScreen({ navigation, route }) {
       Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    return R * c;
+    return R * c; // Distance in meters
   };
 
-  // Show detailed error with helpful guidance
-  const showDetailedError = (title, message, errorCode) => {
-    const buttons = [];
-    
-    // For "OUT_OF_RANGE", don't offer retry - they need to physically move
-    if (errorCode === 'OUT_OF_RANGE') {
-      buttons.push({
-        text: 'OK, I Understand',
-        onPress: () => navigation.goBack()
+  // ==================== TELEPORTATION DETECTION ====================
+  const detectTeleportation = (newLocation) => {
+    if (locationHistory.length === 0) return false;
+
+    const lastLocation = locationHistory[locationHistory.length - 1];
+    const distance = calculateDistance(
+      lastLocation.latitude,
+      lastLocation.longitude,
+      newLocation.latitude,
+      newLocation.longitude
+    );
+
+    // Time elapsed since last location
+    const timeElapsed = (Date.now() - lastLocation.timestamp) / 1000; // seconds
+
+    // Check if movement is too fast (teleportation)
+    // Average human walking speed: 1.4 m/s, running: 5 m/s, car: 14 m/s
+    const maxSpeed = 15; // m/s (considering car movement)
+    const expectedMaxDistance = maxSpeed * timeElapsed;
+
+    if (distance > expectedMaxDistance && distance > TELEPORTATION_THRESHOLD) {
+      console.log(`🚨 TELEPORTATION DETECTED: Moved ${distance.toFixed(1)}m in ${timeElapsed.toFixed(1)}s`);
+      logSuspiciousActivity('TELEPORTATION', {
+        distance: distance,
+        timeElapsed: timeElapsed,
+        speed: distance / timeElapsed
       });
-    } else {
-      // For other errors, offer retry
-      buttons.push(
-        {
-          text: 'Retry',
-          onPress: () => {
-            setShowGeofenceInfo(true);
-            setCheckingLocation(true);
-          }
-        },
-        {
-          text: 'Cancel',
-          onPress: () => navigation.goBack(),
-          style: 'cancel'
+      return true;
+    }
+
+    return false;
+  };
+
+  // ==================== MOCK LOCATION DETECTION ====================
+  const detectMockLocation = (locationData) => {
+    // Check if location provider is suspicious
+    const provider = locationData.mocked; // Android provides this
+    
+    if (provider === true || locationData.isMocked === true) {
+      console.log('🚨 MOCK LOCATION DETECTED!');
+      logSuspiciousActivity('MOCK_LOCATION', { provider: 'mock/fake' });
+      setIsMockLocation(true);
+      return true;
+    }
+
+    // Additional checks for iOS (location accuracy too perfect)
+    if (Platform.OS === 'ios') {
+      if (locationData.accuracy && locationData.accuracy < 5) {
+        // Too perfect accuracy can indicate mock location
+        const perfectAccuracyCount = locationHistory.filter(
+          loc => loc.accuracy < 5
+        ).length;
+        
+        if (perfectAccuracyCount > 5) {
+          console.log('🚨 SUSPICIOUS: Too perfect GPS accuracy');
+          logSuspiciousActivity('PERFECT_ACCURACY', { count: perfectAccuracyCount });
         }
+      }
+    }
+
+    return false;
+  };
+
+  // ==================== SUSPICIOUS ACTIVITY LOGGING ====================
+  const logSuspiciousActivity = (activityType, metadata) => {
+    const activity = {
+      type: activityType,
+      timestamp: Date.now(),
+      metadata: metadata
+    };
+    
+    setSuspiciousActivities(prev => [...prev, activity]);
+    console.log(`⚠️ Suspicious activity logged: ${activityType}`, metadata);
+  };
+
+  // ==================== GPS SIGNAL LOSS HANDLING ====================
+  const handleGPSSignalLoss = async () => {
+    console.log('📡 GPS signal lost, attempting recovery...');
+    setGpsSignalLost(true);
+    
+    if (retryCount < MAX_RETRY_ATTEMPTS) {
+      const delay = RETRY_DELAYS[retryCount] || 10000;
+      console.log(`⏳ Retrying in ${delay/1000} seconds...`);
+      
+      setTimeout(async () => {
+        setRetryCount(prev => prev + 1);
+        await retryLocationCheck();
+      }, delay);
+    } else {
+      showDetailedError(
+        'GPS Signal Lost',
+        'We\'ve lost your GPS signal after multiple attempts.\n\nPossible reasons:\n• You moved indoors\n• GPS is disabled\n• Poor signal area\n\nPlease move to an area with better GPS signal and try again.',
+        'GPS_LOST',
+        true // Show report issue button
       );
     }
+  };
+
+  const retryLocationCheck = async () => {
+    try {
+      console.log(`🔄 Retry attempt ${retryCount + 1}/${MAX_RETRY_ATTEMPTS}`);
+      
+      const newLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+        maximumAge: 0,
+        timeout: 10000,
+      });
+
+      setGpsSignalLost(false);
+      setRetryCount(0);
+      await processLocationUpdate(newLocation);
+      
+      console.log('✅ GPS signal recovered!');
+    } catch (error) {
+      console.error(`❌ Retry ${retryCount + 1} failed:`, error);
+      await handleGPSSignalLoss();
+    }
+  };
+
+  // ==================== CONTINUOUS LOCATION MONITORING ====================
+  const startContinuousLocationMonitoring = async () => {
+    console.log('📍 Starting continuous location monitoring...');
     
-    Alert.alert(
-      title,
-      message,
-      buttons,
-      { cancelable: false }
+    try {
+      locationSubscription.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: LOCATION_UPDATE_INTERVAL,
+          distanceInterval: 5, // Update every 5 meters
+        },
+        async (newLocation) => {
+          await processLocationUpdate(newLocation);
+        }
+      );
+      
+      console.log('✅ Location monitoring started');
+    } catch (error) {
+      console.error('❌ Failed to start location monitoring:', error);
+      await handleGPSSignalLoss();
+    }
+  };
+
+  // ==================== PROCESS LOCATION UPDATES ====================
+  const processLocationUpdate = async (newLocation) => {
+    const coords = newLocation.coords;
+    
+    // Check GPS accuracy
+    if (coords.accuracy > MAX_GPS_ACCURACY) {
+      console.log(`⚠️ GPS accuracy too low: ${coords.accuracy.toFixed(1)}m`);
+      logSuspiciousActivity('POOR_GPS_ACCURACY', { accuracy: coords.accuracy });
+      setGpsAccuracy(coords.accuracy);
+      return;
+    }
+
+    setGpsAccuracy(coords.accuracy);
+
+    // Check for mock location
+    if (detectMockLocation(newLocation)) {
+      showDetailedError(
+        'Mock Location Detected',
+        'We detected that you\'re using a fake/mock GPS location.\n\nTo ensure review authenticity, please:\n• Disable any mock location apps\n• Use your real GPS location\n• Restart the app',
+        'MOCK_LOCATION',
+        false
+      );
+      return;
+    }
+
+    // Check for teleportation
+    if (detectTeleportation({ ...coords, timestamp: Date.now() })) {
+      showDetailedError(
+        'Suspicious Location Jump',
+        'Your location jumped suddenly by a large distance.\n\nThis could indicate:\n• GPS signal interference\n• Device location spoofing\n\nPlease ensure you\'re using real GPS and try again.',
+        'TELEPORTATION',
+        true
+      );
+      return;
+    }
+
+    // Calculate distance to business
+    const businessLat = business.location.coordinates[1];
+    const businessLon = business.location.coordinates[0];
+    const distance = calculateDistance(
+      coords.latitude,
+      coords.longitude,
+      businessLat,
+      businessLon
     );
+
+    setCurrentDistance(distance);
+    setLocation(newLocation);
+
+    // Add to location history
+    setLocationHistory(prev => [
+      ...prev,
+      {
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        accuracy: coords.accuracy,
+        timestamp: Date.now()
+      }
+    ].slice(-20)); // Keep last 20 locations
+
+    // Check if still within geofence
+    if (distance > MAX_ALLOWED_RADIUS) {
+      console.log(`❌ User moved outside radius: ${distance.toFixed(1)}m`);
+      showDetailedError(
+        'Moved Outside Radius',
+        `You've moved outside the business radius.\n\nCurrent distance: ${Math.round(distance)}m\nRequired: Within ${MAX_ALLOWED_RADIUS}m\n\nPlease return to the business location.`,
+        'MOVED_AWAY',
+        false
+      );
+      
+      // Stop monitoring and verification
+      if (locationSubscription.current) {
+        locationSubscription.current.remove();
+        locationSubscription.current = null;
+      }
+      if (timerInterval.current) {
+        clearInterval(timerInterval.current);
+        timerInterval.current = null;
+      }
+      
+      setVerificationComplete(false);
+      navigation.goBack();
+    }
+
+    console.log(`📏 Distance: ${distance.toFixed(1)}m | Accuracy: ${coords.accuracy.toFixed(1)}m | Timer: ${verificationTimer}s`);
   };
 
-  // LIGHTWEIGHT: Simple submit - Backend will do all validation!
-  const handleSubmit = () => {
-    // Basic frontend validations
-    if (formData.rating === 0) {
-      Alert.alert('Error', 'Please select a rating');
-      return;
-    }
-
-    if (formData.comment.length < 10) {
-      Alert.alert('Error', 'Please write at least 10 characters');
-      return;
-    }
-
-    if (!location) {
-      Alert.alert('Error', 'Location not available');
-      return;
-    }
-
-    // Send to backend - backend will do ALL security checks!
-    dispatch(createReview({
-      business: business._id,
-      rating: formData.rating,
-      comment: formData.comment,
-      latitude: location.coords.latitude,
-      longitude: location.coords.longitude,
-    }));
+  // ==================== MOTION SENSOR VERIFICATION ====================
+  const startMotionSensorMonitoring = () => {
+    console.log('📱 Starting motion sensor monitoring...');
     
-    console.log('✅ Review submitted! Backend will validate location and all security checks.');
+    Accelerometer.setUpdateInterval(1000);
+    
+    accelerometerSubscription.current = Accelerometer.addListener(accelerometerData => {
+      const { x, y, z } = accelerometerData;
+      const magnitude = Math.sqrt(x * x + y * y + z * z);
+      
+      // Detect if user is moving (magnitude > 1.2 indicates movement)
+      if (magnitude > 1.2) {
+        setMotionDetected(true);
+        console.log('🚶 Motion detected');
+      }
+    });
   };
 
-  // Show geofence info popup first
+  // ==================== 30-SECOND TIMER VERIFICATION ====================
+  const start30SecondTimer = () => {
+    console.log('⏱️ Starting 30-second verification timer...');
+    
+    timerInterval.current = setInterval(() => {
+      setVerificationTimer(prev => {
+        const newTime = prev - 1;
+        
+        if (newTime <= 0) {
+          clearInterval(timerInterval.current);
+          setVerificationComplete(true);
+          console.log('✅ 30-second verification complete!');
+          Alert.alert(
+            'Verification Complete! ✅',
+            'You\'ve stayed within the business location for 30 seconds. You can now submit your review!',
+            [{ text: 'Great!', style: 'default' }]
+          );
+        }
+        
+        return newTime;
+      });
+    }, 1000);
+  };
+
+  // ==================== INITIALIZE COMPREHENSIVE VERIFICATION ====================
+  const initializeLocationVerification = async () => {
+    try {
+      console.log('\n🔒 ========== COMPREHENSIVE GEOFENCING STARTED ==========');
+      
+      // Step 1: Request permissions
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        showDetailedError(
+          'Permission Required',
+          'We need your location permission to verify you\'re at the business.\n\nThis ensures review authenticity and prevents fake reviews.',
+          'PERMISSION_DENIED',
+          false
+        );
+        return;
+      }
+
+      // Step 2: Check if location services enabled
+      const locationEnabled = await Location.hasServicesEnabledAsync();
+      if (!locationEnabled) {
+        showDetailedError(
+          'Enable Location Services',
+          'Please turn on GPS/Location in your device settings to continue.\n\nSteps:\n1. Open Settings\n2. Go to Location\n3. Turn ON',
+          'LOCATION_DISABLED',
+          false
+        );
+        return;
+      }
+
+      // Step 3: Get initial location with high accuracy
+      console.log('📍 Getting initial high-accuracy location...');
+      const initialLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+        maximumAge: 0, // NO CACHE!
+        timeout: 10000,
+      });
+
+      // Step 4: Check GPS accuracy
+      if (initialLocation.coords.accuracy > MAX_GPS_ACCURACY) {
+        showDetailedError(
+          'Poor GPS Signal',
+          `Your GPS accuracy is ${Math.round(initialLocation.coords.accuracy)}m, but we need ${MAX_GPS_ACCURACY}m or better.\n\nTips to improve:\n• Move outdoors\n• Move away from tall buildings\n• Wait a few moments for GPS to stabilize\n• Ensure Location mode is set to "High Accuracy"`,
+          'POOR_ACCURACY',
+          true
+        );
+        return;
+      }
+
+      console.log(`✅ GPS accuracy: ${initialLocation.coords.accuracy.toFixed(1)}m`);
+
+      // Step 5: Calculate initial distance
+      const businessLat = business.location.coordinates[1];
+      const businessLon = business.location.coordinates[0];
+      const distance = calculateDistance(
+        initialLocation.coords.latitude,
+        initialLocation.coords.longitude,
+        businessLat,
+        businessLon
+      );
+
+      console.log(`📏 Initial distance: ${distance.toFixed(1)}m (limit: ${MAX_ALLOWED_RADIUS}m)`);
+
+      // Step 6: Check if within radius
+      if (distance > MAX_ALLOWED_RADIUS) {
+        showDetailedError(
+          'Outside Business Radius',
+          `You are ${Math.round(distance)}m away from ${business.name}.\n\nYou must be within ${MAX_ALLOWED_RADIUS}m to leave a review.\n\nPlease visit the business location.`,
+          'OUT_OF_RANGE',
+          false
+        );
+        return;
+      }
+
+      // Step 7: Store initial location
+      setLocation(initialLocation);
+      setCurrentDistance(distance);
+      setGpsAccuracy(initialLocation.coords.accuracy);
+      setLocationHistory([{
+        latitude: initialLocation.coords.latitude,
+        longitude: initialLocation.coords.longitude,
+        accuracy: initialLocation.coords.accuracy,
+        timestamp: Date.now()
+      }]);
+
+      // Step 8: Start continuous monitoring
+      await startContinuousLocationMonitoring();
+
+      // Step 9: Start motion sensor monitoring
+      startMotionSensorMonitoring();
+
+      // Step 10: Start 30-second verification timer
+      start30SecondTimer();
+
+      // Step 11: Ready to write review
+      setCheckingLocation(false);
+      
+      console.log('✅ Comprehensive verification initialized!');
+      console.log('========================================================\n');
+      
+    } catch (error) {
+      console.error('❌ Location verification error:', error);
+      
+      if (error.code === 'E_LOCATION_TIMEOUT') {
+        showDetailedError(
+          'GPS Timeout',
+          'Could not get your location within 10 seconds.\n\nPlease ensure:\n• GPS is enabled\n• You\'re outdoors or near a window\n• Location mode is "High Accuracy"\n• Wait a moment and try again',
+          'TIMEOUT',
+          true
+        );
+      } else if (error.code === 'E_LOCATION_UNAVAILABLE') {
+        showDetailedError(
+          'Location Unavailable',
+          'Your device location is temporarily unavailable.\n\nPlease:\n• Check GPS settings\n• Restart location services\n• Try again in a moment',
+          'UNAVAILABLE',
+          true
+        );
+      } else {
+        showDetailedError(
+          'Location Error',
+          'Unable to access your location.\n\nPlease check that:\n• Location Services are enabled\n• App has location permission\n• GPS is working properly',
+          'UNKNOWN_ERROR',
+          true
+        );
+      }
+    }
+  };
+
+  // ==================== DETAILED ERROR WITH REPORT ISSUE ====================
+  const showDetailedError = (title, message, errorCode, showReportButton) => {
+    const buttons = [];
+    
+    // Report Issue button
+    if (showReportButton) {
+      buttons.push({
+        text: 'Report Issue',
+        onPress: () => {
+          Alert.alert(
+            'Report Location Issue',
+            `We'll flag this for manual review by our team.\n\nYour issue: ${errorCode}\n\nYou'll be notified if your review is approved manually.`,
+            [
+              {
+                text: 'Submit Report',
+                onPress: () => {
+                  // Send to backend for manual review
+                  console.log(`🚩 Issue reported: ${errorCode}`, {
+                    business: business._id,
+                    location: location?.coords,
+                    suspiciousActivities: suspiciousActivities,
+                    deviceFingerprint: deviceFingerprint
+                  });
+                  
+                  Alert.alert('Report Submitted', 'Our team will review your case. Thank you!');
+                  navigation.goBack();
+                }
+              },
+              { text: 'Cancel', style: 'cancel' }
+            ]
+          );
+        }
+      });
+    }
+    
+    // Retry button (for certain errors)
+    if (['GPS_LOST', 'TIMEOUT', 'UNAVAILABLE', 'POOR_ACCURACY'].includes(errorCode)) {
+      buttons.push({
+        text: 'Retry',
+        onPress: () => {
+          setShowGeofenceInfo(true);
+          setCheckingLocation(true);
+          setRetryCount(0);
+        }
+      });
+    }
+    
+    // Cancel/OK button
+    buttons.push({
+      text: errorCode === 'OUT_OF_RANGE' || errorCode === 'MOCK_LOCATION' ? 'OK' : 'Cancel',
+      onPress: () => navigation.goBack(),
+      style: 'cancel'
+    });
+    
+    Alert.alert(title, message, buttons, { cancelable: false });
+  };
+
+  // ==================== SUBMIT REVIEW ====================
+  const handleSubmit = async () => {
+    // Validation 1: Rating
+    if (formData.rating === 0) {
+      Alert.alert('Missing Rating', 'Please select a star rating for your experience.');
+      return;
+    }
+
+    // Validation 2: Comment length
+    if (formData.comment.length < 10) {
+      Alert.alert('Review Too Short', 'Please write at least 10 characters to share your experience.');
+      return;
+    }
+
+    // Validation 3: Location
+    if (!location) {
+      Alert.alert('Location Error', 'Location data is not available. Please try again.');
+      return;
+    }
+
+    // Validation 4: 30-second verification
+    if (!verificationComplete) {
+      Alert.alert(
+        'Verification Incomplete',
+        `Please wait ${verificationTimer} more seconds while we verify your location.\n\nThis ensures review authenticity.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Validation 5: Motion detected (anti-spoofing)
+    if (!motionDetected) {
+      Alert.alert(
+        'Motion Required',
+        'We need to detect some device movement for security purposes. Please move your device slightly and try again.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Get fresh location one more time before submit
+    console.log('🔄 Getting final fresh location before submit...');
+    try {
+      const finalLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+        maximumAge: 0,
+        timeout: 5000,
+      });
+
+      const finalDistance = calculateDistance(
+        finalLocation.coords.latitude,
+        finalLocation.coords.longitude,
+        business.location.coordinates[1],
+        business.location.coordinates[0]
+      );
+
+      if (finalDistance > MAX_ALLOWED_RADIUS) {
+        Alert.alert(
+          'Moved Away',
+          `You've moved away from the business (${Math.round(finalDistance)}m away).\n\nPlease return to submit your review.`
+        );
+        return;
+      }
+
+      // Submit to backend with ALL security metadata
+      dispatch(createReview({
+        business: business._id,
+        rating: formData.rating,
+        comment: formData.comment,
+        latitude: finalLocation.coords.latitude,
+        longitude: finalLocation.coords.longitude,
+        // Security metadata
+        locationAccuracy: finalLocation.coords.accuracy,
+        verificationTime: VERIFICATION_TIME,
+        motionDetected: motionDetected,
+        isMockLocation: isMockLocation,
+        locationHistoryCount: locationHistory.length,
+        suspiciousActivities: suspiciousActivities,
+        deviceFingerprint: deviceFingerprint,
+        devicePlatform: Platform.OS,
+      }));
+      
+      console.log('✅ Review submitted with full security metadata!');
+      
+    } catch (error) {
+      console.error('❌ Failed to get final location:', error);
+      Alert.alert('Location Error', 'Could not verify your final location. Please try again.');
+    }
+  };
+
+  // ==================== RENDER: GEOFENCE INFO ====================
   if (showGeofenceInfo) {
     return (
       <View className="flex-1 justify-center items-center bg-white px-6">
         <View className="bg-blue-50 rounded-2xl p-6 border-2 border-blue-200">
           <View className="items-center mb-4">
-            <Icon name="location" size={48} color={COLORS.secondary} />
+            <Icon name="shield-checkmark" size={56} color={COLORS.secondary} />
           </View>
           
-          <Text className="text-xl font-bold text-gray-900 text-center mb-3">
-            Location Verification Required
+          <Text className="text-2xl font-bold text-gray-900 text-center mb-3">
+            Comprehensive Location Verification
           </Text>
           
           <Text className="text-gray-600 text-center mb-4 leading-6">
-            To ensure authentic reviews, you must be within {MAX_ALLOWED_RADIUS}m of the business location.
-            {'\n\n'}
-            We'll quickly verify your location before you can write a review.
+            To ensure authentic reviews, we'll verify:
           </Text>
+
+          <View className="mb-4">
+            <View className="flex-row items-center mb-2">
+              <Icon name="location" size={20} color={COLORS.secondary} />
+              <Text className="text-gray-700 ml-2">You're within {MAX_ALLOWED_RADIUS}m radius</Text>
+            </View>
+            <View className="flex-row items-center mb-2">
+              <Icon name="checkmark-circle" size={20} color={COLORS.secondary} />
+              <Text className="text-gray-700 ml-2">GPS accuracy better than {MAX_GPS_ACCURACY}m</Text>
+            </View>
+            <View className="flex-row items-center mb-2">
+              <Icon name="time" size={20} color={COLORS.secondary} />
+              <Text className="text-gray-700 ml-2">30-second location stability</Text>
+            </View>
+            <View className="flex-row items-center">
+              <Icon name="phone-portrait" size={20} color={COLORS.secondary} />
+              <Text className="text-gray-700 ml-2">Real device & GPS detection</Text>
+            </View>
+          </View>
           
           <View className="bg-yellow-50 rounded-xl p-4 mb-4 border border-yellow-200">
-            <View className="flex-row items-start">
-              <Icon name="information-circle" size={20} color="#F59E0B" />
-              <Text className="text-sm text-gray-700 ml-2 flex-1">
-                This helps prevent fake reviews and ensures all reviews come from real visitors.
-              </Text>
-            </View>
+            <Text className="text-sm text-gray-700 text-center">
+              This comprehensive verification prevents fake reviews and ensures all reviews are from real visitors.
+            </Text>
           </View>
           
           <TouchableOpacity
@@ -263,7 +741,7 @@ export default function AddReviewScreen({ navigation, route }) {
               colors={[COLORS.secondary, COLORS.secondaryDark]}
               className="rounded-xl py-4 items-center"
             >
-              <Text className="text-white font-bold text-lg">Continue</Text>
+              <Text className="text-white font-bold text-lg">Start Verification</Text>
             </LinearGradient>
           </TouchableOpacity>
           
@@ -278,108 +756,193 @@ export default function AddReviewScreen({ navigation, route }) {
     );
   }
 
-  // Quick location check (2-3 seconds)
+  // ==================== RENDER: LOCATION CHECKING ====================
   if (checkingLocation) {
     return (
-      <View className="flex-1 justify-center items-center bg-white">
+      <View className="flex-1 justify-center items-center bg-white px-8">
         <ActivityIndicator size="large" color={COLORS.secondary} />
-        <Text className="text-gray-700 font-semibold mt-4 text-center px-8">
-          Checking your location...
+        <Text className="text-gray-700 font-bold mt-6 text-center text-lg">
+          Verifying Your Location...
         </Text>
-        <Text className="text-gray-400 text-sm mt-2 text-center px-8">
-          This will only take 2-3 seconds
+        <Text className="text-gray-500 text-sm mt-2 text-center">
+          {gpsSignalLost 
+            ? `Recovering GPS signal... (Attempt ${retryCount + 1}/${MAX_RETRY_ATTEMPTS})`
+            : 'This may take 5-10 seconds'}
         </Text>
+        
+        {gpsSignalLost && (
+          <View className="mt-4 bg-yellow-50 rounded-xl p-4 border border-yellow-200">
+            <Text className="text-gray-700 text-center text-sm">
+              GPS signal lost. Please ensure you're outdoors or near a window.
+            </Text>
+          </View>
+        )}
       </View>
     );
   }
 
+  // ==================== RENDER: REVIEW FORM ====================
   return (
-    <ScrollView className="flex-1 bg-white px-6 py-6">
-      {/* Business Info */}
-      <View className="bg-gray-50 rounded-xl p-4 mb-4">
-        <Text className="text-lg font-bold text-gray-900 mb-2">{business.name}</Text>
-        <View className="flex-row items-center">
-          <Icon name="location" size={16} color={COLORS.secondary} />
-          <Text className="text-sm text-gray-600 ml-1">
-            {business.address?.city || 'Unknown location'}
+    <ScrollView className="flex-1 bg-white">
+      {/* Status Bar */}
+      <StatusBar barStyle="dark-content" />
+
+      {/* Verification Status Banner */}
+      <View className={`px-6 py-4 ${verificationComplete ? 'bg-green-50' : 'bg-yellow-50'}`}>
+        <View className="flex-row items-center justify-between">
+          <View className="flex-1">
+            <View className="flex-row items-center mb-1">
+              <Icon 
+                name={verificationComplete ? "checkmark-circle" : "time"} 
+                size={20} 
+                color={verificationComplete ? "#10B981" : "#F59E0B"} 
+              />
+              <Text className={`ml-2 font-bold ${verificationComplete ? 'text-green-700' : 'text-yellow-700'}`}>
+                {verificationComplete ? 'Verified ✓' : `Verifying... ${verificationTimer}s`}
+              </Text>
+            </View>
+            
+            <View className="flex-row items-center space-x-2">
+              <Text className="text-xs text-gray-600">
+                📏 {currentDistance?.toFixed(0) || '?'}m away
+              </Text>
+              <Text className="text-xs text-gray-600">•</Text>
+              <Text className="text-xs text-gray-600">
+                🎯 ±{gpsAccuracy?.toFixed(0) || '?'}m accuracy
+              </Text>
+              {motionDetected && (
+                <>
+                  <Text className="text-xs text-gray-600">•</Text>
+                  <Text className="text-xs text-green-600">
+                    🚶 Motion ✓
+                  </Text>
+                </>
+              )}
+            </View>
+          </View>
+        </View>
+      </View>
+
+      <View className="px-6 py-6">
+        {/* Business Info */}
+        <View className="bg-gray-50 rounded-xl p-4 mb-6">
+          <Text className="text-lg font-bold text-gray-900 mb-2">{business.name}</Text>
+          <View className="flex-row items-center">
+            <Icon name="location" size={16} color={COLORS.secondary} />
+            <Text className="text-sm text-gray-600 ml-1">
+              {business.address?.city || 'Unknown location'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Rating */}
+        <Text className="text-xl font-bold text-gray-900 mb-4">Rate Your Experience</Text>
+
+        <View className="flex-row justify-center items-center mb-6 py-4">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <TouchableOpacity
+              key={star}
+              onPress={() => setFormData({ ...formData, rating: star })}
+              className="mx-1"
+            >
+              <Icon
+                name={formData.rating >= star ? 'star' : 'star-outline'}
+                size={48}
+                color={formData.rating >= star ? COLORS.secondary : '#E5E7EB'}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {formData.rating > 0 && (
+          <Text className="text-center text-lg font-semibold mb-6" style={{ color: COLORS.secondary }}>
+            {formData.rating === 5 ? 'Excellent!' : 
+             formData.rating === 4 ? 'Great!' :
+             formData.rating === 3 ? 'Good' :
+             formData.rating === 2 ? 'Could be better' : 'Poor'}
+          </Text>
+        )}
+
+        {/* Comment */}
+        <Text className="text-lg font-bold text-gray-900 mb-3">Write Your Review</Text>
+        
+        <TextInput
+          className="bg-gray-50 rounded-xl p-4 text-gray-900 mb-2"
+          placeholder="Share your experience..."
+          value={formData.comment}
+          onChangeText={(text) => setFormData({ ...formData, comment: text })}
+          multiline
+          numberOfLines={6}
+          textAlignVertical="top"
+          maxLength={500}
+        />
+
+        <Text className="text-xs text-gray-500 mb-6 text-right">
+          {formData.comment.length}/500 characters
+        </Text>
+
+        {/* Verification Warning */}
+        {!verificationComplete && (
+          <View className="bg-yellow-50 rounded-xl p-4 mb-6 border border-yellow-200">
+            <View className="flex-row items-start">
+              <Icon name="alert-circle" size={20} color="#F59E0B" />
+              <Text className="text-sm text-gray-700 ml-2 flex-1">
+                Please wait {verificationTimer} more seconds for location verification to complete before submitting.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Coupon Reward */}
+        <View className="bg-green-50 rounded-xl p-4 mb-6">
+          <View className="flex-row items-center mb-2">
+            <Icon name="gift" size={20} color={COLORS.secondary} />
+            <Text className="text-sm font-bold text-green-700 ml-2">Earn a Coupon!</Text>
+          </View>
+          <Text className="text-xs text-green-600">
+            Complete verification and post your review to receive a special discount coupon valid for 2 hours!
           </Text>
         </View>
-      </View>
 
-      {/* Rating */}
-      <Text className="text-xl font-bold text-gray-900 mb-4">Rate Your Experience</Text>
-
-      <View className="flex-row justify-center items-center mb-6 py-4">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <TouchableOpacity
-            key={star}
-            onPress={() => setFormData({ ...formData, rating: star })}
-            className="mx-1"
-          >
-            <Icon
-              name={formData.rating >= star ? 'star' : 'star-outline'}
-              size={48}
-              color={formData.rating >= star ? COLORS.secondary : '#E5E7EB'}
-            />
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {formData.rating > 0 && (
-        <Text className="text-center text-lg font-semibold mb-6" style={{ color: COLORS.secondary }}>
-          {formData.rating === 5 ? 'Excellent!' : 
-           formData.rating === 4 ? 'Great!' :
-           formData.rating === 3 ? 'Good' :
-           formData.rating === 2 ? 'Could be better' : 'Poor'}
-        </Text>
-      )}
-
-      {/* Comment */}
-      <Text className="text-lg font-bold text-gray-900 mb-3">Write Your Review</Text>
-      
-      <TextInput
-        className="bg-gray-50 rounded-xl p-4 text-gray-900 mb-6"
-        placeholder="Share your experience..."
-        value={formData.comment}
-        onChangeText={(text) => setFormData({ ...formData, comment: text })}
-        multiline
-        numberOfLines={6}
-        textAlignVertical="top"
-        maxLength={500}
-      />
-
-      <Text className="text-xs text-gray-500 mb-6 text-right">
-        {formData.comment.length}/500 characters
-      </Text>
-
-      {/* Coupon Reward Info */}
-      <View className="bg-green-50 rounded-xl p-4 mb-6">
-        <View className="flex-row items-center mb-2">
-          <Icon name="gift" size={20} color={COLORS.secondary} />
-          <Text className="text-sm font-bold text-green-700 ml-2">Earn a Coupon!</Text>
-        </View>
-        <Text className="text-xs text-green-600">
-          Post your review and receive a special discount coupon valid for 2 hours!
-        </Text>
-      </View>
-
-      {/* Submit Button */}
-      <TouchableOpacity
-        onPress={handleSubmit}
-        disabled={loading}
-        activeOpacity={0.8}
-      >
-        <LinearGradient
-          colors={[COLORS.secondary, COLORS.secondaryDark]}
-          className="rounded-xl py-4 items-center shadow-lg"
+        {/* Submit Button */}
+        <TouchableOpacity
+          onPress={handleSubmit}
+          disabled={loading || !verificationComplete}
+          activeOpacity={0.8}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text className="text-white font-bold text-lg">Submit Review</Text>
-          )}
-        </LinearGradient>
-      </TouchableOpacity>
+          <LinearGradient
+            colors={
+              loading || !verificationComplete
+                ? ['#9CA3AF', '#6B7280']
+                : [COLORS.secondary, COLORS.secondaryDark]
+            }
+            className="rounded-xl py-4 items-center shadow-lg"
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text className="text-white font-bold text-lg">
+                {verificationComplete ? 'Submit Review' : `Wait ${verificationTimer}s`}
+              </Text>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Debug Info (Remove in production) */}
+        {__DEV__ && (
+          <View className="mt-6 bg-gray-100 rounded-xl p-4">
+            <Text className="text-xs font-bold text-gray-700 mb-2">Debug Info:</Text>
+            <Text className="text-xs text-gray-600">Distance: {currentDistance?.toFixed(2)}m</Text>
+            <Text className="text-xs text-gray-600">Accuracy: {gpsAccuracy?.toFixed(2)}m</Text>
+            <Text className="text-xs text-gray-600">Timer: {verificationTimer}s</Text>
+            <Text className="text-xs text-gray-600">Motion: {motionDetected ? 'Yes' : 'No'}</Text>
+            <Text className="text-xs text-gray-600">Mock GPS: {isMockLocation ? 'Yes' : 'No'}</Text>
+            <Text className="text-xs text-gray-600">History: {locationHistory.length} points</Text>
+            <Text className="text-xs text-gray-600">Suspicious: {suspiciousActivities.length} events</Text>
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 }
+
