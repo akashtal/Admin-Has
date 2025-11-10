@@ -26,6 +26,7 @@ export default function AddReviewScreen({ navigation, route }) {
   const [checkingLocation, setCheckingLocation] = useState(true);
   const [verificationTime, setVerificationTime] = useState(0);
   const [isVerified, setIsVerified] = useState(false);
+  const [showGeofenceInfo, setShowGeofenceInfo] = useState(true); // Show info popup first
   
   // Security & monitoring state
   const [locationHistory, setLocationHistory] = useState([]);
@@ -44,7 +45,8 @@ export default function AddReviewScreen({ navigation, route }) {
   const MAX_ALLOWED_RADIUS = business.radius || 500;
 
   useEffect(() => {
-    initializeLocationVerification();
+    // Show info popup first, don't start verification yet
+    // Verification will start after user acknowledges popup
     
     return () => {
       // Cleanup on unmount
@@ -87,15 +89,15 @@ export default function AddReviewScreen({ navigation, route }) {
     }
   }, [error]);
 
-  // Initialize location verification
+  // Quick location verification (2-3 seconds max)
   const initializeLocationVerification = async () => {
     try {
       // Step 1: Request permissions
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         showDetailedError(
-          'Permission Denied',
-          'Location permission is required to verify you are at the business location.',
+          'Permission Required',
+          'We need your location to verify you are at the business. This ensures review authenticity.',
           'PERMISSION_DENIED'
         );
         return;
@@ -105,19 +107,19 @@ export default function AddReviewScreen({ navigation, route }) {
       const locationEnabled = await Location.hasServicesEnabledAsync();
       if (!locationEnabled) {
         showDetailedError(
-          'Location Services Disabled',
-          'Please enable GPS/Location services in your device settings.',
+          'Enable Location Services',
+          'Please turn on GPS/Location in your device settings to continue.',
           'LOCATION_DISABLED'
         );
         return;
       }
 
-      // Step 3: Get initial location with high accuracy
-      console.log('📍 Getting initial GPS location...');
+      // Step 3: Quick location check (2-3 seconds, not 15!)
+      console.log('📍 Quick location check...');
       const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-        maximumAge: 5000, // Cache for max 5 seconds
-        timeout: 15000, // 15 second timeout
+        accuracy: Location.Accuracy.Balanced, // Faster than High
+        maximumAge: 10000, // Use 10-second cache for speed
+        timeout: 3000, // Only wait 3 seconds
       });
 
       // Step 4: Validate GPS accuracy
@@ -165,8 +167,8 @@ export default function AddReviewScreen({ navigation, route }) {
       // Step 7: Check if within geofence
       if (distance > MAX_ALLOWED_RADIUS) {
         showDetailedError(
-          'Too Far Away',
-          `You must be within ${MAX_ALLOWED_RADIUS}m of the business.\n\nYou are currently ${Math.round(distance)}m away.\n\nPlease visit the business location to leave a review.`,
+          'Outside Business Radius',
+          `You are outside the business radius (${Math.round(distance)}m away).\n\nPlease visit the business location to leave a review.\n\nRequired: Within ${MAX_ALLOWED_RADIUS}m`,
           'OUT_OF_RANGE'
         );
         return;
@@ -185,30 +187,31 @@ export default function AddReviewScreen({ navigation, route }) {
       // Step 11: Start verification timer
       startVerificationTimer();
 
-      // Step 12: Success - show form
+      // Step 12: Success - show form immediately
       setCheckingLocation(false);
       
-      console.log('✅ Initial location verification passed!');
+      console.log('✅ Quick location check passed! Showing review form...');
+      console.log('📊 Background monitoring started (30-second verification running)');
       
     } catch (error) {
       console.error('❌ Location verification error:', error);
       
       if (error.code === 'E_LOCATION_TIMEOUT') {
         showDetailedError(
-          'Location Timeout',
-          'Could not get your location in time. Please ensure GPS is enabled and you have a clear view of the sky.',
+          'GPS Signal Issue',
+          'Could not get your location quickly enough.\n\nPlease ensure:\n• GPS is enabled\n• You are not indoors or in a covered area\n• Your device has clear sky view',
           'TIMEOUT'
         );
       } else if (error.code === 'E_LOCATION_UNAVAILABLE') {
         showDetailedError(
           'Location Unavailable',
-          'Your device location is temporarily unavailable. Please try again in a moment.',
+          'Your device location is temporarily unavailable. Please check your GPS settings and try again.',
           'UNAVAILABLE'
         );
       } else {
         showDetailedError(
           'Location Error',
-          'Failed to get your location. Please check your device settings and try again.',
+          'Unable to access your location. Please check that Location Services are enabled in your device settings.',
           'UNKNOWN_ERROR'
         );
       }
@@ -280,10 +283,10 @@ export default function AddReviewScreen({ navigation, route }) {
     // Check if user moved out of range
     if (distance > MAX_ALLOWED_RADIUS) {
       Alert.alert(
-        'Moved Out of Range',
-        `You have moved ${Math.round(distance)}m away from the business. Please return to the location to complete your review.`,
+        'Outside Business Radius',
+        `You have moved ${Math.round(distance)}m away from the business.\n\nPlease return to the business location to complete your review.\n\nRequired: Within ${MAX_ALLOWED_RADIUS}m`,
         [
-          { text: 'OK', onPress: () => navigation.goBack() }
+          { text: 'OK, I Understand', onPress: () => navigation.goBack() }
         ],
         { cancelable: false }
       );
@@ -355,29 +358,38 @@ export default function AddReviewScreen({ navigation, route }) {
     return R * c;
   };
 
-  // Show detailed error with retry/report options
+  // Show detailed error with helpful guidance
   const showDetailedError = (title, message, errorCode) => {
-    Alert.alert(
-      title,
-      message,
-      [
+    const buttons = [];
+    
+    // For "OUT_OF_RANGE", don't offer retry - they need to physically move
+    if (errorCode === 'OUT_OF_RANGE') {
+      buttons.push({
+        text: 'OK, I Understand',
+        onPress: () => navigation.goBack()
+      });
+    } else {
+      // For other errors, offer retry
+      buttons.push(
         {
           text: 'Retry',
           onPress: () => {
+            setShowGeofenceInfo(true);
             setCheckingLocation(true);
-            setTimeout(() => initializeLocationVerification(), 1000);
           }
-        },
-        {
-          text: 'Report Issue',
-          onPress: () => handleReportIssue(errorCode)
         },
         {
           text: 'Cancel',
           onPress: () => navigation.goBack(),
           style: 'cancel'
         }
-      ],
+      );
+    }
+    
+    Alert.alert(
+      title,
+      message,
+      buttons,
       { cancelable: false }
     );
   };
@@ -434,9 +446,9 @@ export default function AddReviewScreen({ navigation, route }) {
     // Validation 4: Still within radius
     if (currentDistance > MAX_ALLOWED_RADIUS) {
       Alert.alert(
-        'Out of Range',
-        `You've moved ${Math.round(currentDistance)}m away. Please return to the business location.`,
-        [{ text: 'OK' }]
+        'Outside Business Radius',
+        `You've moved ${Math.round(currentDistance)}m away from the business.\n\nPlease return to the business location within ${MAX_ALLOWED_RADIUS}m to submit your review.`,
+        [{ text: 'OK, I Understand' }]
       );
       return;
     }
@@ -444,8 +456,8 @@ export default function AddReviewScreen({ navigation, route }) {
     // Validation 5: GPS accuracy still good
     if (locationAccuracy > MAX_GPS_ACCURACY) {
       Alert.alert(
-        'Poor GPS Signal',
-        'GPS accuracy has degraded. Please ensure you have a clear view of the sky and try again.',
+        'GPS Signal Issue',
+        `Your GPS accuracy has degraded to ${Math.round(locationAccuracy)}m.\n\nPlease move to an area with better GPS signal (outdoor/near window) and try again.`,
         [{ text: 'OK' }]
       );
       return;
@@ -502,13 +514,70 @@ export default function AddReviewScreen({ navigation, route }) {
     return '#6B7280'; // Gray
   };
 
+  // Show geofence info popup first
+  if (showGeofenceInfo) {
+    return (
+      <View className="flex-1 justify-center items-center bg-white px-6">
+        <View className="bg-blue-50 rounded-2xl p-6 border-2 border-blue-200">
+          <View className="items-center mb-4">
+            <Icon name="location" size={48} color={COLORS.secondary} />
+          </View>
+          
+          <Text className="text-xl font-bold text-gray-900 text-center mb-3">
+            Location Verification Required
+          </Text>
+          
+          <Text className="text-gray-600 text-center mb-4 leading-6">
+            To ensure authentic reviews, you must be within {MAX_ALLOWED_RADIUS}m of the business location.
+            {'\n\n'}
+            We'll quickly verify your location before you can write a review.
+          </Text>
+          
+          <View className="bg-yellow-50 rounded-xl p-4 mb-4 border border-yellow-200">
+            <View className="flex-row items-start">
+              <Icon name="information-circle" size={20} color="#F59E0B" />
+              <Text className="text-sm text-gray-700 ml-2 flex-1">
+                This helps prevent fake reviews and ensures all reviews come from real visitors.
+              </Text>
+            </View>
+          </View>
+          
+          <TouchableOpacity
+            onPress={() => {
+              setShowGeofenceInfo(false);
+              initializeLocationVerification();
+            }}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={[COLORS.secondary, COLORS.secondaryDark]}
+              className="rounded-xl py-4 items-center"
+            >
+              <Text className="text-white font-bold text-lg">Continue</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            className="mt-3 py-3 items-center"
+          >
+            <Text className="text-gray-500 font-semibold">Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Quick location check (2-3 seconds)
   if (checkingLocation) {
     return (
       <View className="flex-1 justify-center items-center bg-white">
         <ActivityIndicator size="large" color={COLORS.secondary} />
-        <Text className="text-gray-500 mt-4 text-center px-8">
-          Verifying your location...{'\n'}
-          <Text className="text-xs text-gray-400">This ensures review authenticity</Text>
+        <Text className="text-gray-700 font-semibold mt-4 text-center px-8">
+          Checking your location...
+        </Text>
+        <Text className="text-gray-400 text-sm mt-2 text-center px-8">
+          This will only take 2-3 seconds
         </Text>
       </View>
     );
