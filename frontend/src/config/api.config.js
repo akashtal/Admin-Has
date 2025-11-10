@@ -1,15 +1,17 @@
 // API Configuration
 export const API_CONFIG = {
-  // Change this to your deployed backend URL
+  // 🔧 DEVELOPMENT MODE: Using local backend
+  // Change this to your deployed backend URL for production
   // IMPORTANT: For Expo Go on phone, use your computer's IP address
   // To find your IP: Run "ipconfig" in PowerShell and look for IPv4 Address
-  BASE_URL: __DEV__ 
-    ? 'http://10.44.239.239:5000/api'  // ← YOUR COMPUTER'S IP (Updated to current IP)
-    : 'https://your-backend-api.com/api',
   
-  SOCKET_URL: __DEV__
-    ? 'http://10.44.239.239:5000'      // ← YOUR COMPUTER'S IP (Updated to current IP)
-    : 'https://your-backend-api.com',
+  // 🏠 LOCAL BACKEND (Development)
+  BASE_URL: 'http://192.168.29.151:5000/api',  // ✅ Local backend
+  SOCKET_URL: 'http://192.168.29.151:5000',    // ✅ Local Socket.io
+  
+  // 🌐 PRODUCTION BACKEND (Uncomment for production)
+  // BASE_URL: 'https://hashview-backend.onrender.com/api',
+  // SOCKET_URL: 'https://hashview-backend.onrender.com',
   
   TIMEOUT: 30000, // 30 seconds
   
