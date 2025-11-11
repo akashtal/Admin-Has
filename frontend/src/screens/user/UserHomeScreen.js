@@ -104,33 +104,31 @@ export default function UserHomeScreen({ navigation }) {
     }
   };
 
-  // Fetch businesses with server-side star-based rating and distance filters
+  // Fetch businesses - BACKEND HANDLES EVERYTHING
   const fetchFilteredBusinesses = useCallback(async () => {
+    // Build params - backend will handle all logic
     const params = {};
     
-    // Only apply rating filters if both source and stars are selected
+    // Add rating filter (if both source and stars selected)
     if (ratingFilter.source && ratingFilter.stars) {
       params.ratingSource = ratingFilter.source;
       params.minRating = ratingFilter.stars;
     }
 
-    // Add distance filter if selected
+    // Add distance filter
     if (distanceFilter) {
       params.distance = distanceFilter;
     }
 
-    // If location available, get nearby businesses with filters
-    if (hasLocation) {
-      await dispatch(getNearbyBusinesses({ 
-        ...params,
-        latitude: user?.location?.coordinates?.[1],
-        longitude: user?.location?.coordinates?.[0]
-      }));
+    // Add location (backend will calculate distances and sort)
+    if (hasLocation && user?.location?.coordinates) {
+      params.latitude = user.location.coordinates[1];
+      params.longitude = user.location.coordinates[0];
+      await dispatch(getNearbyBusinesses(params));
     } else {
-      // Get all active businesses with filters (no distance filter without location)
       await dispatch(getAllActiveBusinesses(params));
     }
-  }, [ratingFilter, distanceFilter, hasLocation, user, dispatch]); // Close useCallback with dependencies
+  }, [ratingFilter, distanceFilter, hasLocation, user, dispatch]);
 
   // Memoize onRefresh to prevent recreation on every render
   const onRefresh = useCallback(async () => {
@@ -146,35 +144,27 @@ export default function UserHomeScreen({ navigation }) {
     }
   }, [ratingFilter.source, ratingFilter.stars, distanceFilter, fetchFilteredBusinesses]);
 
-  // Real-time search with debouncing (server-side)
+  // Search - Simple debounce, backend does everything
   const handleSearch = useCallback(async (query) => {
     setSearchQuery(query);
     
-    // Clear previous timeout
-    if (searchTimeout.current) {
-      clearTimeout(searchTimeout.current);
-    }
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
     
-    // If query is empty, hide dropdown
     if (!query.trim()) {
       setShowSearchDropdown(false);
       setSearchResults([]);
       return;
     }
     
-    // Show loading and dropdown
     setSearchLoading(true);
     setShowSearchDropdown(true);
     
-    // Debounce API call (wait 300ms after user stops typing)
+    // Debounce only to reduce API calls - backend handles all logic
     searchTimeout.current = setTimeout(async () => {
       try {
-        const params = { 
-          search: query.trim(),
-          limit: 10 // Limit autocomplete results
-        };
+        const params = { search: query.trim(), limit: 10 };
         
-        // Add location if available for distance sorting
+        // Add location - backend calculates & sorts
         if (hasLocation && user?.location?.coordinates) {
           params.latitude = user.location.coordinates[1];
           params.longitude = user.location.coordinates[0];
@@ -183,12 +173,11 @@ export default function UserHomeScreen({ navigation }) {
         const result = await dispatch(searchBusinesses(params)).unwrap();
         setSearchResults(result || []);
       } catch (error) {
-        console.error('Search error:', error);
         setSearchResults([]);
       } finally {
         setSearchLoading(false);
       }
-    }, 300); // 300ms debounce
+    }, 300);
   }, [dispatch, hasLocation, user]);
 
   // Handle search result selection
