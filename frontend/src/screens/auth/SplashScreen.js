@@ -40,7 +40,7 @@ export default function SplashScreen({ navigation }) {
     >
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       
-      {/* Logo */}
+      {/* Logo with white circular background */}
       <Animated.View 
         style={{
           transform: [{ scale: scaleAnim }],
@@ -48,11 +48,27 @@ export default function SplashScreen({ navigation }) {
         }}
         className="items-center"
       >
-        <Image
-          source={require('../../../assets/HashViewlogo-01.png')}
-          style={{ width: 280, height: 280 }}
-          resizeMode="contain"
-        />
+        <View 
+          style={{
+            width: 300,
+            height: 300,
+            borderRadius: 150,
+            backgroundColor: 'white',
+            justifyContent: 'center',
+            alignItems: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 8,
+          }}
+        >
+          <Image
+            source={require('../../../assets/HashViewlogo-01.png')}
+            style={{ width: 280, height: 280 }}
+            resizeMode="contain"
+          />
+        </View>
       </Animated.View>
     </LinearGradient>
   );
