@@ -274,18 +274,11 @@ exports.createReview = async (req, res, next) => {
       // Don't block, but flag for review
     }
 
-    // CHECK #5: Motion Detection (anti-spoofing)
-    if (motionDetected === false) {
-      console.log(`   ⚠️ WARNING: No motion detected during verification`);
-      
-      await logSuspiciousBehavior(req.user.id, 'NO_MOTION_DETECTED', {
-        businessId: businessId,
-        locationHistoryCount: locationHistoryCount
-      });
-      
-      // Flag but don't block (could be legitimate)
+    // CHECK #5: Motion Detection (removed - not required for submission)
+    // We still log it for analytics, but don't block reviews
+    if (motionDetected !== undefined) {
+      console.log(`   ℹ️ Motion detected: ${motionDetected} (informational only)`);
     }
-    console.log(`   ✅ PASSED: Motion detected = ${motionDetected}`);
 
     // CHECK #6: Mock Location Detection
     if (isMockLocation === true) {

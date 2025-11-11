@@ -8,7 +8,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/Ionicons';
 import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
-import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { createReview, clearSuccessMessage } from '../../store/slices/reviewSlice';
 import COLORS from '../../config/colors';
 
@@ -100,6 +100,32 @@ export default function AddReviewScreen({ navigation, route }) {
     }
   }, [error]);
 
+  // 🔄 CRITICAL: Reset location when business changes (prevents cache bug!)
+  useEffect(() => {
+    setLocation(null);
+    setCheckingLocation(true);
+    setShowGeofenceInfo(true);
+    setVerificationComplete(false);
+    setLocationHistory([]);
+    setCurrentDistance(null);
+    
+    // Clean up subscriptions
+    if (locationSubscription.current) {
+      locationSubscription.current.remove();
+      locationSubscription.current = null;
+    }
+    if (timerInterval.current) {
+      clearInterval(timerInterval.current);
+      timerInterval.current = null;
+    }
+    if (accelerometerSubscription.current) {
+      accelerometerSubscription.current.remove();
+      accelerometerSubscription.current = null;
+    }
+    
+    console.log('🔄 Business changed — forcing fresh GPS verification for:', business.name);
+  }, [business._id]);
+
   // ==================== DEVICE FINGERPRINTING ====================
   useEffect(() => {
     createDeviceFingerprint();
@@ -108,15 +134,16 @@ export default function AddReviewScreen({ navigation, route }) {
   const createDeviceFingerprint = async () => {
     try {
       const fingerprint = {
-        deviceId: Device.modelId || 'unknown',
-        deviceName: Device.deviceName || 'unknown',
-        manufacturer: Device.manufacturer || 'unknown',
-        modelName: Device.modelName || 'unknown',
-        osName: Device.osName || 'unknown',
-        osVersion: Device.osVersion || 'unknown',
+        deviceId: Constants.sessionId || 'unknown',
+        deviceName: Constants.deviceName || 'unknown',
+        manufacturer: Platform.OS === 'android' ? 'Android' : 'Apple',
+        modelName: Constants.platform?.ios?.model || Constants.platform?.android?.model || 'unknown',
+        osName: Platform.OS,
+        osVersion: Platform.Version.toString(),
         platform: Platform.OS,
         platformVersion: Platform.Version,
-        isDevice: Device.isDevice,
+        isDevice: !Constants.isDevice ? false : true,
+        appVersion: Constants.expoConfig?.version || '1.0.0',
         timestamp: Date.now()
       };
       
@@ -124,7 +151,73 @@ export default function AddReviewScreen({ navigation, route }) {
       console.log('🔐 Device fingerprint created:', fingerprint);
     } catch (error) {
       console.error('❌ Error creating device fingerprint:', error);
+      // Fallback fingerprint if error
+      setDeviceFingerprint({
+        platform: Platform.OS,
+        platformVersion: Platform.Version,
+        timestamp: Date.now()
+      });
     }
+  };
+
+  // ==================== GET TRULY FRESH GPS (ChatGPT's Solution) ====================
+  const getFreshLocation = async () => {
+    return new Promise(async (resolve, reject) => {
+      let gotFresh = false;
+      let subscription = null;
+      let bestReading = null;
+      let bestAccuracy = 999;
+
+      try {
+        console.log('📡 Forcing fresh GPS fix (waiting for accuracy ≤ 35m)...');
+        
+        subscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Highest,
+            distanceInterval: 1, // Update on small movements
+            timeInterval: 1000,  // Check every second
+          },
+          (loc) => {
+            const accuracy = loc.coords.accuracy ?? 999;
+            console.log(`📍 GPS reading: accuracy ${accuracy.toFixed(1)}m`);
+
+            // Store best reading
+            if (accuracy < bestAccuracy) {
+              bestAccuracy = accuracy;
+              bestReading = loc.coords;
+            }
+
+            // ✅ Accept GOOD readings (≤ 35m) - Relaxed from 20m
+            if (accuracy <= 35 && !gotFresh) {
+              gotFresh = true;
+              console.log('✅ Got accurate GPS fix!');
+              if (subscription) subscription.remove();
+              resolve(loc.coords);
+            }
+          }
+        );
+
+        // Timeout after 10 seconds - use best available reading
+        setTimeout(() => {
+          if (!gotFresh) {
+            console.log(`⏱️ GPS timeout after 10s - using best reading (${bestAccuracy.toFixed(1)}m)`);
+            if (subscription) subscription.remove();
+            
+            // Accept best reading if it's reasonable (≤ 50m)
+            if (bestReading && bestAccuracy <= 50) {
+              console.log('✅ Accepting best available GPS reading');
+              resolve(bestReading);
+            } else {
+              reject(new Error('GPS accuracy too low. Please try again outdoors with clear sky view.'));
+            }
+          }
+        }, 10000);
+
+      } catch (error) {
+        if (subscription) subscription.remove();
+        reject(error);
+      }
+    });
   };
 
   // ==================== HAVERSINE DISTANCE CALCULATION ====================
@@ -443,13 +536,11 @@ export default function AddReviewScreen({ navigation, route }) {
         return;
       }
 
-      // Step 3: Get initial location with high accuracy
-      console.log('📍 Getting initial high-accuracy location...');
-      const initialLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-        maximumAge: 0, // NO CACHE!
-        timeout: 10000,
-      });
+      // Step 3: Get TRULY FRESH GPS (use the updated getFreshLocation function)
+      console.log('📍 Getting fresh GPS location...');
+      
+      const coords = await getFreshLocation();
+      const initialLocation = { coords };
 
       // Step 4: Check GPS accuracy
       if (initialLocation.coords.accuracy > MAX_GPS_ACCURACY) {
@@ -628,16 +719,9 @@ export default function AddReviewScreen({ navigation, route }) {
       return;
     }
 
-    // Validation 5: Motion detected (anti-spoofing)
-    if (!motionDetected) {
-      Alert.alert(
-        'Motion Required',
-        'We need to detect some device movement for security purposes. Please move your device slightly and try again.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
+    // Validation 5: Motion detection (removed - not required)
+    // Motion sensor still runs for metadata, but doesn't block submission
+    
     // Get fresh location one more time before submit
     console.log('🔄 Getting final fresh location before submit...');
     try {

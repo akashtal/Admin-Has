@@ -18,7 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { Picker } from '@react-native-picker/picker';
 import { registerBusiness } from '../../store/slices/businessSlice';
-import SimpleLocationPicker from '../../components/SimpleLocationPicker';
+import AdvancedLocationPicker from '../../components/AdvancedLocationPicker';
 import ApiService from '../../services/api.service';
 import COLORS from '../../config/colors';
 
@@ -33,6 +33,12 @@ export default function BusinessRegistrationScreen({ navigation }) {
     email: '',
     phone: '',
     address: '',
+    street: '',
+    area: '',
+    city: 'Guwahati',
+    state: 'Assam',
+    pincode: '',
+    landmark: '',
     description: '',
     website: '',
     tripAdvisorLink: '',
@@ -83,7 +89,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
     sunday: { open: '09:00 AM', close: '05:00 PM', closed: true }
   });
 
-  // Function to search for addresses using Google Places API or Nominatim
+  // Function to search for addresses using Google Places Autocomplete API
   const searchAddress = async (query) => {
     if (query.trim().length < 3) {
       setAddressSuggestions([]);
@@ -94,56 +100,74 @@ export default function BusinessRegistrationScreen({ navigation }) {
     try {
       setSearchingAddress(true);
       
-      // Using Nominatim (OpenStreetMap) - Free API
-      // You can replace this with Google Places API if you have an API key
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1&countrycodes=in`,
-        {
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'HashView/1.0'  // Nominatim requires a User-Agent
-          }
-        }
+      // Get Google API key from environment
+      const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY;
+      
+      if (!GOOGLE_API_KEY) {
+        console.error('❌ Google API key not configured');
+        Alert.alert('Configuration Error', 'Google API key is missing. Please contact support.');
+        setAddressSuggestions([]);
+        setShowAddressSuggestions(false);
+        return;
+      }
+      
+      // Step 1: Get place predictions using Places Autocomplete API
+      const autocompleteResponse = await fetch(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&components=country:in&types=establishment|geocode&key=${GOOGLE_API_KEY}`
       );
       
-      // Check if response is ok
-      if (!response.ok) {
-        console.error('Address search API error:', response.status);
-        setAddressSuggestions([]);
-        setShowAddressSuggestions(false);
-        return;
-      }
-
-      // Check content type
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.error('Address search API returned non-JSON response');
+      if (!autocompleteResponse.ok) {
+        console.error('Google Places API error:', autocompleteResponse.status);
         setAddressSuggestions([]);
         setShowAddressSuggestions(false);
         return;
       }
       
-      const data = await response.json();
+      const autocompleteData = await autocompleteResponse.json();
       
-      if (!Array.isArray(data)) {
-        console.error('Address search API returned invalid data');
+      if (autocompleteData.status !== 'OK' || !autocompleteData.predictions || autocompleteData.predictions.length === 0) {
+        console.log(`ℹ️ Google Places API returned: ${autocompleteData.status}`);
         setAddressSuggestions([]);
         setShowAddressSuggestions(false);
         return;
       }
       
-      const suggestions = data.map(item => ({
-        id: item.place_id,
-        address: item.display_name,
-        latitude: parseFloat(item.lat),
-        longitude: parseFloat(item.lon)
-      }));
+      // Step 2: Get detailed information (lat/lng) for each prediction
+      const detailedSuggestions = await Promise.all(
+        autocompleteData.predictions.slice(0, 5).map(async (prediction) => {
+          try {
+            const placeDetailsResponse = await fetch(
+              `https://maps.googleapis.com/maps/api/place/details/json?place_id=${prediction.place_id}&fields=formatted_address,geometry&key=${GOOGLE_API_KEY}`
+            );
+            
+            const placeDetailsData = await placeDetailsResponse.json();
+            
+            if (placeDetailsData.status === 'OK' && placeDetailsData.result) {
+              return {
+                id: prediction.place_id,
+                address: placeDetailsData.result.formatted_address || prediction.description,
+                latitude: placeDetailsData.result.geometry.location.lat,
+                longitude: placeDetailsData.result.geometry.location.lng,
+                placeId: prediction.place_id,
+                types: prediction.types || []
+              };
+            }
+            return null;
+          } catch (error) {
+            console.error('Error fetching place details:', error);
+            return null;
+          }
+        })
+      );
       
-      setAddressSuggestions(suggestions);
-      setShowAddressSuggestions(suggestions.length > 0);
+      // Filter out null results
+      const validSuggestions = detailedSuggestions.filter(s => s !== null);
       
-      if (suggestions.length > 0) {
-        console.log(`✅ Found ${suggestions.length} address suggestions`);
+      setAddressSuggestions(validSuggestions);
+      setShowAddressSuggestions(validSuggestions.length > 0);
+      
+      if (validSuggestions.length > 0) {
+        console.log(`✅ Found ${validSuggestions.length} accurate address suggestions`);
       }
     } catch (error) {
       console.error('Error searching address:', error);
@@ -164,6 +188,20 @@ export default function BusinessRegistrationScreen({ navigation }) {
 
     return () => clearTimeout(delayDebounce);
   }, [addressSearchQuery]);
+
+  // Function to update full address from manual fields
+  const updateFullAddress = (data) => {
+    const parts = [];
+    if (data.street) parts.push(data.street);
+    if (data.area) parts.push(data.area);
+    if (data.city) parts.push(data.city);
+    if (data.state) parts.push(data.state);
+    if (data.pincode) parts.push(data.pincode);
+    if (data.landmark) parts.push(`Near: ${data.landmark}`);
+    
+    const fullAddress = parts.join(', ');
+    setFormData(prev => ({ ...prev, address: fullAddress }));
+  };
 
   // Function to select address from suggestions
   const selectAddressSuggestion = (suggestion) => {
@@ -254,9 +292,11 @@ export default function BusinessRegistrationScreen({ navigation }) {
     }
   };
 
-  // Get current location on mount
+  // Don't auto-get location on mount - let owner choose
+  // This prevents capturing owner's home location if registering remotely
   useEffect(() => {
-    getLocation();
+    // Commented out - owner should explicitly choose GPS or address search
+    // getLocation();
   }, []);
 
   const categories = [
@@ -471,6 +511,13 @@ export default function BusinessRegistrationScreen({ navigation }) {
         email: formData.email?.trim() || '',
         phone: formData.phone?.trim() || '',
         address: formData.address?.trim() || '',
+        // Manual address fields (new)
+        street: formData.street?.trim() || '',
+        area: formData.area?.trim() || '',
+        city: formData.city?.trim() || '',
+        state: formData.state?.trim() || '',
+        pincode: formData.pincode?.trim() || '',
+        landmark: formData.landmark?.trim() || '',
         category: formData.category || '',
         latitude: parseFloat(location.latitude),
         longitude: parseFloat(location.longitude),
@@ -739,144 +786,143 @@ export default function BusinessRegistrationScreen({ navigation }) {
           />
         </View>
 
-        {/* Enhanced Address with Search & Manual Location Picker */}
+        {/* Manual Address Entry Fields */}
         <View className="mb-4">
-          <Text className="text-gray-900 font-semibold mb-2">Business Address & Location</Text>
+          <Text className="text-gray-900 font-semibold mb-3">Business Address</Text>
           
-          {/* Two Options: Search or Pick */}
-          <View className="bg-white rounded-xl border border-gray-200 p-4 mb-3">
-            {/* Option 1: Search Address */}
-            <View className="mb-3" style={{ zIndex: 100 }}>
-              <View className="flex-row items-center mb-2">
-                <View className="bg-blue-50 rounded-full w-8 h-8 items-center justify-center mr-2">
-                  <Text className="font-bold text-blue-600">1</Text>
-                </View>
-                <Text className="text-gray-700 font-medium">Search Address</Text>
-              </View>
-              
-              <View style={{ position: 'relative', zIndex: 100 }}>
-                <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
-                  <Icon name="search" size={20} color="#9CA3AF" />
-                  <TextInput
-                    className="flex-1 ml-3 text-gray-900"
-                    placeholder="Type your business address..."
-                    placeholderTextColor="#9CA3AF"
-                    value={addressSearchQuery}
-                    onChangeText={(value) => {
-                      setAddressSearchQuery(value);
-                      handleInputChange('address', value);
-                      if (value.trim().length >= 3) {
-                        setShowAddressSuggestions(true);
-                      } else {
-                        setShowAddressSuggestions(false);
-                        setAddressSuggestions([]);
-                      }
-                    }}
-                    onFocus={() => {
-                      if (addressSearchQuery.trim().length >= 3 && addressSuggestions.length > 0) {
-                        setShowAddressSuggestions(true);
-                      }
-                    }}
-                  />
-                  {searchingAddress && (
-                    <ActivityIndicator size="small" color={COLORS.primary} />
-                  )}
-                  {addressSearchQuery.length > 0 && !searchingAddress && (
-                    <TouchableOpacity onPress={() => {
-                      setAddressSearchQuery('');
-                      setAddressSuggestions([]);
-                      setShowAddressSuggestions(false);
-                      handleInputChange('address', '');
-                    }}>
-                      <Icon name="close-circle" size={20} color="#9CA3AF" />
-                    </TouchableOpacity>
-                  )}
-                </View>
+          {/* Street Address */}
+          <View className="mb-3">
+            <Text className="text-gray-700 font-medium mb-2">Street/Road *</Text>
+            <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
+              <Icon name="business" size={20} color="#9CA3AF" />
+              <TextInput
+                className="flex-1 ml-3 text-gray-900"
+                placeholder="e.g., Shop No. 5, GS Road, Lokhra Road"
+                placeholderTextColor="#9CA3AF"
+                value={formData.street || ''}
+                onChangeText={(value) => {
+                  setFormData({ ...formData, street: value });
+                  updateFullAddress({ ...formData, street: value });
+                }}
+              />
+            </View>
+          </View>
 
-                {/* Address Suggestions Dropdown - Fixed positioning */}
-                {showAddressSuggestions && addressSuggestions.length > 0 && (
-                  <View 
-                    className="absolute left-0 right-0 bg-white rounded-lg border-2 border-blue-400 shadow-2xl" 
-                    style={{ 
-                      top: 48,  // Position right below the search input
-                      maxHeight: 250, 
-                      elevation: 10,
-                      zIndex: 999,
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 4 },
-                      shadowOpacity: 0.3,
-                      shadowRadius: 5
-                    }}
-                  >
-                    <ScrollView 
-                      nestedScrollEnabled={true}
-                      keyboardShouldPersistTaps="handled"
-                      showsVerticalScrollIndicator={true}
-                    >
-                      {addressSuggestions.map((item, index) => (
-                        <TouchableOpacity
-                          key={item.id.toString()}
-                          onPress={() => selectAddressSuggestion(item)}
-                          className="px-4 py-4 border-b border-gray-100 flex-row items-center"
-                          activeOpacity={0.7}
-                          style={{ 
-                            backgroundColor: '#FAFAFA',
-                            borderBottomWidth: index === addressSuggestions.length - 1 ? 0 : 1 
-                          }}
-                        >
-                          <View className="bg-blue-50 rounded-full p-2 mr-3">
-                            <Icon name="location" size={18} color={COLORS.primary} />
-                          </View>
-                          <View className="flex-1">
-                            <Text className="text-gray-900 font-medium" numberOfLines={2}>
-                              {item.address.split(',')[0]}
-                            </Text>
-                            <Text className="text-gray-500 text-xs mt-1" numberOfLines={1}>
-                              {item.address.split(',').slice(1).join(',')}
-                            </Text>
-                          </View>
-                          <Icon name="arrow-forward-circle" size={20} color={COLORS.primary} />
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                )}
+          {/* Area/Locality */}
+          <View className="mb-3">
+            <Text className="text-gray-700 font-medium mb-2">Area/Locality *</Text>
+            <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
+              <Icon name="location" size={20} color="#9CA3AF" />
+              <TextInput
+                className="flex-1 ml-3 text-gray-900"
+                placeholder="e.g., Lal Ganesh, Paltan Bazaar"
+                placeholderTextColor="#9CA3AF"
+                value={formData.area || ''}
+                onChangeText={(value) => {
+                  setFormData({ ...formData, area: value });
+                  updateFullAddress({ ...formData, area: value });
+                }}
+              />
+            </View>
+          </View>
+
+          {/* City and State in Row */}
+          <View className="flex-row mb-3">
+            <View className="flex-1 mr-2">
+              <Text className="text-gray-700 font-medium mb-2">City *</Text>
+              <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
+                <Icon name="home" size={20} color="#9CA3AF" />
+                <TextInput
+                  className="flex-1 ml-2 text-gray-900"
+                  placeholder="Guwahati"
+                  placeholderTextColor="#9CA3AF"
+                  value={formData.city || ''}
+                  onChangeText={(value) => {
+                    setFormData({ ...formData, city: value });
+                    updateFullAddress({ ...formData, city: value });
+                  }}
+                />
               </View>
             </View>
-
-            {/* Divider */}
-            <View className="flex-row items-center my-3">
-              <View className="flex-1 h-px bg-gray-200" />
-              <Text className="mx-3 text-gray-500 text-xs">OR</Text>
-              <View className="flex-1 h-px bg-gray-200" />
-            </View>
-
-            {/* Option 2: Pick from Map */}
-            <View>
-              <View className="flex-row items-center mb-2">
-                <View className="bg-orange-50 rounded-full w-8 h-8 items-center justify-center mr-2">
-                  <Text className="font-bold text-orange-600">2</Text>
-                </View>
-                <Text className="text-gray-700 font-medium">Pick from Map</Text>
+            
+            <View className="flex-1 ml-2">
+              <Text className="text-gray-700 font-medium mb-2">State *</Text>
+              <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
+                <Icon name="flag" size={20} color="#9CA3AF" />
+                <TextInput
+                  className="flex-1 ml-2 text-gray-900"
+                  placeholder="Assam"
+                  placeholderTextColor="#9CA3AF"
+                  value={formData.state || ''}
+                  onChangeText={(value) => {
+                    setFormData({ ...formData, state: value });
+                    updateFullAddress({ ...formData, state: value });
+                  }}
+                />
               </View>
-              
-              <TouchableOpacity
-                onPress={() => setShowLocationPicker(true)}
-                activeOpacity={0.7}
-                style={{ backgroundColor: COLORS.secondary + '15' }}
-                className="rounded-lg border-2 border-dashed py-4 items-center"
-              >
-                <View className="rounded-full p-3 mb-2" style={{ backgroundColor: COLORS.secondary + '20' }}>
-                  <Icon name="map" size={28} color={COLORS.secondary} />
-                </View>
-                <Text className="font-semibold" style={{ color: COLORS.secondary }}>
-                  Open Map Picker
+            </View>
+          </View>
+
+          {/* PIN Code */}
+          <View className="mb-3">
+            <Text className="text-gray-700 font-medium mb-2">PIN Code *</Text>
+            <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
+              <Icon name="mail" size={20} color="#9CA3AF" />
+              <TextInput
+                className="flex-1 ml-3 text-gray-900"
+                placeholder="e.g., 781018"
+                placeholderTextColor="#9CA3AF"
+                value={formData.pincode || ''}
+                onChangeText={(value) => {
+                  setFormData({ ...formData, pincode: value });
+                  updateFullAddress({ ...formData, pincode: value });
+                }}
+                keyboardType="numeric"
+                maxLength={6}
+              />
+            </View>
+          </View>
+
+          {/* Landmark (Optional) */}
+          <View className="mb-4">
+            <Text className="text-gray-700 font-medium mb-2">Landmark (Optional)</Text>
+            <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
+              <Icon name="navigate" size={20} color="#9CA3AF" />
+              <TextInput
+                className="flex-1 ml-3 text-gray-900"
+                placeholder="e.g., Near KFC, Opposite Mall"
+                placeholderTextColor="#9CA3AF"
+                value={formData.landmark || ''}
+                onChangeText={(value) => {
+                  setFormData({ ...formData, landmark: value });
+                  updateFullAddress({ ...formData, landmark: value });
+                }}
+              />
+            </View>
+          </View>
+
+          {/* Map Picker Button */}
+          <View className="bg-orange-50 rounded-xl p-4 border-2 border-orange-200">
+            <View className="flex-row items-center mb-3">
+              <Icon name="pin" size={24} color={COLORS.secondary} />
+              <Text className="flex-1 ml-2 text-gray-700 font-semibold">Set Exact Location</Text>
+            </View>
+            <Text className="text-gray-600 text-xs mb-3">
+              Click below to pick your exact business location on the map and get coordinates
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowLocationPicker(true)}
+              activeOpacity={0.7}
+              style={{ backgroundColor: COLORS.secondary }}
+              className="rounded-lg py-4 items-center"
+            >
+              <View className="flex-row items-center">
+                <Icon name="map" size={24} color="#FFF" />
+                <Text className="font-bold text-white ml-2 text-base">
+                  📍 Open Map Picker
                 </Text>
-                <Text className="text-xs text-gray-500 mt-1">
-                  Manually select your business location
-                </Text>
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
           </View>
 
           {/* Selected Location Display */}
@@ -1209,8 +1255,8 @@ export default function BusinessRegistrationScreen({ navigation }) {
 
       </ScrollView>
 
-      {/* Location Picker Modal */}
-      <SimpleLocationPicker
+      {/* Advanced Location Picker Modal - 3 modes: Search, Map, Manual */}
+      <AdvancedLocationPicker
         visible={showLocationPicker}
         onClose={() => setShowLocationPicker(false)}
         onSelectLocation={(selectedLocation) => {
@@ -1223,9 +1269,10 @@ export default function BusinessRegistrationScreen({ navigation }) {
           });
           setFormData({ ...formData, address: selectedLocation.address });
           setAddressSearchQuery(selectedLocation.address);
-          console.log('✅ Manual location selected:', selectedLocation.latitude, selectedLocation.longitude);
+          console.log('✅ Location selected:', selectedLocation);
         }}
         initialLocation={location}
+        googleApiKey={process.env.EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY}
       />
     </View>
   );

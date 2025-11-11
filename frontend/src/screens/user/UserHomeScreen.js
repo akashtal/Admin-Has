@@ -212,7 +212,7 @@ export default function UserHomeScreen({ navigation }) {
       >
         <View className="flex-row justify-between items-center mb-4">
           <View>
-            <Text className="text-white text-2xl font-bold">Welcome back,</Text>
+            <Text className="text-white text-2xl font-bold">Hi,</Text>
             <Text className="text-white text-2xl font-bold">{user?.name}!</Text>
           </View>
           <View className="flex-row gap-2">
