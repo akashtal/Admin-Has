@@ -4,12 +4,13 @@ import axios from 'axios';
 const api = axios.create({
   // In production, use VITE_API_URL from .env.production
   // In development, use proxy (configured in vite.config.js)
-  baseURL: import.meta.env.VITE_API_URL || '/api',  // Production uses env var, dev uses proxy
+  baseURL: import.meta.env.PROD && import.meta.env.VITE_API_URL
+    ? `${import.meta.env.VITE_API_URL}/api`  // Production: https://your-backend.com/api
+    : '/api',                                  // Development: uses Vite proxy
   headers: {
     'Content-Type': 'application/json'
   },
-  timeout: import.meta.env.VITE_API_TIMEOUT || 30000,
-  withCredentials: false  // Important for CORS
+  timeout: import.meta.env.VITE_API_TIMEOUT || 30000
 });
 
 // Add token to all requests

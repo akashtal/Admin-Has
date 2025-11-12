@@ -30,8 +30,9 @@ export const adminApi = {
   updateReviewStatus: (reviewId, status) => 
     api.put(`/admin/reviews/${reviewId}/status`, { status }),
   
-  // Notifications
+  // Notifications - Enhanced for full admin control
   sendNotification: (data) => api.post('/admin/notifications/send', data),
+  getNotificationHistory: (params) => api.get('/admin/notifications/history', { params }),
   
   // Categories
   getAllCategories: () => api.get('/categories'),
@@ -44,9 +45,9 @@ export const adminApi = {
   toggleCouponStatus: (couponId, isActive) => api.put(`/admin/coupons/${couponId}/status`, { isActive }),
   deleteCoupon: (couponId) => api.delete(`/admin/coupons/${couponId}`),
   
-  // TripAdvisor
-  updateTripAdvisorRating: (businessId, rating, reviewCount) => 
-    api.put(`/business/${businessId}/tripadvisor-rating`, { rating, reviewCount }),
+  // TripAdvisor - Updated to accept object with rating, reviewCount, profileUrl
+  updateTripAdvisorRating: (businessId, data) => 
+    api.put(`/business/${businessId}/tripadvisor-rating`, data),
 };
 
 export default adminApi;
