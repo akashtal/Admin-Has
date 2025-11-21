@@ -75,13 +75,11 @@ const TripAdvisor = () => {
     }
 
     try {
-      await adminApi.updateTripAdvisorRating(editModal._id, formData.rating, formData.reviewCount);
-      
-      if (formData.profileUrl && formData.profileUrl !== editModal.externalProfiles?.tripAdvisor?.profileUrl) {
-        await adminApi.updateBusiness(editModal._id, {
-          'externalProfiles.tripAdvisor.profileUrl': formData.profileUrl
-        });
-      }
+      await adminApi.updateTripAdvisorRating(editModal._id, {
+        rating: formData.rating || null,
+        reviewCount: formData.reviewCount || null,
+        profileUrl: formData.profileUrl || null
+      });
 
       alert('TripAdvisor rating updated successfully');
       setEditModal(null);

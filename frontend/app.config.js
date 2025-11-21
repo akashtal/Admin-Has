@@ -16,7 +16,7 @@ export default {
 
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.hashview.app",
+      bundleIdentifier: "com.mycompany.hashview",
       infoPlist: {
         NSLocationWhenInUseUsageDescription:
           "HashView needs your location to show nearby businesses and verify reviews.",
@@ -30,8 +30,8 @@ export default {
     },
 
     android: {
-      package: "com.hashview.app",
-      versionCode: 1,
+      package: "com.mycompany.hashview",
+      versionCode: 7,
       permissions: [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
