@@ -117,11 +117,25 @@ export default function LoginScreen({ navigation, route }) {
 
           {/* Logo */}
           <View className="items-center mt-8 mb-6">
-            <Image
-              source={require('../../../assets/HashViewlogo-01.png')}
-              style={{ width: 140, height: 140 }}
-              resizeMode="contain"
-            />
+            <View style={{
+              width: 160,
+              height: 160,
+              borderRadius: 80,
+              backgroundColor: '#FFF',
+              alignItems: 'center',
+              justifyContent: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 8,
+              elevation: 6
+            }}>
+              <Image
+                source={require('../../../assets/HashViewlogo-01.png')}
+                style={{ width: 140, height: 140 }}
+                resizeMode="contain"
+              />
+            </View>
           </View>
 
           {/* Login Form Card */}

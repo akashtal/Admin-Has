@@ -6,7 +6,6 @@ import { loadUser } from '../store/slices/authSlice';
 
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
-import SplashScreen from '../screens/auth/SplashScreen';
 
 const Stack = createStackNavigator();
 
@@ -16,21 +15,28 @@ export default function AppNavigator() {
   const [isReady, setIsReady] = React.useState(false);
 
   useEffect(() => {
+    let isMounted = true;
     const initializeApp = async () => {
       try {
         await dispatch(loadUser()).unwrap();
       } catch (error) {
         console.log('No user logged in');
       } finally {
-        setTimeout(() => setIsReady(true), 2000); // Show splash for 2 seconds
+        if (isMounted) {
+          setIsReady(true);
+        }
       }
     };
 
     initializeApp();
+
+    return () => {
+      isMounted = false;
+    };
   }, [dispatch]);
 
   if (!isReady) {
-    return <SplashScreen />;
+    return null;
   }
 
   return (

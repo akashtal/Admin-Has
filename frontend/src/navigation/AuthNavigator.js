@@ -1,7 +1,6 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 
-import SplashScreen from '../screens/auth/SplashScreen';
 import RoleSelectionScreen from '../screens/auth/RoleSelectionScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import SignUpScreen from '../screens/auth/SignUpScreen';
@@ -16,13 +15,12 @@ const Stack = createStackNavigator();
 export default function AuthNavigator() {
   return (
     <Stack.Navigator
-      initialRouteName="Splash"
+      initialRouteName="RoleSelection"
       screenOptions={{
         headerShown: false,
         cardStyle: { backgroundColor: '#2D1B69' },
       }}
     >
-      <Stack.Screen name="Splash" component={SplashScreen} />
       <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="SignUp" component={SignUpScreen} />

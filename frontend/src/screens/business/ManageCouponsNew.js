@@ -33,6 +33,7 @@ export default function ManageCouponsNew({ navigation, route }) {
     minPurchaseAmount: '',
     maxDiscountAmount: '',
     usageLimit: '',
+    redemptionLimit: '', // How many users can redeem coupons from this template
     terms: ''
   });
 
@@ -70,6 +71,7 @@ export default function ManageCouponsNew({ navigation, route }) {
       minPurchaseAmount: '',
       maxDiscountAmount: '',
       usageLimit: '',
+      redemptionLimit: '',
       terms: ''
     });
     setEditingCoupon(null);
@@ -88,6 +90,7 @@ export default function ManageCouponsNew({ navigation, route }) {
         minPurchaseAmount: coupon.minPurchaseAmount?.toString() || '',
         maxDiscountAmount: coupon.maxDiscountAmount?.toString() || '',
         usageLimit: coupon.usageLimit?.toString() || '',
+        redemptionLimit: coupon.redemptionLimit?.toString() || '',
         terms: coupon.terms || ''
       });
     } else {
@@ -127,6 +130,7 @@ export default function ManageCouponsNew({ navigation, route }) {
         minPurchaseAmount: parseFloat(formData.minPurchaseAmount) || 0,
         maxDiscountAmount: formData.maxDiscountAmount ? parseFloat(formData.maxDiscountAmount) : null,
         usageLimit: formData.usageLimit ? parseInt(formData.usageLimit) : null,
+        redemptionLimit: formData.redemptionLimit ? parseInt(formData.redemptionLimit) : null,
         terms: formData.terms
       };
 
@@ -242,10 +246,18 @@ export default function ManageCouponsNew({ navigation, route }) {
             )}
 
             {coupon.usageLimit && (
-              <View className="flex-row items-center">
+              <View className="flex-row items-center mb-1">
                 <Icon name="people-outline" size={14} color="#6B7280" />
                 <Text className="text-xs text-gray-600 ml-1">
                   Used {coupon.usageCount}/{coupon.usageLimit} times
+                </Text>
+              </View>
+            )}
+            {coupon.redemptionLimit && (
+              <View className="flex-row items-center">
+                <Icon name="gift-outline" size={14} color="#6B7280" />
+                <Text className="text-xs text-gray-600 ml-1">
+                  {coupon.redemptionCount || 0}/{coupon.redemptionLimit} redeemed
                 </Text>
               </View>
             )}
@@ -531,6 +543,25 @@ export default function ManageCouponsNew({ navigation, route }) {
                   value={formData.usageLimit}
                   onChangeText={(value) => setFormData({ ...formData, usageLimit: value })}
                 />
+                <Text className="text-xs text-gray-500 mt-1">
+                  How many times this coupon code can be used
+                </Text>
+              </View>
+
+              {/* Redemption Limit */}
+              <View className="mb-4">
+                <Text className="text-gray-900 font-semibold mb-2">Redemption Limit (Optional)</Text>
+                <TextInput
+                  className="bg-gray-50 rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
+                  placeholder="e.g., 10 (leave empty for unlimited)"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="numeric"
+                  value={formData.redemptionLimit}
+                  onChangeText={(value) => setFormData({ ...formData, redemptionLimit: value })}
+                />
+                <Text className="text-xs text-gray-500 mt-1">
+                  How many users can redeem coupons from this template (e.g., 10 users can redeem review reward coupons)
+                </Text>
               </View>
 
               {/* Terms */}

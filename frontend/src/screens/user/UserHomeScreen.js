@@ -5,8 +5,61 @@ import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/Ionicons';
 import * as Location from 'expo-location';
 import { getAllActiveBusinesses, getNearbyBusinesses, searchBusinesses } from '../../store/slices/businessSlice';
+import ApiService from '../../services/api.service';
 import COLORS from '../../config/colors';
 import { FLATLIST_OPTIMIZATIONS, optimizeImageUri } from '../../utils/performanceHelpers';
+
+const RatingBadge = ({ source, rating, reviews }) => {
+  const colors = {
+    google: '#3B82F6',
+    tripadvisor: '#10B981',
+    default: '#9CA3AF'
+  };
+  const labels = {
+    google: 'Google',
+    tripadvisor: 'TripAdvisor',
+    default: source
+  };
+
+  const color = colors[source] || colors.default;
+  const label = labels[source] || labels.default;
+
+  const renderLogo = () => {
+    if (source === 'google') {
+      return <Icon name="logo-google" size={14} color="#3B82F6" />;
+    }
+    if (source === 'tripadvisor') {
+      return (
+        <Image
+          source={require('../../../assets/tripadvisor.png')}
+          className="w-4 h-4"
+          resizeMode="contain"
+        />
+      );
+    }
+    return null;
+  };
+
+  return (
+    <View className="flex-row items-center justify-between py-2 px-3 bg-gray-50 rounded-xl border border-gray-100">
+      <View className="flex-row items-center">
+        {renderLogo()}
+        <Text className="text-sm font-medium text-gray-900 ml-1.5">{label}</Text>
+      </View>
+      <View className="flex-row items-center">
+        <View className="flex-row items-center">
+          <Icon name="star" size={13} color="#F4B400" />
+          <Text className="text-sm font-semibold text-gray-900 ml-1">
+            {rating ? rating.toFixed(1) : 'N/A'}
+          </Text>
+        </View>
+        <Text className="text-xs text-gray-500 ml-2">
+          ({reviews || 0})
+        </Text>
+      </View>
+    </View>
+  );
+};
 
 export default function UserHomeScreen({ navigation }) {
   const dispatch = useDispatch();
@@ -14,27 +67,34 @@ export default function UserHomeScreen({ navigation }) {
   const { user } = useSelector((state) => state.auth);
   const [locationPermission, setLocationPermission] = useState(null);
   const [hasLocation, setHasLocation] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  
-  // Search state
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  /* --- SEARCH FUNCTIONALITY TEMPORARILY DISABLED ---
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const searchTimeout = useRef(null);
-  
+  const [showSearchBar, setShowSearchBar] = useState(false);
+  --- END SEARCH DISABLE --- */
+
   // Filter modal state
   const [showFilterModal, setShowFilterModal] = useState(false);
-  
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+
   // Star-based rating filter states
   const [ratingFilter, setRatingFilter] = useState({
-    source: null, // 'hashview', 'google', or 'tripadvisor'
-    stars: null   // 3, 4, or 5
+    source: null,
+    stars: null
   });
-  
+
   // Distance filter state
-  const [distanceFilter, setDistanceFilter] = useState(null); // 'nearme', '1km', '5km', '10km', '25km'
-  
+  const [distanceFilter, setDistanceFilter] = useState(null);
+
   // Track active filters count
   const activeFiltersCount = useMemo(() => {
     let count = 0;
@@ -45,14 +105,50 @@ export default function UserHomeScreen({ navigation }) {
 
   useEffect(() => {
     initializeScreen();
+    fetchUnreadNotifications();
+    loadCategories();
   }, []);
 
   const initializeScreen = async () => {
-    // Load all businesses first (regardless of location)
     dispatch(getAllActiveBusinesses());
-    
-    // Check location permission
     await checkLocationPermission();
+  };
+
+  const loadCategories = async () => {
+    try {
+      setLoadingCategories(true);
+      const response = await ApiService.getCategories();
+      const allCategory = {
+        _id: 'all',
+        name: 'All',
+        slug: 'all',
+        icon: 'apps',
+        color: COLORS.secondary,
+      };
+      setCategories([allCategory, ...(response?.categories || [])]);
+    } catch (error) {
+      console.error('Failed to load categories:', error);
+      setCategories([
+        {
+          _id: 'all',
+          name: 'All',
+          slug: 'all',
+          icon: 'apps',
+          color: COLORS.secondary,
+        },
+      ]);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  const fetchUnreadNotifications = async () => {
+    try {
+      const response = await ApiService.getNotifications({ status: 'unread' });
+      setUnreadNotifications(response.unreadCount || 0);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
   };
 
   const checkLocationPermission = async () => {
@@ -70,18 +166,24 @@ export default function UserHomeScreen({ navigation }) {
 
   const getCurrentLocation = async () => {
     try {
-      const currentLocation = await Location.getCurrentPositionAsync({});
+      const location = await Location.getCurrentPositionAsync({});
+      const coords = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
+      };
+
+      setCurrentLocation(coords);
       setHasLocation(true);
-      
-      // Get nearby businesses
+
       dispatch(getNearbyBusinesses({
-        latitude: currentLocation.coords.latitude,
-        longitude: currentLocation.coords.longitude,
-        radius: 50000 // 50km
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        radius: 50000
       }));
     } catch (error) {
       console.error('Error getting location:', error);
       setHasLocation(false);
+      setCurrentLocation(null);
     }
   };
 
@@ -89,7 +191,7 @@ export default function UserHomeScreen({ navigation }) {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       setLocationPermission(status);
-      
+
       if (status === 'granted') {
         await getCurrentLocation();
       } else {
@@ -104,47 +206,57 @@ export default function UserHomeScreen({ navigation }) {
     }
   };
 
-  // Fetch businesses - BACKEND HANDLES EVERYTHING
+  // Backend handles all filtering logic - frontend just passes parameters
   const fetchFilteredBusinesses = useCallback(async () => {
-    // Build params - backend will handle all logic
-    const params = {};
-    
-    // Add rating filter (if both source and stars selected)
-    if (ratingFilter.source && ratingFilter.stars) {
-      params.ratingSource = ratingFilter.source;
-      params.minRating = ratingFilter.stars;
-    }
+    try {
+      const params = {};
 
-    // Add distance filter
-    if (distanceFilter) {
-      params.distance = distanceFilter;
-    }
+      // Pass category to backend (backend handles case-insensitive matching)
+      if (selectedCategory && typeof selectedCategory === 'string' && selectedCategory.trim() !== '') {
+        params.category = selectedCategory.trim();
+      }
 
-    // Add location (backend will calculate distances and sort)
-    if (hasLocation && user?.location?.coordinates) {
-      params.latitude = user.location.coordinates[1];
-      params.longitude = user.location.coordinates[0];
-      await dispatch(getNearbyBusinesses(params));
-    } else {
-      await dispatch(getAllActiveBusinesses(params));
-    }
-  }, [ratingFilter, distanceFilter, hasLocation, user, dispatch]);
+      // Pass rating filters to backend
+      if (ratingFilter.source && ratingFilter.stars) {
+        params.ratingSource = ratingFilter.source;
+        params.minRating = ratingFilter.stars;
+      }
 
-  // Memoize onRefresh to prevent recreation on every render
+      // Pass distance filter to backend
+      if (distanceFilter) {
+        params.distance = distanceFilter;
+      }
+
+      // Backend decides which endpoint to use based on location
+      if (currentLocation) {
+        params.latitude = currentLocation.latitude;
+        params.longitude = currentLocation.longitude;
+        await dispatch(getNearbyBusinesses(params));
+      } else {
+        await dispatch(getAllActiveBusinesses(params));
+      }
+    } catch (error) {
+      console.error('❌ Error fetching businesses:', error);
+    }
+  }, [ratingFilter, distanceFilter, currentLocation, selectedCategory, dispatch]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchFilteredBusinesses();
     setRefreshing(false);
   }, [fetchFilteredBusinesses]);
 
-  // Re-fetch when filters change
   useEffect(() => {
-    if (!loading) {
-      fetchFilteredBusinesses();
-    }
-  }, [ratingFilter.source, ratingFilter.stars, distanceFilter, fetchFilteredBusinesses]);
+    fetchFilteredBusinesses();
+  }, [
+    ratingFilter.source,
+    ratingFilter.stars,
+    distanceFilter,
+    selectedCategory,
+    fetchFilteredBusinesses,
+  ]);
 
-  // Search - Simple debounce, backend does everything
+  /* --- SEARCH FUNCTIONALITY TEMPORARILY DISABLED ---
   const handleSearch = useCallback(async (query) => {
     setSearchQuery(query);
     
@@ -159,19 +271,18 @@ export default function UserHomeScreen({ navigation }) {
     setSearchLoading(true);
     setShowSearchDropdown(true);
     
-    // Debounce only to reduce API calls - backend handles all logic
     searchTimeout.current = setTimeout(async () => {
       try {
         const params = { search: query.trim(), limit: 10 };
         
-        // Add location - backend calculates & sorts
         if (hasLocation && user?.location?.coordinates) {
           params.latitude = user.location.coordinates[1];
           params.longitude = user.location.coordinates[0];
         }
         
         const result = await dispatch(searchBusinesses(params)).unwrap();
-        setSearchResults(result || []);
+        console.log(`✅ Search results: ${result.businesses?.length || 0} businesses found`);
+        setSearchResults(result.businesses || []);
       } catch (error) {
         setSearchResults([]);
       } finally {
@@ -180,7 +291,6 @@ export default function UserHomeScreen({ navigation }) {
     }, 300);
   }, [dispatch, hasLocation, user]);
 
-  // Handle search result selection
   const handleSelectSearchResult = useCallback((business) => {
     setSearchQuery('');
     setShowSearchDropdown(false);
@@ -188,389 +298,334 @@ export default function UserHomeScreen({ navigation }) {
     Keyboard.dismiss();
     navigation.navigate('BusinessDetail', { businessId: business._id });
   }, [navigation]);
+  --- END SEARCH DISABLE --- */
 
-  // Clear filters
   const clearFilters = useCallback(() => {
     setRatingFilter({ source: null, stars: null });
     setDistanceFilter(null);
+    setSelectedCategory(null);
     setShowFilterModal(false);
   }, []);
 
-  // Apply filters and close modal
   const applyFilters = useCallback(() => {
     setShowFilterModal(false);
     fetchFilteredBusinesses();
   }, [fetchFilteredBusinesses]);
 
-  // Determine which businesses to show (memoized for performance)
-  const displayBusinesses = useMemo(() => {
-    return hasLocation && nearbyBusinesses.length > 0 ? nearbyBusinesses : businesses;
-  }, [hasLocation, nearbyBusinesses, businesses]);
-  
+  // Backend handles all filtering - just use what backend returns
+  const displayBusinesses = hasLocation && nearbyBusinesses.length > 0 ? nearbyBusinesses : businesses;
   const isShowingNearby = hasLocation && nearbyBusinesses.length > 0;
 
-  // Memoize renderBusiness to prevent unnecessary re-renders
-  const renderBusiness = useCallback(({ item }) => (
-    <TouchableOpacity
-      onPress={() => navigation.navigate('BusinessDetail', { businessId: item._id })}
-      className="bg-white rounded-xl p-3 mb-3 shadow-md overflow-hidden"
-      style={{ height: 140 }}
-    >
-      <View className="flex-row h-full">
-        {/* Logo/Image Section - Left Side */}
-        <View className="w-24 h-full mr-3 rounded-lg overflow-hidden" style={{ backgroundColor: '#FFF9F0' }}>
-          {item.coverImage?.url ? (
-            <Image
-              source={{ uri: optimizeImageUri(item.coverImage.url, 200, 80) }}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
-              cache="force-cache"
-            />
-          ) : item.logo?.url ? (
-            <View className="w-full h-full items-center justify-center">
+  // BUSINESS CARD RENDER - Tailwind CSS Styling
+  const renderBusiness = useCallback(({ item }) => {
+    const parseRating = (rating) => {
+      const parsed = parseFloat(rating);
+      return !isNaN(parsed) && parsed > 0 ? parsed : null;
+    };
+
+    // FIX: Use externalProfiles (from backend) instead of externalRatings
+    const googleRatingValue = parseRating(item.externalProfiles?.googleBusiness?.rating);
+    const googleCount = parseInt(item.externalProfiles?.googleBusiness?.reviewCount) || 0;
+    const tripAdvisorRatingValue = parseRating(item.externalProfiles?.tripAdvisor?.rating);
+    const tripAdvisorCount = parseInt(item.externalProfiles?.tripAdvisor?.reviewCount) || 0;
+
+    // Debug logging for first item
+    if (item._id && !renderBusiness.logged) {
+      console.log('🏢 Business Card Data:', {
+        name: item.name,
+        hashviewRating: item.rating?.average,
+        externalProfiles: item.externalProfiles,
+        googleRating: googleRatingValue,
+        googleCount,
+        tripAdvisorRating: tripAdvisorRatingValue,
+        tripAdvisorCount
+      });
+      renderBusiness.logged = true;
+    }
+
+    const hashviewRating = parseRating(item.rating?.average) || 0;
+    const hashviewCount = item.rating?.count || 0;
+    const coverImageUri = item.coverImage?.url || item.images?.[0]?.url || item.logo?.url || null;
+    const categoryLabel = item.category || 'Business';
+    const locationText = [item.address?.area, item.address?.city].filter(Boolean).join(', ') || item.address?.street || 'Location not specified';
+
+    return (
+      <TouchableOpacity
+        onPress={() => navigation.navigate('BusinessDetail', { businessId: item._id })}
+        activeOpacity={0.85}
+        className="mb-4"
+      >
+        <View className="rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm">
+          {/* Cover Image */}
+          <View className="relative h-36 w-full overflow-hidden">
+            {coverImageUri ? (
               <Image
-                source={{ uri: optimizeImageUri(item.logo.url, 150, 85) }}
-                style={{ width: 70, height: 70, borderRadius: 8 }}
+                source={{ uri: optimizeImageUri(coverImageUri, 800, 500) }}
+                className="w-full h-full"
                 resizeMode="cover"
-                cache="force-cache"
               />
-            </View>
-          ) : (
-            <View className="w-full h-full items-center justify-center">
-              <Icon name="business" size={40} color={COLORS.primary} />
-            </View>
-          )}
-        </View>
+            ) : (
+              <LinearGradient
+                colors={[COLORS.primary, COLORS.primaryDark]}
+                className="w-full h-full items-center justify-center"
+              >
+                <Icon name="business" size={48} color="#FFF" />
+              </LinearGradient>
+            )}
 
-        {/* Content Section - Right Side */}
-        <View className="flex-1 justify-between">
-          <View className="flex-1">
-            <Text className="text-base font-bold text-gray-900 mb-1" numberOfLines={1}>
-              {item.name}
-            </Text>
-            <View className="flex-row items-center mb-1">
-              <Icon name="star" size={14} color={COLORS.primary} />
-              <Text className="text-xs text-gray-600 ml-1">
-                {item.rating?.average?.toFixed(1) || '0.0'} ({item.rating?.count || 0})
+            <LinearGradient
+              colors={['rgba(0,0,0,0.45)', 'transparent']}
+              className="absolute inset-0"
+            />
+
+            {/* Rating Badge */}
+            <View className="absolute top-2 right-2">
+              <View className="bg-[#5e399e] flex-row items-center px-2.5 py-1 rounded-full shadow border border-[#FDE68A]">
+                <Icon name="star" size={13} color="#F4B400" />
+                <Text className="text-[#F4B400] font-semibold text-xs ml-1">
+                  {hashviewRating ? hashviewRating.toFixed(1) : 'New'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Distance badge */}
+            {item.distance !== undefined && item.distance > 0 && (
+              <View className="absolute top-2 left-2 bg-white/90 rounded-full px-2 py-0.5 flex-row items-center shadow border border-gray-100">
+                <Icon name="navigate" size={11} color={COLORS.secondary} />
+                <Text className="text-gray-800 font-semibold text-[10px] ml-1">
+                  {item.distance < 1
+                    ? `${(item.distance * 1000).toFixed(0)}m away`
+                    : `${item.distance.toFixed(1)}km away`}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Header */}
+          <View className="px-4 pt-4 pb-3">
+            <View className="flex-row items-center justify-between mb-1.5">
+              <Text className="text-[15px] font-semibold text-[#5e399e] flex-1 pr-2" numberOfLines={1}>
+                {item.name}
+              </Text>
+              <Text className="text-[14px] text-[#5e399e]" style={{ opacity: 0.8 }} numberOfLines={1}>
+                {locationText}
               </Text>
             </View>
-            <View className="flex-row items-center mb-1">
-              <Icon name="location-outline" size={12} color="#6B7280" />
-              <Text className="text-xs text-gray-500 ml-1 flex-1" numberOfLines={1}>
-                {item.address?.fullAddress || item.address?.city || 'Unknown'}
-              </Text>
+            <View className="flex-row items-center gap-1.5">
+              <View className="bg-[#FFF1E6] border border-[#FCD9BD] rounded-full px-2 py-0.5">
+                <Text className="text-[14px] font-semibold text-[#e6ba4c]" numberOfLines={2}>{categoryLabel}</Text>
+              </View>
             </View>
           </View>
-          <View className="flex-row items-center justify-between">
-            <View className="rounded-full px-2 py-1" style={{ backgroundColor: '#FFF9F0' }}>
-              <Text className="text-xs font-semibold capitalize" style={{ color: COLORS.secondary }}>
-                {item.category}
-              </Text>
+
+          {/* Content */}
+          <View className="px-4 pb-4">
+            <View className="flex-row items-center justify-between mb-2.5">
+              <Text className="text-xs font-semibold text-gray-900">Overall Rating</Text>
+              <Text className="text-xs text-gray-500">{hashviewCount} reviews</Text>
             </View>
-            <Icon name="chevron-forward" size={20} color="#D1D5DB" />
+            <View className="space-y-1.5">
+              <RatingBadge source="google" rating={googleRatingValue} reviews={googleCount} />
+              <RatingBadge source="tripadvisor" rating={tripAdvisorRatingValue} reviews={tripAdvisorCount} />
+            </View>
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  ), [navigation]); // Close useCallback with navigation dependency
+      </TouchableOpacity>
+    );
+  }, [navigation]);
 
-  // Memoize key extractor
   const keyExtractor = useCallback((item) => item._id, []);
 
   return (
     <View className="flex-1 bg-gray-50">
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-      
+
       {/* Header Section */}
       <LinearGradient
         colors={[COLORS.primary, COLORS.primaryDark]}
-        style={{ paddingTop: 40, paddingBottom: 20, paddingHorizontal: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }}
+        className="pt-10 pb-5 px-5 rounded-b-3xl"
       >
         {/* Top Row: Greeting + Action Buttons */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: '#FFF', fontSize: 22, fontWeight: 'bold' }}>
+        <View className="flex-row justify-between items-center mb-4">
+          <View className="flex-1">
+            <Text className="text-white text-2xl font-bold">
               Hi {user?.name.split(' ')[0]} 👋
             </Text>
-            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, marginTop: 2 }}>
+            <Text className="text-white/80 text-[13px] mt-0.5">
               Discover amazing businesses
             </Text>
           </View>
-          
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            {/* Filter Button with Badge */}
-            <TouchableOpacity 
+
+          <View className="flex-row gap-2.5">
+            {/* Notifications Bell */}
+            <TouchableOpacity
+              onPress={() => {
+                navigation.navigate('Notifications');
+                setUnreadNotifications(0);
+              }}
+              activeOpacity={0.7}
+              className="relative"
+            >
+              <View className="bg-white rounded-full w-11 h-11 items-center justify-center shadow-md">
+                <Icon name="notifications-outline" size={20} color={COLORS.primary} />
+                {unreadNotifications > 0 && (
+                  <View className="absolute -top-1 -right-1 bg-red-500 rounded-full min-w-[20px] h-5 items-center justify-center px-1.5 border-2 border-white">
+                    <Text className="text-white text-[11px] font-bold">
+                      {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+
+            {/* Filter Button */}
+            <TouchableOpacity
               onPress={() => setShowFilterModal(true)}
               activeOpacity={0.7}
-              style={{ position: 'relative' }}
+              className="relative"
             >
-              <View style={{ 
-                backgroundColor: '#FFF', 
-                borderRadius: 50, 
-                width: 44, 
-                height: 44, 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                elevation: 3,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4
-              }}>
+              <View className="bg-white rounded-full w-11 h-11 items-center justify-center shadow-md">
                 <Icon name="options-outline" size={20} color={COLORS.primary} />
                 {activeFiltersCount > 0 && (
-                  <View style={{
-                    position: 'absolute',
-                    top: -4,
-                    right: -4,
-                    backgroundColor: '#EF4444',
-                    borderRadius: 10,
-                    width: 20,
-                    height: 20,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 2,
-                    borderColor: '#FFF'
-                  }}>
-                    <Text style={{ color: '#FFF', fontSize: 11, fontWeight: 'bold' }}>
+                  <View className="absolute -top-1 -right-1 bg-red-500 rounded-full w-5 h-5 items-center justify-center border-2 border-white">
+                    <Text className="text-white text-[11px] font-bold">
                       {activeFiltersCount}
                     </Text>
                   </View>
                 )}
               </View>
             </TouchableOpacity>
-            
-            {/* QR Scanner Button */}
-            <TouchableOpacity 
-              onPress={() => navigation.navigate('QRScanner')}
-              activeOpacity={0.7}
-            >
-              <View style={{ 
-                backgroundColor: '#FFF', 
-                borderRadius: 50, 
-                width: 44, 
-                height: 44, 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                elevation: 3,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4
-              }}>
-                <Icon name="qr-code-outline" size={20} color={COLORS.primary} />
-              </View>
-            </TouchableOpacity>
-            
+
             {/* Coupons Button */}
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => navigation.navigate('Coupons')}
               activeOpacity={0.7}
             >
-              <View style={{ 
-                backgroundColor: '#FFF', 
-                borderRadius: 50, 
-                width: 44, 
-                height: 44, 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                elevation: 3,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4
-              }}>
+              <View className="bg-white rounded-full w-11 h-11 items-center justify-center shadow-md">
                 <Icon name="gift-outline" size={20} color={COLORS.primary} />
               </View>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Active Filters Indicator (if any) */}
+        {/* Active Filters Indicator */}
         {activeFiltersCount > 0 && (
-          <View style={{ 
-            flexDirection: 'row', 
-            alignItems: 'center', 
-            backgroundColor: 'rgba(255,255,255,0.2)', 
-            borderRadius: 12, 
-            paddingHorizontal: 12, 
-            paddingVertical: 8,
-            marginBottom: 12
-          }}>
+          <View className="flex-row items-center bg-white/20 rounded-xl px-3 py-2 mb-3">
             <Icon name="funnel" size={14} color="#FFF" />
-            <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '600', marginLeft: 6 }}>
+            <Text className="text-white text-xs font-semibold ml-1.5">
               {activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''} active
             </Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={clearFilters}
-              style={{ marginLeft: 'auto' }}
+              className="ml-auto"
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={{ color: '#FFF', fontSize: 12, textDecorationLine: 'underline' }}>Clear</Text>
+              <Text className="text-white text-xs underline">Clear</Text>
             </TouchableOpacity>
           </View>
         )}
       </LinearGradient>
 
-      {/* Search Bar - OUTSIDE gradient to prevent overflow issues */}
-      <View style={{ paddingHorizontal: 20, marginTop: -20, zIndex: 100 }}>
-        <View style={{ 
-          backgroundColor: '#FFF', 
-          borderRadius: 16, 
-          flexDirection: 'row', 
-          alignItems: 'center', 
-          paddingHorizontal: 16, 
-          paddingVertical: 14,
-          elevation: 8,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.15,
-          shadowRadius: 8
-        }}>
-          <Icon name="search" size={22} color={COLORS.primary} />
-          <TextInput
-            placeholder="Search businesses by name or location"
-            placeholderTextColor="#9CA3AF"
-            value={searchQuery}
-            onChangeText={handleSearch}
-            onFocus={() => searchQuery.trim() && setShowSearchDropdown(true)}
-            style={{ 
-              flex: 1, 
-              marginLeft: 12, 
-              fontSize: 15, 
-              fontWeight: '500',
-              color: '#111827'
-            }}
-            returnKeyType="search"
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity 
-              onPress={() => {
-                setSearchQuery('');
-                setShowSearchDropdown(false);
-                setSearchResults([]);
-              }}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      {/* Search Bar Temporarily Disabled */}
+      {false && (
+        <View className="px-5 -mt-5 z-50">
+          {/* Search UI commented out */}
+        </View>
+      )}
+
+      {/* Category Slider */}
+      <View className="px-2 mt-2">
+        <View className="flex-row items-center justify-between mb-3">
+          {selectedCategory !== null && (
+            <TouchableOpacity
+              onPress={() => setSelectedCategory(null)}
+              hitSlop={{ top: 10, bottom: 5, left: 10, right: 10 }}
             >
-              <Icon name="close-circle" size={22} color="#9CA3AF" />
+              <Text className="text-sm font-semibold text-[#5e399e]">Reset</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        {/* Search Dropdown Results */}
-        {showSearchDropdown && (
-          <View 
-            style={{
-              position: 'absolute',
-              top: 64,
-              left: 0,
-              right: 0,
-              backgroundColor: '#FFF',
-              borderRadius: 16,
-              maxHeight: 300,
-              elevation: 20,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.25,
-              shadowRadius: 16,
-              zIndex: 1000
-            }}
-          >
-            {searchLoading ? (
-              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                <ActivityIndicator size="small" color={COLORS.primary} />
-                <Text style={{ color: '#6B7280', fontSize: 14, marginTop: 12 }}>Searching...</Text>
-              </View>
-            ) : searchResults.length > 0 ? (
-              <ScrollView 
-                keyboardShouldPersistTaps="handled"
-                nestedScrollEnabled={true}
-                showsVerticalScrollIndicator={false}
-                style={{ paddingVertical: 4 }}
-              >
-                {searchResults.map((business, index) => (
-                  <TouchableOpacity
-                    key={business._id}
-                    onPress={() => handleSelectSearchResult(business)}
-                    style={{ 
-                      paddingHorizontal: 16,
-                      paddingVertical: 14,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      borderBottomWidth: index < searchResults.length - 1 ? 1 : 0,
-                      borderBottomColor: '#F3F4F6'
-                    }}
-                    activeOpacity={0.6}
-                  >
-                    {business.logo?.url ? (
-                      <Image
-                        source={{ uri: optimizeImageUri(business.logo.url, 100, 85) }}
-                        style={{ width: 48, height: 48, borderRadius: 12 }}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View style={{ 
-                        width: 48, 
-                        height: 48, 
-                        borderRadius: 12, 
-                        backgroundColor: '#F9FAFB',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <Icon name="business" size={24} color={COLORS.primary} />
-                      </View>
-                    )}
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={{ color: '#111827', fontWeight: 'bold', fontSize: 15 }} numberOfLines={1}>
-                        {business.name}
-                      </Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                        <Icon name="location" size={14} color="#9CA3AF" />
-                        <Text style={{ color: '#6B7280', fontSize: 13, marginLeft: 4, flex: 1 }} numberOfLines={1}>
-                          {business.address?.city || business.address?.area || 'Unknown'}
-                        </Text>
-                      </View>
-                    </View>
-                    {business.distance !== undefined && business.distance > 0 && (
-                      <View style={{ 
-                        marginLeft: 8,
-                        paddingHorizontal: 10,
-                        paddingVertical: 6,
-                        borderRadius: 10,
-                        backgroundColor: '#DBEAFE'
-                      }}>
-                        <Text style={{ color: '#1E40AF', fontSize: 12, fontWeight: 'bold' }}>
-                          {business.distance.toFixed(1)}km
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            ) : (
-              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                <Icon name="search-outline" size={48} color="#D1D5DB" />
-                <Text style={{ color: '#6B7280', fontSize: 14, marginTop: 12, fontWeight: '500' }}>
-                  No businesses found
-                </Text>
-                <Text style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>
-                  Try a different search term
-                </Text>
-              </View>
-            )}
+        {loadingCategories ? (
+          <View className="py-4 items-center">
+            <ActivityIndicator size="small" color={COLORS.secondary} />
           </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            className="mb-2"
+            contentContainerStyle={{ paddingBottom: 0, paddingRight: 12 }}
+          >
+            {categories.map((category) => {
+              const categoryColor = category.color || COLORS.secondary;
+              const isAllCategory = category.slug === 'all' || category._id === 'all';
+              const filterValue = isAllCategory
+                ? null
+                : (category.slug || category.value || category.name || '').trim();
+
+              const isSelected = isAllCategory
+                ? (!selectedCategory || selectedCategory === null)
+                : (selectedCategory === filterValue && filterValue !== '');
+
+              return (
+                <TouchableOpacity
+                  key={category._id}
+                  onPress={() => {
+                    if (isAllCategory) {
+                      setSelectedCategory(null);
+                    } else if (filterValue) {
+                      setSelectedCategory(filterValue);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                  className="mr-3 items-center"
+                  style={{ width: 65 }}
+                >
+                  {/* Circular Icon Container */}
+                  <View
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 28,
+                      backgroundColor: isSelected
+                        ? '#5e399e'
+                        : '#FFFFFF',
+                      borderWidth: isSelected ? 0 : 1.5,
+                      borderColor: '#E5E7EB',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: isSelected ? 0.15 : 0.08,
+                      shadowRadius: 4,
+                      elevation: isSelected ? 4 : 2,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 6,
+                    }}
+                  >
+                    <Icon
+                      name={category.icon || 'apps'}
+                      size={26}
+                      color={isSelected ? '#FFFFFF' : categoryColor}
+                    />
+                  </View>
+                  {/* Category Label */}
+                  <Text
+                    className={`text-[11px] font-medium text-center ${isSelected ? 'text-[#5e399e]' : 'text-gray-700'
+                      }`}
+                    numberOfLines={1}
+                    style={{ lineHeight: 14 }}
+                  >
+                    {category.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         )}
       </View>
 
-      <View className="flex-1 px-6 mt-6">
-        <View className="flex-row justify-between items-center mb-4">
-          <Text className="text-xl font-bold text-gray-900">
-            {isShowingNearby ? 'Nearby Businesses' : 'All Businesses'}
-          </Text>
-          <Text className="text-sm text-gray-500">{displayBusinesses.length} found</Text>
-        </View>
+      <View className="flex-1 px-4 mt-2">
 
         {loading && !refreshing ? (
           <View className="flex-1 justify-center items-center">
@@ -619,39 +674,26 @@ export default function UserHomeScreen({ navigation }) {
         )}
       </View>
 
-      {/* Filter Modal */}
+      {/* Filter Modal - Keeping existing modal code as is */}
       <Modal
         visible={showFilterModal}
         animationType="slide"
         transparent={true}
         onRequestClose={() => setShowFilterModal(false)}
       >
-        <TouchableOpacity 
-          activeOpacity={1} 
+        <TouchableOpacity
+          activeOpacity={1}
           onPress={() => setShowFilterModal(false)}
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+          className="flex-1 bg-black/50 justify-end"
         >
           <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
-            <View style={{ 
-              backgroundColor: '#FFF', 
-              borderTopLeftRadius: 24, 
-              borderTopRightRadius: 24,
-              maxHeight: 600
-            }}>
+            <View className="bg-white rounded-t-3xl max-h-[600px]">
               {/* Modal Header */}
-              <View style={{ 
-                flexDirection: 'row', 
-                alignItems: 'center', 
-                justifyContent: 'space-between', 
-                paddingHorizontal: 20, 
-                paddingVertical: 16,
-                borderBottomWidth: 1,
-                borderBottomColor: '#F3F4F6'
-              }}>
-                <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#111827' }}>
+              <View className="flex-row items-center justify-between px-5 py-4 border-b border-gray-100">
+                <Text className="text-xl font-bold text-gray-900">
                   Filters
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setShowFilterModal(false)}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
@@ -659,139 +701,82 @@ export default function UserHomeScreen({ navigation }) {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={{ maxHeight: 450, paddingHorizontal: 20, paddingVertical: 16 }} showsVerticalScrollIndicator={false}>
-                {/* Rating Filters Section */}
-                <View style={{ marginBottom: 24 }}>
-                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 12 }}>
+              <ScrollView className="max-h-[450px] px-5 py-4" showsVerticalScrollIndicator={false}>
+                {/* Rating Filters */}
+                <View className="mb-6">
+                  <Text className="text-lg font-bold text-gray-900 mb-3">
                     Filter by Rating
                   </Text>
-                  
-                  {/* Step 1: Select Source */}
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 }}>
+
+                  <Text className="text-sm font-semibold text-gray-700 mb-2">
                     Step 1: Select Rating Source
                   </Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 }}>
-                      <TouchableOpacity
-                        onPress={() => setRatingFilter({ source: ratingFilter.source === 'hashview' ? null : 'hashview', stars: null })}
-                        activeOpacity={0.7}
-                        style={{ 
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingHorizontal: 16,
-                          paddingVertical: 10,
-                          borderRadius: 12,
-                          marginRight: 8,
-                          marginBottom: 8,
-                          backgroundColor: ratingFilter.source === 'hashview' ? COLORS.secondary : '#F3F4F6',
-                          borderWidth: 2,
-                          borderColor: ratingFilter.source === 'hashview' ? COLORS.secondary : '#E5E7EB'
-                        }}
-                      >
-                        <Icon name="star" size={18} color={ratingFilter.source === 'hashview' ? '#FFF' : '#6B7280'} />
-                        <Text style={{ 
-                          marginLeft: 8, 
-                          fontWeight: '600',
-                          color: ratingFilter.source === 'hashview' ? '#FFF' : '#374151'
-                        }}>
-                          HashView
-                        </Text>
-                      </TouchableOpacity>
+                  <View className="flex-row flex-wrap mb-4">
+                    <TouchableOpacity
+                      onPress={() => setRatingFilter({ source: ratingFilter.source === 'hashview' ? null : 'hashview', stars: null })}
+                      activeOpacity={0.7}
+                      className={`flex-row items-center px-4 py-2.5 rounded-xl mr-2 mb-2 border-2 ${ratingFilter.source === 'hashview' ? '' : 'bg-gray-100'}`}
+                      style={ratingFilter.source === 'hashview' ? { backgroundColor: COLORS.secondary, borderColor: COLORS.secondary } : { borderColor: '#E5E7EB' }}
+                    >
+                      <Icon name="star" size={18} color={ratingFilter.source === 'hashview' ? '#FFF' : '#6B7280'} />
+                      <Text className={`ml-2 font-semibold ${ratingFilter.source === 'hashview' ? 'text-white' : 'text-gray-700'}`}>
+                        HashView
+                      </Text>
+                    </TouchableOpacity>
 
-                      <TouchableOpacity
-                        onPress={() => setRatingFilter({ source: ratingFilter.source === 'google' ? null : 'google', stars: null })}
-                        activeOpacity={0.7}
-                        style={{ 
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingHorizontal: 16,
-                          paddingVertical: 10,
-                          borderRadius: 12,
-                          marginRight: 8,
-                          marginBottom: 8,
-                          backgroundColor: ratingFilter.source === 'google' ? '#4285F4' : '#F3F4F6',
-                          borderWidth: 2,
-                          borderColor: ratingFilter.source === 'google' ? '#4285F4' : '#E5E7EB'
-                        }}
-                      >
-                        <Icon name="logo-google" size={18} color={ratingFilter.source === 'google' ? '#FFF' : '#6B7280'} />
-                        <Text style={{ 
-                          marginLeft: 8, 
-                          fontWeight: '600',
-                          color: ratingFilter.source === 'google' ? '#FFF' : '#374151'
-                        }}>
-                          Google
-                        </Text>
-                      </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setRatingFilter({ source: ratingFilter.source === 'google' ? null : 'google', stars: null })}
+                      activeOpacity={0.7}
+                      className={`flex-row items-center px-4 py-2.5 rounded-xl mr-2 mb-2 border-2 ${ratingFilter.source === 'google' ? 'bg-[#4285F4]' : 'bg-gray-100'}`}
+                      style={ratingFilter.source === 'google' ? { borderColor: '#4285F4' } : { borderColor: '#E5E7EB' }}
+                    >
+                      <Icon name="logo-google" size={18} color={ratingFilter.source === 'google' ? '#FFF' : '#6B7280'} />
+                      <Text className={`ml-2 font-semibold ${ratingFilter.source === 'google' ? 'text-white' : 'text-gray-700'}`}>
+                        Google
+                      </Text>
+                    </TouchableOpacity>
 
-                      <TouchableOpacity
-                        onPress={() => setRatingFilter({ source: ratingFilter.source === 'tripadvisor' ? null : 'tripadvisor', stars: null })}
-                        activeOpacity={0.7}
-                        style={{ 
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingHorizontal: 16,
-                          paddingVertical: 10,
-                          borderRadius: 12,
-                          marginRight: 8,
-                          marginBottom: 8,
-                          backgroundColor: ratingFilter.source === 'tripadvisor' ? '#00AA6C' : '#F3F4F6',
-                          borderWidth: 2,
-                          borderColor: ratingFilter.source === 'tripadvisor' ? '#00AA6C' : '#E5E7EB'
-                        }}
-                      >
-                        <Image 
-                          source={require('../../../assets/tripadvisor.png')}
-                          style={{ width: 18, height: 18 }}
-                          resizeMode="contain"
-                        />
-                        <Text style={{ 
-                          marginLeft: 8, 
-                          fontWeight: '600',
-                          color: ratingFilter.source === 'tripadvisor' ? '#FFF' : '#374151'
-                        }}>
-                          TripAdvisor
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity
+                      onPress={() => setRatingFilter({ source: ratingFilter.source === 'tripadvisor' ? null : 'tripadvisor', stars: null })}
+                      activeOpacity={0.7}
+                      className={`flex-row items-center px-4 py-2.5 rounded-xl mr-2 mb-2 border-2 ${ratingFilter.source === 'tripadvisor' ? 'bg-[#00AA6C]' : 'bg-gray-100'}`}
+                      style={ratingFilter.source === 'tripadvisor' ? { borderColor: '#00AA6C' } : { borderColor: '#E5E7EB' }}
+                    >
+                      <Image
+                        source={require('../../../assets/tripadvisor.png')}
+                        className="w-[18px] h-[18px]"
+                        resizeMode="contain"
+                      />
+                      <Text className={`ml-2 font-semibold ${ratingFilter.source === 'tripadvisor' ? 'text-white' : 'text-gray-700'}`}>
+                        TripAdvisor
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
 
-                  {/* Step 2: Select Star Level */}
+                  {/* Star Level */}
                   {ratingFilter.source && (
                     <>
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 }}>
+                      <Text className="text-sm font-semibold text-gray-700 mb-2">
                         Step 2: Select Star Level
                       </Text>
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                      <View className="flex-row flex-wrap">
                         {[5, 4, 3].map((starLevel) => (
                           <TouchableOpacity
                             key={starLevel}
                             onPress={() => setRatingFilter({ ...ratingFilter, stars: ratingFilter.stars === starLevel ? null : starLevel })}
                             activeOpacity={0.7}
-                            style={{ 
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              paddingHorizontal: 16,
-                              paddingVertical: 10,
-                              borderRadius: 12,
-                              marginRight: 8,
-                              marginBottom: 8,
-                              backgroundColor: ratingFilter.stars === starLevel ? '#FFC107' : '#F3F4F6',
-                              borderWidth: 2,
-                              borderColor: ratingFilter.stars === starLevel ? '#FFC107' : '#E5E7EB'
-                            }}
+                            className={`flex-row items-center px-4 py-2.5 rounded-xl mr-2 mb-2 border-2 ${ratingFilter.stars === starLevel ? 'bg-amber-400' : 'bg-gray-100'}`}
+                            style={ratingFilter.stars === starLevel ? { borderColor: '#FFC107' } : { borderColor: '#E5E7EB' }}
                           >
                             {[...Array(starLevel)].map((_, i) => (
-                              <Icon 
+                              <Icon
                                 key={i}
-                                name="star" 
-                                size={14} 
-                                color={ratingFilter.stars === starLevel ? '#000' : '#6B7280'} 
+                                name="star"
+                                size={14}
+                                color={ratingFilter.stars === starLevel ? '#000' : '#6B7280'}
                               />
                             ))}
-                            <Text style={{ 
-                              marginLeft: 8, 
-                              fontWeight: '600',
-                              color: ratingFilter.stars === starLevel ? '#111827' : '#374151'
-                            }}>
+                            <Text className={`ml-2 font-semibold ${ratingFilter.stars === starLevel ? 'text-gray-900' : 'text-gray-700'}`}>
                               {starLevel}+ Stars
                             </Text>
                           </TouchableOpacity>
@@ -801,36 +786,22 @@ export default function UserHomeScreen({ navigation }) {
                   )}
                 </View>
 
-                {/* Distance Filters Section */}
+                {/* Distance Filters */}
                 {hasLocation && (
-                  <View style={{ marginBottom: 24 }}>
-                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 12 }}>
+                  <View className="mb-6">
+                    <Text className="text-lg font-bold text-gray-900 mb-3">
                       Filter by Distance
                     </Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                    <View className="flex-row flex-wrap">
                       <TouchableOpacity
                         onPress={() => setDistanceFilter(distanceFilter === 'nearme' ? null : 'nearme')}
                         activeOpacity={0.7}
-                        style={{ 
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingHorizontal: 16,
-                          paddingVertical: 10,
-                          borderRadius: 12,
-                          marginRight: 8,
-                          marginBottom: 8,
-                          backgroundColor: distanceFilter === 'nearme' ? '#10B981' : '#F3F4F6',
-                          borderWidth: 2,
-                          borderColor: distanceFilter === 'nearme' ? '#10B981' : '#E5E7EB'
-                        }}
+                        className={`flex-row items-center px-4 py-2.5 rounded-xl mr-2 mb-2 border-2 ${distanceFilter === 'nearme' ? 'bg-emerald-500' : 'bg-gray-100'}`}
+                        style={distanceFilter === 'nearme' ? { borderColor: '#10B981' } : { borderColor: '#E5E7EB' }}
                       >
                         <Icon name="navigate" size={18} color={distanceFilter === 'nearme' ? '#FFF' : '#6B7280'} />
-                        <Text style={{ 
-                          marginLeft: 8, 
-                          fontWeight: '600',
-                          color: distanceFilter === 'nearme' ? '#FFF' : '#374151'
-                        }}>
-                          Near Me (5km)
+                        <Text className={`ml-2 font-semibold ${distanceFilter === 'nearme' ? 'text-white' : 'text-gray-700'}`}>
+                          Near Me
                         </Text>
                       </TouchableOpacity>
 
@@ -839,25 +810,11 @@ export default function UserHomeScreen({ navigation }) {
                           key={dist}
                           onPress={() => setDistanceFilter(distanceFilter === dist ? null : dist)}
                           activeOpacity={0.7}
-                          style={{ 
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            paddingHorizontal: 16,
-                            paddingVertical: 10,
-                            borderRadius: 12,
-                            marginRight: 8,
-                            marginBottom: 8,
-                            backgroundColor: distanceFilter === dist ? '#3B82F6' : '#F3F4F6',
-                            borderWidth: 2,
-                            borderColor: distanceFilter === dist ? '#3B82F6' : '#E5E7EB'
-                          }}
+                          className={`flex-row items-center px-4 py-2.5 rounded-xl mr-2 mb-2 border-2 ${distanceFilter === dist ? 'bg-blue-500' : 'bg-gray-100'}`}
+                          style={distanceFilter === dist ? { borderColor: '#3B82F6' } : { borderColor: '#E5E7EB' }}
                         >
                           <Icon name="location" size={18} color={distanceFilter === dist ? '#FFF' : '#6B7280'} />
-                          <Text style={{ 
-                            marginLeft: 8, 
-                            fontWeight: '600',
-                            color: distanceFilter === dist ? '#FFF' : '#374151'
-                          }}>
+                          <Text className={`ml-2 font-semibold ${distanceFilter === dist ? 'text-white' : 'text-gray-700'}`}>
                             {dist.toUpperCase()}
                           </Text>
                         </TouchableOpacity>
@@ -866,27 +823,21 @@ export default function UserHomeScreen({ navigation }) {
                   </View>
                 )}
 
-                {/* Location Permission Prompt */}
+                {/* Location Permission */}
                 {locationPermission !== 'granted' && (
-                  <View style={{ marginBottom: 24 }}>
+                  <View className="mb-6">
                     <TouchableOpacity
                       onPress={requestLocationPermission}
                       activeOpacity={0.7}
-                      style={{
-                        backgroundColor: '#EFF6FF',
-                        borderRadius: 12,
-                        padding: 16,
-                        borderWidth: 2,
-                        borderColor: '#BFDBFE'
-                      }}
+                      className="bg-blue-50 rounded-xl p-4 border-2 border-blue-200"
                     >
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View className="flex-row items-center">
                         <Icon name="location-outline" size={24} color="#3B82F6" />
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                          <Text style={{ color: '#1E3A8A', fontWeight: 'bold', fontSize: 14 }}>
+                        <View className="flex-1 ml-3">
+                          <Text className="text-blue-900 font-bold text-sm">
                             Enable Location Access
                           </Text>
-                          <Text style={{ color: '#1D4ED8', fontSize: 12, marginTop: 4 }}>
+                          <Text className="text-blue-700 text-xs mt-1">
                             Get distance-based filters and nearby businesses
                           </Text>
                         </View>
@@ -898,47 +849,27 @@ export default function UserHomeScreen({ navigation }) {
               </ScrollView>
 
               {/* Modal Footer */}
-              <View style={{ 
-                flexDirection: 'row', 
-                paddingHorizontal: 20, 
-                paddingVertical: 16,
-                borderTopWidth: 1,
-                borderTopColor: '#F3F4F6',
-                gap: 12
-              }}>
+              <View className="flex-row px-5 py-4 border-t border-gray-100 gap-3">
                 <TouchableOpacity
                   onPress={clearFilters}
                   activeOpacity={0.7}
-                  style={{
-                    flex: 1,
-                    paddingVertical: 14,
-                    borderRadius: 12,
-                    borderWidth: 2,
-                    borderColor: '#D1D5DB',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
+                  className="flex-1 py-3.5 rounded-xl border-2 border-gray-300 items-center justify-center"
                 >
-                  <Text style={{ color: '#374151', fontWeight: 'bold', fontSize: 15 }}>
+                  <Text className="text-gray-700 font-bold text-[15px]">
                     Clear All
                   </Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
                   onPress={applyFilters}
                   activeOpacity={0.7}
-                  style={{ flex: 1 }}
+                  className="flex-1"
                 >
                   <LinearGradient
                     colors={[COLORS.secondary, COLORS.secondaryDark]}
-                    style={{
-                      paddingVertical: 14,
-                      borderRadius: 12,
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
+                    className="py-3.5 rounded-xl items-center justify-center"
                   >
-                    <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 15 }}>
+                    <Text className="text-white font-bold text-[15px]">
                       Apply Filters
                     </Text>
                   </LinearGradient>

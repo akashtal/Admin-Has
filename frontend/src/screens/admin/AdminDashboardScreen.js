@@ -99,6 +99,15 @@ export default function AdminDashboardScreen({ navigation }) {
       badge: null,
       description: 'Manage ratings'
     },
+    {
+      title: 'Notifications',
+      icon: 'notifications',
+      color: '#3B82F6',
+      bgColor: '#EFF6FF',
+      screen: 'NotificationManagement',
+      badge: null,
+      description: 'Send push notifications'
+    },
   ];
 
   return (

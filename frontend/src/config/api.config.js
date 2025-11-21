@@ -1,19 +1,15 @@
 // API Configuration
+// Uses environment variables with production defaults
+// For EAS builds, set EXPO_PUBLIC_API_BASE_URL in eas.json
 export const API_CONFIG = {
-  // 🔧 DEVELOPMENT MODE: Using local backend
-  // Change this to your deployed backend URL for production
-  // IMPORTANT: For Expo Go on phone, use your computer's IP address
-  // To find your IP: Run "ipconfig" in PowerShell and look for IPv4 Address
+  // API Base URL - defaults to production if not set
+  BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hashview-backend.onrender.com/api',
   
-  // 🏠 LOCAL BACKEND (Development)
-  BASE_URL: 'http://192.168.29.151:5000/api',  // ✅ Local backend
-  SOCKET_URL: 'http://192.168.29.151:5000',    // ✅ Local Socket.io
+  // Socket.io URL - defaults to production if not set
+  SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || 'https://hashview-backend.onrender.com',
   
-  // 🌐 PRODUCTION BACKEND (Uncomment for production)
-  // BASE_URL: 'https://hashview-backend.onrender.com/api',
-  // SOCKET_URL: 'https://hashview-backend.onrender.com',
-  
-  TIMEOUT: 30000, // 30 seconds
+  // Request timeout in milliseconds
+  TIMEOUT: parseInt(process.env.EXPO_PUBLIC_API_TIMEOUT || '30000', 10),
   
   // API Endpoints
   ENDPOINTS: {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -18,6 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { Picker } from '@react-native-picker/picker';
 import { registerBusiness } from '../../store/slices/businessSlice';
+import PhoneInput from 'react-native-phone-number-input';
 import AdvancedLocationPicker from '../../components/AdvancedLocationPicker';
 import ApiService from '../../services/api.service';
 import COLORS from '../../config/colors';
@@ -33,11 +34,12 @@ export default function BusinessRegistrationScreen({ navigation }) {
     email: '',
     phone: '',
     address: '',
+    buildingNumber: '',
     street: '',
-    area: '',
-    city: 'Guwahati',
-    state: 'Assam',
-    pincode: '',
+    city: '',
+    county: '',
+    postcode: '',
+    country: 'United Kingdom',
     landmark: '',
     description: '',
     website: '',
@@ -78,6 +80,12 @@ export default function BusinessRegistrationScreen({ navigation }) {
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [searchingAddress, setSearchingAddress] = useState(false);
+  const [manualAddressDirty, setManualAddressDirty] = useState(false);
+  const manualGeocodeTimeoutRef = useRef(null);
+
+  // Categories from database (backend-managed)
+  const [categories, setCategories] = useState([{ label: 'Select Category', value: '' }]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
   const [openHours, setOpenHours] = useState({
     monday: { open: '09:00 AM', close: '05:00 PM', closed: false },
@@ -88,6 +96,10 @@ export default function BusinessRegistrationScreen({ navigation }) {
     saturday: { open: '09:00 AM', close: '05:00 PM', closed: false },
     sunday: { open: '09:00 AM', close: '05:00 PM', closed: true }
   });
+
+  const businessPhoneInputRef = useRef(null);
+  const [businessPhoneRawValue, setBusinessPhoneRawValue] = useState('');
+  const [businessPhoneError, setBusinessPhoneError] = useState('');
 
   // Function to search for addresses using Google Places Autocomplete API
   const searchAddress = async (query) => {
@@ -111,9 +123,9 @@ export default function BusinessRegistrationScreen({ navigation }) {
         return;
       }
       
-      // Step 1: Get place predictions using Places Autocomplete API
+      // Step 1: Get place predictions using Places Autocomplete API (UK addresses only)
       const autocompleteResponse = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&components=country:in&types=establishment|geocode&key=${GOOGLE_API_KEY}`
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&components=country:gb&types=establishment|geocode&key=${GOOGLE_API_KEY}`
       );
       
       if (!autocompleteResponse.ok) {
@@ -137,21 +149,22 @@ export default function BusinessRegistrationScreen({ navigation }) {
         autocompleteData.predictions.slice(0, 5).map(async (prediction) => {
           try {
             const placeDetailsResponse = await fetch(
-              `https://maps.googleapis.com/maps/api/place/details/json?place_id=${prediction.place_id}&fields=formatted_address,geometry&key=${GOOGLE_API_KEY}`
+              `https://maps.googleapis.com/maps/api/place/details/json?place_id=${prediction.place_id}&fields=formatted_address,geometry,address_component&key=${GOOGLE_API_KEY}`
             );
             
             const placeDetailsData = await placeDetailsResponse.json();
             
-            if (placeDetailsData.status === 'OK' && placeDetailsData.result) {
-              return {
-                id: prediction.place_id,
-                address: placeDetailsData.result.formatted_address || prediction.description,
-                latitude: placeDetailsData.result.geometry.location.lat,
-                longitude: placeDetailsData.result.geometry.location.lng,
-                placeId: prediction.place_id,
-                types: prediction.types || []
-              };
-            }
+              if (placeDetailsData.status === 'OK' && placeDetailsData.result) {
+                return {
+                  id: prediction.place_id,
+                  address: placeDetailsData.result.formatted_address || prediction.description,
+                  latitude: placeDetailsData.result.geometry.location.lat,
+                  longitude: placeDetailsData.result.geometry.location.lng,
+                  placeId: prediction.place_id,
+                  types: prediction.types || [],
+                  components: placeDetailsData.result.address_components || []
+                };
+              }
             return null;
           } catch (error) {
             console.error('Error fetching place details:', error);
@@ -189,23 +202,110 @@ export default function BusinessRegistrationScreen({ navigation }) {
     return () => clearTimeout(delayDebounce);
   }, [addressSearchQuery]);
 
-  // Function to update full address from manual fields
-  const updateFullAddress = (data) => {
+  const parseAddressComponents = (components = []) => {
+    const getComponent = (types) => {
+      const comp = components.find((c) => types.every((type) => c.types.includes(type)));
+      return comp ? comp.long_name : '';
+    };
+
+    return {
+      buildingNumber: getComponent(['street_number']),
+      street: getComponent(['route']),
+      city: getComponent(['postal_town']) || getComponent(['locality']),
+      county: getComponent(['administrative_area_level_2']),
+      postcode: getComponent(['postal_code']),
+      country: getComponent(['country']),
+    };
+  };
+
+  const updateFormWithAddressComponents = (components, formattedAddress) => {
+    const parsed = parseAddressComponents(components);
+    const updated = {
+      ...formData,
+      buildingNumber: parsed.buildingNumber || formData.buildingNumber,
+      street: parsed.street || formData.street,
+      city: parsed.city || formData.city,
+      county: parsed.county || formData.county,
+      postcode: parsed.postcode || formData.postcode,
+      country: parsed.country || formData.country,
+      address: formattedAddress || formData.address,
+    };
+    setFormData(updated);
+    updateFullAddress(updated, false);
+    setManualAddressDirty(false);
+  };
+
+  const geocodeManualAddress = async (addressPayload) => {
+    const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY;
+    if (!GOOGLE_API_KEY) return;
+
+    const { buildingNumber, street, city, county, postcode } = addressPayload;
+    if (!street || !city || !postcode) return;
+
+    const query = [buildingNumber, street, city, county, postcode, 'United Kingdom']
+      .filter(Boolean)
+      .join(', ');
+
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+          query
+        )}&components=country:GB&key=${GOOGLE_API_KEY}`
+      );
+      const data = await response.json();
+      if (data.status === 'OK' && data.results?.length) {
+        const coords = data.results[0].geometry.location;
+        setLocation((prev) => ({
+          ...prev,
+          latitude: coords.lat,
+          longitude: coords.lng,
+          address: data.results[0].formatted_address,
+          loading: false,
+          error: null,
+        }));
+      }
+    } catch (error) {
+      console.error('Error geocoding manual address:', error);
+    } finally {
+      setManualAddressDirty(false);
+    }
+  };
+
+  // Function to update full address from manual fields (UK format)
+  const updateFullAddress = (data, shouldUpdateState = true) => {
     const parts = [];
+    if (data.buildingNumber) parts.push(data.buildingNumber);
     if (data.street) parts.push(data.street);
-    if (data.area) parts.push(data.area);
     if (data.city) parts.push(data.city);
-    if (data.state) parts.push(data.state);
-    if (data.pincode) parts.push(data.pincode);
+    if (data.county) parts.push(data.county);
+    if (data.postcode) parts.push(data.postcode);
+    if (data.country) parts.push(data.country);
     if (data.landmark) parts.push(`Near: ${data.landmark}`);
     
     const fullAddress = parts.join(', ');
-    setFormData(prev => ({ ...prev, address: fullAddress }));
+    if (shouldUpdateState) {
+      setFormData(prev => ({ ...prev, address: fullAddress }));
+    }
+    return fullAddress;
   };
 
   // Function to select address from suggestions
   const selectAddressSuggestion = (suggestion) => {
-    setFormData({ ...formData, address: suggestion.address });
+    let updatedForm = { ...formData, address: suggestion.address };
+    if (suggestion.components) {
+      const parsed = parseAddressComponents(suggestion.components);
+      updatedForm = {
+        ...updatedForm,
+        buildingNumber: parsed.buildingNumber || updatedForm.buildingNumber,
+        street: parsed.street || updatedForm.street,
+        city: parsed.city || updatedForm.city,
+        county: parsed.county || updatedForm.county,
+        postcode: parsed.postcode || updatedForm.postcode,
+        country: parsed.country || updatedForm.country,
+      };
+    }
+    setFormData(updatedForm);
+    updateFullAddress(updatedForm);
     setAddressSearchQuery(suggestion.address);
     setLocation({
       latitude: suggestion.latitude,
@@ -214,6 +314,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
       loading: false,
       error: null
     });
+    setManualAddressDirty(false);
     setShowAddressSuggestions(false);
     setAddressSuggestions([]); // Clear suggestions after selection
     console.log('✅ Address selected from search:', suggestion.address);
@@ -221,7 +322,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
   };
 
   // Function to get location
-  const getLocation = async () => {
+  const getLocation = useCallback(async () => {
     try {
       setLocation(prev => ({ ...prev, loading: true, error: null }));
       
@@ -270,7 +371,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
       if (addressData && addressData.length > 0) {
         const addr = addressData[0];
         const fullAddress = `${addr.name || ''}, ${addr.street || ''}, ${addr.city || ''}, ${addr.region || ''}, ${addr.country || ''}`.replace(/,\s*,/g, ',').trim();
-        setFormData({ ...formData, address: fullAddress });
+        setFormData(prev => ({ ...prev, address: fullAddress }));
         setAddressSearchQuery(fullAddress);
         setLocation(prev => ({ ...prev, address: fullAddress }));
       }
@@ -290,28 +391,72 @@ export default function BusinessRegistrationScreen({ navigation }) {
         ]
       );
     }
-  };
-
-  // Don't auto-get location on mount - let owner choose
-  // This prevents capturing owner's home location if registering remotely
-  useEffect(() => {
-    // Commented out - owner should explicitly choose GPS or address search
-    // getLocation();
   }, []);
 
-  const categories = [
-    { label: 'Select Category', value: '' },
-    { label: 'Restaurant', value: 'restaurant' },
-    { label: 'Café', value: 'cafe' },
-    { label: 'Retail Store', value: 'retail' },
-    { label: 'Services', value: 'services' },
-    { label: 'Healthcare', value: 'healthcare' },
-    { label: 'Education', value: 'education' },
-    { label: 'Entertainment', value: 'entertainment' },
-    { label: 'Salon & Spa', value: 'salon' },
-    { label: 'Hotel', value: 'hotel' },
-    { label: 'Gym & Fitness', value: 'gym' }
-  ];
+  useEffect(() => {
+    getLocation();
+  }, [getLocation]);
+
+  useEffect(() => {
+    if (!manualAddressDirty) return;
+    if (manualGeocodeTimeoutRef.current) {
+      clearTimeout(manualGeocodeTimeoutRef.current);
+    }
+    manualGeocodeTimeoutRef.current = setTimeout(() => {
+      geocodeManualAddress(formData);
+    }, 1200);
+
+    return () => {
+      if (manualGeocodeTimeoutRef.current) {
+        clearTimeout(manualGeocodeTimeoutRef.current);
+      }
+    };
+  }, [formData.buildingNumber, formData.street, formData.city, formData.county, formData.postcode, manualAddressDirty]);
+
+  // Fetch categories from database (admin-managed ONLY)
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const response = await ApiService.getCategories();
+        
+        if (response.success && response.categories) {
+          const categoryOptions = [
+            { label: 'Select Category', value: '' },
+            ...response.categories.map(cat => ({
+              label: cat.name,
+              value: cat.value || cat.name.toLowerCase()
+            }))
+          ];
+          setCategories(categoryOptions);
+          console.log(`✅ Loaded ${response.categories.length} categories from database`);
+        } else {
+          // No categories found - admin needs to create them
+          setCategories([{ label: 'No categories available', value: '' }]);
+          Alert.alert(
+            'Categories Not Available',
+            'Admin has not created any categories yet. Please contact support.'
+          );
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        // API failed - show error, NO fallback categories
+        setCategories([{ label: 'Error loading categories', value: '' }]);
+        Alert.alert(
+          'Error Loading Categories',
+          'Failed to load categories from server. Please check your internet connection and try again.',
+          [
+            { text: 'Retry', onPress: () => fetchCategories() },
+            { text: 'Cancel', style: 'cancel' }
+          ]
+        );
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+    
+    fetchCategories();
+  }, []);
 
   const timeSlots = [
     'Closed',
@@ -474,9 +619,17 @@ export default function BusinessRegistrationScreen({ navigation }) {
       return false;
     }
     if (!formData.phone.trim()) {
+      setBusinessPhoneError('Phone number is required');
       Alert.alert('Error', 'Please enter phone number');
       return false;
     }
+    const isPhoneValid = businessPhoneInputRef.current?.isValidNumber(businessPhoneRawValue);
+    if (!isPhoneValid) {
+      setBusinessPhoneError('Please enter a valid phone number with country code');
+      Alert.alert('Error', 'Please enter a valid phone number with country code');
+      return false;
+    }
+    setBusinessPhoneError('');
     if (!formData.address.trim()) {
       Alert.alert('Error', 'Please enter business address');
       return false;
@@ -511,12 +664,13 @@ export default function BusinessRegistrationScreen({ navigation }) {
         email: formData.email?.trim() || '',
         phone: formData.phone?.trim() || '',
         address: formData.address?.trim() || '',
-        // Manual address fields (new)
+        // UK Address fields
+        buildingNumber: formData.buildingNumber?.trim() || '',
         street: formData.street?.trim() || '',
-        area: formData.area?.trim() || '',
         city: formData.city?.trim() || '',
-        state: formData.state?.trim() || '',
-        pincode: formData.pincode?.trim() || '',
+        county: formData.county?.trim() || '',
+        postcode: formData.postcode?.trim().toUpperCase() || '',
+        country: formData.country || 'United Kingdom',
         landmark: formData.landmark?.trim() || '',
         category: formData.category || '',
         latitude: parseFloat(location.latitude),
@@ -776,110 +930,190 @@ export default function BusinessRegistrationScreen({ navigation }) {
         {/* Phone Number */}
         <View className="mb-4">
           <Text className="text-gray-900 font-semibold mb-2">Phone Number</Text>
-          <TextInput
-            className="bg-white rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
-            placeholder="Enter Phone Number"
-            placeholderTextColor="#9CA3AF"
-            keyboardType="phone-pad"
-            value={formData.phone}
-            onChangeText={(value) => handleInputChange('phone', value)}
+          <PhoneInput
+            ref={businessPhoneInputRef}
+            defaultCode="GB"
+            layout="first"
+            defaultValue={businessPhoneRawValue}
+            value={businessPhoneRawValue}
+            onChangeText={(text) => {
+              setBusinessPhoneRawValue(text);
+              if (businessPhoneError) setBusinessPhoneError('');
+            }}
+            onChangeFormattedText={(text) => {
+              handleInputChange('phone', text);
+            }}
+            textInputProps={{
+              placeholder: 'Enter phone number',
+              placeholderTextColor: '#9CA3AF',
+            }}
+            containerStyle={{
+              width: '100%',
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: businessPhoneError ? '#EF4444' : '#E5E7EB',
+              backgroundColor: '#F9FAFB',
+            }}
+            textContainerStyle={{
+              backgroundColor: 'transparent',
+              borderTopRightRadius: 12,
+              borderBottomRightRadius: 12,
+            }}
+            textInputStyle={{ color: '#111827', fontSize: 16 }}
+            codeTextStyle={{ color: '#111827' }}
           />
+          {businessPhoneError ? (
+            <Text className="text-red-500 text-xs mt-1">{businessPhoneError}</Text>
+          ) : null}
         </View>
 
-        {/* Manual Address Entry Fields */}
+        {/* Manual Address Entry Fields - UK Format */}
         <View className="mb-4">
-          <Text className="text-gray-900 font-semibold mb-3">Business Address</Text>
+          <Text className="text-gray-900 font-semibold mb-3">Business Address (UK)</Text>
+
+          {/* Search Address */}
+          <View className="mb-4">
+            <Text className="text-gray-700 font-medium mb-2">Search Business Address</Text>
+            <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
+              <Icon name="search" size={20} color="#9CA3AF" />
+              <TextInput
+                className="flex-1 ml-3 text-gray-900"
+                placeholder="e.g., Quay Hotel & Spa, Deganwy LL31"
+                placeholderTextColor="#9CA3AF"
+                value={addressSearchQuery}
+                onChangeText={(value) => setAddressSearchQuery(value)}
+                autoCapitalize="words"
+              />
+              {searchingAddress && <ActivityIndicator size="small" color={COLORS.primary} />}
+            </View>
+            {showAddressSuggestions && addressSuggestions.length > 0 && (
+              <View className="mt-2 bg-white rounded-xl border border-gray-200 shadow-sm">
+                {addressSuggestions.map((suggestion) => (
+                  <TouchableOpacity
+                    key={suggestion.id}
+                    className="flex-row items-start px-3 py-2 border-b border-gray-100"
+                    onPress={() => selectAddressSuggestion(suggestion)}
+                  >
+                    <Icon name="location-outline" size={18} color={COLORS.primary} style={{ marginTop: 2 }} />
+                    <Text className="flex-1 ml-2 text-gray-800">{suggestion.address}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
           
-          {/* Street Address */}
+          {/* Building Number & Street Name */}
+          <View className="flex-row mb-3">
+            <View className="w-28 mr-2">
+              <Text className="text-gray-700 font-medium mb-2">Building No. (Optional)</Text>
+              <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
+                <TextInput
+                  className="flex-1 text-gray-900 text-center"
+                  placeholder="e.g., 12A"
+                  placeholderTextColor="#9CA3AF"
+                  value={formData.buildingNumber || ''}
+                  onChangeText={(value) => {
+                    const updated = { ...formData, buildingNumber: value };
+                    setFormData(updated);
+                    updateFullAddress(updated);
+                    setManualAddressDirty(true);
+                  }}
+                />
+              </View>
+            </View>
+            
+            <View className="flex-1">
+              <Text className="text-gray-700 font-medium mb-2">Street Name *</Text>
+              <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
+                <Icon name="business" size={20} color="#9CA3AF" />
+                <TextInput
+                  className="flex-1 ml-3 text-gray-900"
+                  placeholder="e.g., High Street, Baker Street"
+                  placeholderTextColor="#9CA3AF"
+                  value={formData.street || ''}
+                  onChangeText={(value) => {
+                    const updated = { ...formData, street: value };
+                    setFormData(updated);
+                    updateFullAddress(updated);
+                    setManualAddressDirty(true);
+                  }}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Town/City */}
           <View className="mb-3">
-            <Text className="text-gray-700 font-medium mb-2">Street/Road *</Text>
+            <Text className="text-gray-700 font-medium mb-2">Town/City *</Text>
             <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
-              <Icon name="business" size={20} color="#9CA3AF" />
+              <Icon name="home" size={20} color="#9CA3AF" />
               <TextInput
                 className="flex-1 ml-3 text-gray-900"
-                placeholder="e.g., Shop No. 5, GS Road, Lokhra Road"
+                placeholder="e.g., London, Manchester, Birmingham"
                 placeholderTextColor="#9CA3AF"
-                value={formData.street || ''}
+                value={formData.city || ''}
                 onChangeText={(value) => {
-                  setFormData({ ...formData, street: value });
-                  updateFullAddress({ ...formData, street: value });
+                  const updated = { ...formData, city: value };
+                  setFormData(updated);
+                  updateFullAddress(updated);
+                  setManualAddressDirty(true);
                 }}
               />
             </View>
           </View>
 
-          {/* Area/Locality */}
-          <View className="mb-3">
-            <Text className="text-gray-700 font-medium mb-2">Area/Locality *</Text>
-            <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
-              <Icon name="location" size={20} color="#9CA3AF" />
-              <TextInput
-                className="flex-1 ml-3 text-gray-900"
-                placeholder="e.g., Lal Ganesh, Paltan Bazaar"
-                placeholderTextColor="#9CA3AF"
-                value={formData.area || ''}
-                onChangeText={(value) => {
-                  setFormData({ ...formData, area: value });
-                  updateFullAddress({ ...formData, area: value });
-                }}
-              />
-            </View>
-          </View>
-
-          {/* City and State in Row */}
+          {/* County & Postcode in Row */}
           <View className="flex-row mb-3">
             <View className="flex-1 mr-2">
-              <Text className="text-gray-700 font-medium mb-2">City *</Text>
+              <Text className="text-gray-700 font-medium mb-2">County (Optional)</Text>
               <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
-                <Icon name="home" size={20} color="#9CA3AF" />
+                <Icon name="flag" size={20} color="#9CA3AF" />
                 <TextInput
                   className="flex-1 ml-2 text-gray-900"
-                  placeholder="Guwahati"
+                  placeholder="e.g., Greater London"
                   placeholderTextColor="#9CA3AF"
-                  value={formData.city || ''}
+                  value={formData.county || ''}
                   onChangeText={(value) => {
-                    setFormData({ ...formData, city: value });
-                    updateFullAddress({ ...formData, city: value });
+                    const updated = { ...formData, county: value };
+                    setFormData(updated);
+                    updateFullAddress(updated);
+                    setManualAddressDirty(true);
                   }}
                 />
               </View>
             </View>
             
             <View className="flex-1 ml-2">
-              <Text className="text-gray-700 font-medium mb-2">State *</Text>
+              <Text className="text-gray-700 font-medium mb-2">Postcode *</Text>
               <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
-                <Icon name="flag" size={20} color="#9CA3AF" />
+                <Icon name="mail" size={20} color="#9CA3AF" />
                 <TextInput
                   className="flex-1 ml-2 text-gray-900"
-                  placeholder="Assam"
+                  placeholder="SW1A 1AA"
                   placeholderTextColor="#9CA3AF"
-                  value={formData.state || ''}
+                  value={formData.postcode || ''}
                   onChangeText={(value) => {
-                    setFormData({ ...formData, state: value });
-                    updateFullAddress({ ...formData, state: value });
+                    const formatted = value.toUpperCase();
+                    const updated = { ...formData, postcode: formatted };
+                    setFormData(updated);
+                    updateFullAddress(updated);
+                    setManualAddressDirty(true);
                   }}
+                  autoCapitalize="characters"
+                  maxLength={8}
                 />
               </View>
             </View>
           </View>
 
-          {/* PIN Code */}
+          {/* Country (Read-only) */}
           <View className="mb-3">
-            <Text className="text-gray-700 font-medium mb-2">PIN Code *</Text>
-            <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
-              <Icon name="mail" size={20} color="#9CA3AF" />
-              <TextInput
-                className="flex-1 ml-3 text-gray-900"
-                placeholder="e.g., 781018"
-                placeholderTextColor="#9CA3AF"
-                value={formData.pincode || ''}
-                onChangeText={(value) => {
-                  setFormData({ ...formData, pincode: value });
-                  updateFullAddress({ ...formData, pincode: value });
-                }}
-                keyboardType="numeric"
-                maxLength={6}
-              />
+            <Text className="text-gray-700 font-medium mb-2">Country</Text>
+            <View className="bg-gray-100 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
+              <Icon name="globe" size={20} color="#9CA3AF" />
+              <Text className="flex-1 ml-3 text-gray-900 font-semibold">
+                🇬🇧 United Kingdom
+              </Text>
             </View>
           </View>
 
@@ -890,7 +1124,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
               <Icon name="navigate" size={20} color="#9CA3AF" />
               <TextInput
                 className="flex-1 ml-3 text-gray-900"
-                placeholder="e.g., Near KFC, Opposite Mall"
+                placeholder="e.g., Near Tesco, Opposite Post Office"
                 placeholderTextColor="#9CA3AF"
                 value={formData.landmark || ''}
                 onChangeText={(value) => {
@@ -1216,17 +1450,25 @@ export default function BusinessRegistrationScreen({ navigation }) {
         {/* Business Category */}
         <View className="mb-6">
           <Text className="text-gray-900 font-semibold mb-2">Business Category</Text>
-          <View className="bg-white rounded-xl border border-gray-200">
-            <Picker
-              selectedValue={formData.category}
-              onValueChange={(value) => handleInputChange('category', value)}
-              style={{ height: 50 }}
-            >
-              {categories.map((cat) => (
-                <Picker.Item key={cat.value} label={cat.label} value={cat.value} />
-              ))}
-            </Picker>
-          </View>
+          {loadingCategories ? (
+            <View className="bg-white rounded-xl border border-gray-200 py-4 items-center">
+              <ActivityIndicator size="small" color={COLORS.primary} />
+              <Text className="text-gray-500 text-sm mt-2">Loading categories...</Text>
+            </View>
+          ) : (
+            <View className="bg-white rounded-xl border border-gray-200">
+              <Picker
+                selectedValue={formData.category}
+                onValueChange={(value) => handleInputChange('category', value)}
+                style={{ height: 50 }}
+                enabled={!loadingCategories}
+              >
+                {categories.map((cat) => (
+                  <Picker.Item key={cat.value} label={cat.label} value={cat.value} />
+                ))}
+              </Picker>
+            </View>
+          )}
         </View>
 
         {/* Submit Button */}
@@ -1267,7 +1509,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
             loading: false,
             error: null
           });
-          setFormData({ ...formData, address: selectedLocation.address });
+          setFormData(prev => ({ ...prev, address: selectedLocation.address }));
           setAddressSearchQuery(selectedLocation.address);
           console.log('✅ Location selected:', selectedLocation);
         }}

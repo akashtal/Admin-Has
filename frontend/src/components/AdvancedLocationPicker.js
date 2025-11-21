@@ -17,6 +17,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import COLORS from '../config/colors';
 
 const { width, height } = Dimensions.get('window');
+const UK_DEFAULT_COORDS = { latitude: 54.5, longitude: -3.3 };
 
 export default function AdvancedLocationPicker({ 
   visible, 
@@ -35,26 +36,25 @@ export default function AdvancedLocationPicker({
   
   // Map state
   const [mapRegion, setMapRegion] = useState({
-    latitude: initialLocation?.latitude || 26.1445, // Guwahati default
-    longitude: initialLocation?.longitude || 91.7362,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01
+    latitude: initialLocation?.latitude ?? UK_DEFAULT_COORDS.latitude,
+    longitude: initialLocation?.longitude ?? UK_DEFAULT_COORDS.longitude,
+    latitudeDelta: initialLocation?.latitude ? 0.01 : 0.2,
+    longitudeDelta: initialLocation?.longitude ? 0.01 : 0.2
   });
   const [markerPosition, setMarkerPosition] = useState({
-    latitude: initialLocation?.latitude || 26.1445,
-    longitude: initialLocation?.longitude || 91.7362
+    latitude: initialLocation?.latitude ?? UK_DEFAULT_COORDS.latitude,
+    longitude: initialLocation?.longitude ?? UK_DEFAULT_COORDS.longitude
   });
   const [mapAddress, setMapAddress] = useState(initialLocation?.address || '');
   const mapRef = useRef(null);
   
   // Manual entry state
   const [manualAddress, setManualAddress] = useState({
-    buildingName: '',
+    buildingNumber: '',
     street: '',
-    area: '',
-    city: initialLocation?.city || 'Guwahati',
-    state: initialLocation?.state || 'Assam',
-    pincode: '',
+    city: initialLocation?.city || 'London',
+    county: initialLocation?.county || 'England',
+    postcode: '',
     landmark: ''
   });
   
@@ -82,7 +82,7 @@ export default function AdvancedLocationPicker({
 
       // Google Places Autocomplete
       const autocompleteResponse = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&components=country:in&types=establishment|geocode&key=${googleApiKey}`
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&components=country:gb&types=establishment|geocode&key=${googleApiKey}`
       );
 
       const autocompleteData = await autocompleteResponse.json();
@@ -221,12 +221,12 @@ export default function AdvancedLocationPicker({
 
   // Geocode manual address
   const geocodeManualAddress = async () => {
-    const fullAddress = `${manualAddress.buildingName} ${manualAddress.street}, ${manualAddress.area}, ${manualAddress.city}, ${manualAddress.state} ${manualAddress.pincode}, India`;
-
-    if (!manualAddress.street || !manualAddress.city || !manualAddress.state || !manualAddress.pincode) {
-      Alert.alert('Incomplete Address', 'Please fill in all required fields');
+    if (!manualAddress.street || !manualAddress.city || !manualAddress.postcode) {
+      Alert.alert('Incomplete Address', 'Street, town/city, and postcode are required');
       return;
     }
+
+    const fullAddress = `${manualAddress.buildingNumber ? manualAddress.buildingNumber + ' ' : ''}${manualAddress.street}, ${manualAddress.city}, ${manualAddress.county ? manualAddress.county + ', ' : ''}${manualAddress.postcode}, United Kingdom`;
 
     try {
       setLoading(true);
@@ -330,7 +330,7 @@ export default function AdvancedLocationPicker({
               <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="e.g., Indulge Guwahati, Pizza Hut GS Road..."
+                placeholder="e.g., Pret A Manger London, 10 Downing Street..."
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 autoCapitalize="words"
@@ -444,66 +444,54 @@ export default function AdvancedLocationPicker({
 
             <View style={styles.manualForm}>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Building/Shop Name</Text>
+                <Text style={styles.inputLabel}>Building No. (Optional)</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="e.g., Shop No. 5, Tower A"
-                  value={manualAddress.buildingName}
-                  onChangeText={(text) => setManualAddress({ ...manualAddress, buildingName: text })}
+                  placeholder="e.g., 221B"
+                  value={manualAddress.buildingNumber}
+                  onChangeText={(text) => setManualAddress({ ...manualAddress, buildingNumber: text })}
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Street/Road *</Text>
+                <Text style={styles.inputLabel}>Street *</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="e.g., GS Road, Lokhra Road"
+                  placeholder="e.g., Baker Street"
                   value={manualAddress.street}
                   onChangeText={(text) => setManualAddress({ ...manualAddress, street: text })}
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Area/Locality *</Text>
+                <Text style={styles.inputLabel}>Town/City *</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="e.g., Lal Ganesh, Paltan Bazaar"
-                  value={manualAddress.area}
-                  onChangeText={(text) => setManualAddress({ ...manualAddress, area: text })}
+                  placeholder="e.g., London, Manchester"
+                  value={manualAddress.city}
+                  onChangeText={(text) => setManualAddress({ ...manualAddress, city: text })}
                 />
               </View>
 
-              <View style={styles.inputRow}>
-                <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                  <Text style={styles.inputLabel}>City *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Guwahati"
-                    value={manualAddress.city}
-                    onChangeText={(text) => setManualAddress({ ...manualAddress, city: text })}
-                  />
-                </View>
-
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.inputLabel}>State *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Assam"
-                    value={manualAddress.state}
-                    onChangeText={(text) => setManualAddress({ ...manualAddress, state: text })}
-                  />
-                </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>County (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., Greater London"
+                  value={manualAddress.county}
+                  onChangeText={(text) => setManualAddress({ ...manualAddress, county: text })}
+                />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>PIN Code *</Text>
+                <Text style={styles.inputLabel}>Postcode *</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="e.g., 781018"
-                  value={manualAddress.pincode}
-                  onChangeText={(text) => setManualAddress({ ...manualAddress, pincode: text })}
-                  keyboardType="numeric"
-                  maxLength={6}
+                  placeholder="SW1A 1AA"
+                  value={manualAddress.postcode}
+                  onChangeText={(text) => setManualAddress({ ...manualAddress, postcode: text.toUpperCase() })}
+                  autoCapitalize="characters"
+                  maxLength={8}
                 />
               </View>
 
@@ -511,7 +499,7 @@ export default function AdvancedLocationPicker({
                 <Text style={styles.inputLabel}>Landmark (Optional)</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="e.g., Near KFC, Opposite Mall"
+                  placeholder="e.g., Near Tesco, Opposite Tube Station"
                   value={manualAddress.landmark}
                   onChangeText={(text) => setManualAddress({ ...manualAddress, landmark: text })}
                 />

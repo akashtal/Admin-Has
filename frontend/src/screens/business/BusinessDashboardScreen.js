@@ -14,10 +14,44 @@ export default function BusinessDashboardScreen({ navigation }) {
     rating: '',
     reviewCount: ''
   });
+  const [unreadNotifications, setUnreadNotifications] = React.useState(0);
+  const [redemptionStats, setRedemptionStats] = React.useState(null);
+  const [loadingStats, setLoadingStats] = React.useState(false);
 
   useEffect(() => {
     fetchBusinessData();
+    fetchUnreadNotifications();
   }, []);
+
+  useEffect(() => {
+    if (business?._id) {
+      fetchRedemptionStats();
+    }
+  }, [business?._id]);
+
+  const fetchUnreadNotifications = async () => {
+    try {
+      const response = await ApiService.getNotifications({ status: 'unread' });
+      setUnreadNotifications(response.unreadCount || 0);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
+
+  const fetchRedemptionStats = async () => {
+    if (!business?._id) return;
+    try {
+      setLoadingStats(true);
+      const response = await ApiService.getRedemptionStats(business._id);
+      if (response.success) {
+        setRedemptionStats(response.stats);
+      }
+    } catch (error) {
+      console.error('Error fetching redemption stats:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
   const fetchBusinessData = async () => {
     try {
@@ -162,7 +196,50 @@ export default function BusinessDashboardScreen({ navigation }) {
         colors={[COLORS.primary, COLORS.primaryDark]}
         className="pt-12 pb-15 px-6"
       >
-        <Text className="text-white text-2xl font-bold mb-2">My Business</Text>
+        <View className="flex-row items-center justify-between">
+          <Text className="text-white text-2xl font-bold">My Business</Text>
+          
+          {/* Notifications Bell */}
+          <TouchableOpacity 
+            onPress={() => {
+              navigation.navigate('Notifications');
+              setUnreadNotifications(0);
+            }}
+            activeOpacity={0.7}
+            style={{ position: 'relative' }}
+          >
+            <View style={{ 
+              backgroundColor: 'rgba(255,255,255,0.2)', 
+              borderRadius: 50, 
+              width: 44, 
+              height: 44, 
+              alignItems: 'center', 
+              justifyContent: 'center'
+            }}>
+              <Icon name="notifications-outline" size={22} color="#FFF" />
+              {unreadNotifications > 0 && (
+                <View style={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -4,
+                  backgroundColor: '#EF4444',
+                  borderRadius: 10,
+                  minWidth: 20,
+                  height: 20,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingHorizontal: 5,
+                  borderWidth: 2,
+                  borderColor: COLORS.primary
+                }}>
+                  <Text style={{ color: '#FFF', fontSize: 11, fontWeight: 'bold' }}>
+                    {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
 
       <ScrollView className="flex-1 bg-gray-50">
@@ -331,6 +408,16 @@ export default function BusinessDashboardScreen({ navigation }) {
           </TouchableOpacity>
 
           <TouchableOpacity 
+            onPress={() => navigation.navigate('CouponQRScanner', { businessId: business._id })}
+            className="bg-white rounded-2xl p-4 shadow-sm items-center w-[48%] mb-3"
+          >
+            <View className="w-12 h-12 rounded-full items-center justify-center mb-2" style={{ backgroundColor: '#ECFDF5' }}>
+              <Icon name="qr-code" size={24} color="#10B981" />
+            </View>
+            <Text className="text-sm font-semibold text-gray-900">Scan QR</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
             onPress={() => navigation.navigate('ViewReviews', { businessId: business._id })}
             className="bg-white rounded-2xl p-4 shadow-sm items-center w-[48%] mb-3"
           >
@@ -338,6 +425,16 @@ export default function BusinessDashboardScreen({ navigation }) {
               <Icon name="chatbubbles" size={24} color={COLORS.secondary} />
             </View>
             <Text className="text-sm font-semibold text-gray-900">Reviews</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('ManageUpdates', { businessId: business._id })}
+            className="bg-white rounded-2xl p-4 shadow-sm items-center w-[48%] mb-3"
+          >
+            <View className="w-12 h-12 rounded-full items-center justify-center mb-2" style={{ backgroundColor: '#ECFDF5' }}>
+              <Icon name="megaphone" size={24} color="#10B981" />
+            </View>
+            <Text className="text-sm font-semibold text-gray-900">Updates & Offers</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -360,6 +457,72 @@ export default function BusinessDashboardScreen({ navigation }) {
             <Text className="text-sm font-semibold text-gray-900">Edit Info</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Coupon Redemption Statistics */}
+        {redemptionStats && (
+          <View className="bg-white rounded-2xl p-6 shadow-sm mb-4">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-lg font-bold text-gray-900">Coupon Redemption Stats</Text>
+              <TouchableOpacity onPress={fetchRedemptionStats} disabled={loadingStats}>
+                <Icon name="refresh" size={20} color={loadingStats ? '#9CA3AF' : COLORS.secondary} />
+              </TouchableOpacity>
+            </View>
+            
+            {loadingStats ? (
+              <ActivityIndicator size="small" color={COLORS.secondary} />
+            ) : (
+              <>
+                {redemptionStats.template && (
+                  <View className="mb-4 pb-4 border-b border-gray-100">
+                    <View className="flex-row items-center justify-between">
+                      <Text className="text-sm text-gray-600">Redemption Limit</Text>
+                      <Text className="text-base font-semibold text-gray-900">
+                        {redemptionStats.template.redemptionLimit || 'Unlimited'}
+                      </Text>
+                    </View>
+                    <View className="flex-row items-center justify-between mt-2">
+                      <Text className="text-sm text-gray-600">Redeemed</Text>
+                      <Text className="text-base font-semibold text-green-600">
+                        {redemptionStats.template.redemptionCount || 0}
+                      </Text>
+                    </View>
+                    {redemptionStats.template.redemptionLimit && (
+                      <View className="mt-3">
+                        <View className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <View 
+                            className="h-full bg-green-500 rounded-full"
+                            style={{ 
+                              width: `${Math.min(100, (redemptionStats.template.redemptionCount / redemptionStats.template.redemptionLimit) * 100)}%` 
+                            }}
+                          />
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                )}
+                
+                <View className="flex-row flex-wrap justify-between">
+                  <View className="w-[48%] bg-green-50 rounded-xl p-3 mb-2">
+                    <Text className="text-xs text-gray-600 mb-1">Redeemed</Text>
+                    <Text className="text-2xl font-bold text-green-600">{redemptionStats.redeemed || 0}</Text>
+                  </View>
+                  <View className="w-[48%] bg-red-50 rounded-xl p-3 mb-2">
+                    <Text className="text-xs text-gray-600 mb-1">Expired</Text>
+                    <Text className="text-2xl font-bold text-red-600">{redemptionStats.expired || 0}</Text>
+                  </View>
+                  <View className="w-[48%] bg-blue-50 rounded-xl p-3">
+                    <Text className="text-xs text-gray-600 mb-1">Active</Text>
+                    <Text className="text-2xl font-bold text-blue-600">{redemptionStats.active || 0}</Text>
+                  </View>
+                  <View className="w-[48%] bg-gray-50 rounded-xl p-3">
+                    <Text className="text-xs text-gray-600 mb-1">Total Issued</Text>
+                    <Text className="text-2xl font-bold text-gray-700">{redemptionStats.totalIssued || 0}</Text>
+                  </View>
+                </View>
+              </>
+            )}
+          </View>
+        )}
 
         {/* Business Info */}
         <View className="bg-white rounded-2xl p-6 shadow-sm">

@@ -1,26 +1,57 @@
 {
   "cli": {
-    "version": ">= 5.9.0"
+    "version": ">= 5.9.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": true
+      }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://hashview-backend.onrender.com/api",
+        "EXPO_PUBLIC_SOCKET_URL": "https://hashview-backend.onrender.com",
+        "EXPO_PUBLIC_API_TIMEOUT": "30000"
       }
     },
     "production": {
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://hashview-backend.onrender.com/api",
+        "EXPO_PUBLIC_SOCKET_URL": "https://hashview-backend.onrender.com",
+        "EXPO_PUBLIC_API_TIMEOUT": "30000"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "your-apple-id@example.com",
+        "ascAppId": "your-app-store-connect-app-id",
+        "appleTeamId": "your-apple-team-id"
+      }
+    }
   }
 }
 

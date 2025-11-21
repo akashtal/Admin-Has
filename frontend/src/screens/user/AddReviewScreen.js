@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, Text, TextInput, TouchableOpacity, ScrollView, 
-  ActivityIndicator, Alert, StatusBar, Platform, AppState 
+  ActivityIndicator, Alert, StatusBar, Platform, AppState, Image 
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDispatch, useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/Ionicons';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { Accelerometer } from 'expo-sensors';
 import Constants from 'expo-constants';
 import { createReview, clearSuccessMessage } from '../../store/slices/reviewSlice';
+import ApiService from '../../services/api.service';
 import COLORS from '../../config/colors';
 
 export default function AddReviewScreen({ navigation, route }) {
@@ -22,6 +24,13 @@ export default function AddReviewScreen({ navigation, route }) {
     rating: 0,
     comment: '',
   });
+  
+  // Media state
+  const [selectedPhotos, setSelectedPhotos] = useState([]);
+  const [selectedVideos, setSelectedVideos] = useState([]);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [uploadedPhotos, setUploadedPhotos] = useState([]);
+  const [uploadedVideos, setUploadedVideos] = useState([]);
   
   // 🔒 COMPREHENSIVE GEOFENCING STATE
   const [location, setLocation] = useState(null);
@@ -169,7 +178,6 @@ export default function AddReviewScreen({ navigation, route }) {
       let bestAccuracy = 999;
 
       try {
-        console.log('📡 Forcing fresh GPS fix (waiting for accuracy ≤ 35m)...');
         
         subscription = await Location.watchPositionAsync(
           {
@@ -179,7 +187,6 @@ export default function AddReviewScreen({ navigation, route }) {
           },
           (loc) => {
             const accuracy = loc.coords.accuracy ?? 999;
-            console.log(`📍 GPS reading: accuracy ${accuracy.toFixed(1)}m`);
 
             // Store best reading
             if (accuracy < bestAccuracy) {
@@ -187,10 +194,9 @@ export default function AddReviewScreen({ navigation, route }) {
               bestReading = loc.coords;
             }
 
-            // ✅ Accept GOOD readings (≤ 35m) - Relaxed from 20m
+            // Accept readings ≤ 35m
             if (accuracy <= 35 && !gotFresh) {
               gotFresh = true;
-              console.log('✅ Got accurate GPS fix!');
               if (subscription) subscription.remove();
               resolve(loc.coords);
             }
@@ -213,10 +219,10 @@ export default function AddReviewScreen({ navigation, route }) {
           }
         }, 10000);
 
-      } catch (error) {
+    } catch (error) {
         if (subscription) subscription.remove();
         reject(error);
-      }
+    }
     });
   };
 
@@ -689,6 +695,204 @@ export default function AddReviewScreen({ navigation, route }) {
     Alert.alert(title, message, buttons, { cancelable: false });
   };
 
+  // ==================== MEDIA HANDLING ====================
+  const pickPhotos = async () => {
+    try {
+      // Show options: Camera or Gallery
+      Alert.alert(
+        'Add Photos',
+        'Choose an option',
+        [
+          {
+            text: 'Take Photo',
+            onPress: async () => {
+              const { status } = await ImagePicker.requestCameraPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert('Permission Required', 'Please grant permission to use camera');
+                return;
+              }
+
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                quality: 0.8,
+              });
+
+              if (!result.canceled && result.assets) {
+                setSelectedPhotos([...selectedPhotos, result.assets[0]]);
+              }
+            }
+          },
+          {
+            text: 'Choose from Gallery',
+            onPress: async () => {
+              const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert('Permission Required', 'Please grant permission to access photos');
+                return;
+              }
+
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsMultipleSelection: true,
+                quality: 0.8,
+                selectionLimit: 5 - selectedPhotos.length, // Max 5 photos total
+              });
+
+              if (!result.canceled && result.assets) {
+                const newPhotos = result.assets.slice(0, 5 - selectedPhotos.length);
+                setSelectedPhotos([...selectedPhotos, ...newPhotos]);
+              }
+            }
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error picking photos:', error);
+      Alert.alert('Error', 'Failed to pick photos');
+    }
+  };
+
+  const pickVideos = async () => {
+    try {
+      // Show options: Record Video or Choose from Gallery
+      Alert.alert(
+        'Add Videos',
+        'Choose an option',
+        [
+          {
+            text: 'Record Video',
+            onPress: async () => {
+              const { status } = await ImagePicker.requestCameraPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert('Permission Required', 'Please grant permission to use camera');
+                return;
+              }
+
+              const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+                videoMaxDuration: 30, // Max 30 seconds
+                quality: 0.8,
+              });
+
+              if (!result.canceled && result.assets) {
+                setSelectedVideos([...selectedVideos, result.assets[0]]);
+              }
+            }
+          },
+          {
+            text: 'Choose from Gallery',
+            onPress: async () => {
+              const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (status !== 'granted') {
+                Alert.alert('Permission Required', 'Please grant permission to access videos');
+                return;
+              }
+
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+                allowsMultipleSelection: true,
+                quality: 0.8,
+                videoMaxDuration: 30, // Max 30 seconds per video
+                selectionLimit: 2 - selectedVideos.length, // Max 2 videos total
+              });
+
+              if (!result.canceled && result.assets) {
+                const newVideos = result.assets.slice(0, 2 - selectedVideos.length);
+                setSelectedVideos([...selectedVideos, ...newVideos]);
+              }
+            }
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error picking videos:', error);
+      Alert.alert('Error', 'Failed to pick videos');
+    }
+  };
+
+  const removePhoto = (index) => {
+    setSelectedPhotos(selectedPhotos.filter((_, i) => i !== index));
+  };
+
+  const removeVideo = (index) => {
+    setSelectedVideos(selectedVideos.filter((_, i) => i !== index));
+  };
+
+  const uploadMediaToCloudinary = async () => {
+    try {
+      const photos = [];
+      const videos = [];
+
+      // Upload photos if selected
+      if (selectedPhotos.length > 0) {
+        setUploadingMedia(true);
+        const photoFormData = new FormData();
+        
+        selectedPhotos.forEach((photo, index) => {
+          const filename = photo.uri.split('/').pop() || `photo_${Date.now()}_${index}.jpg`;
+          const match = /\.(\w+)$/.exec(filename);
+          const extension = match ? match[1].toLowerCase() : 'jpg';
+          const mimeType = `image/${extension === 'jpg' ? 'jpeg' : extension}`;
+          
+          photoFormData.append('photos', {
+            uri: photo.uri,
+            name: filename,
+            type: mimeType
+          });
+        });
+
+        const photoResponse = await ApiService.uploadReviewPhotos(photoFormData);
+        if (photoResponse.success && photoResponse.photos) {
+          photos.push(...photoResponse.photos);
+          setUploadedPhotos(photoResponse.photos);
+          console.log(`✅ Uploaded ${photoResponse.photos.length} photos`);
+        }
+      }
+
+      // Upload videos if selected
+      if (selectedVideos.length > 0) {
+        setUploadingMedia(true);
+        const videoFormData = new FormData();
+        
+        selectedVideos.forEach((video, index) => {
+          const filename = video.uri.split('/').pop() || `video_${Date.now()}_${index}.mp4`;
+          const match = /\.(\w+)$/.exec(filename);
+          const extension = match ? match[1].toLowerCase() : 'mp4';
+          const mimeType = `video/${extension}`;
+          
+          videoFormData.append('videos', {
+            uri: video.uri,
+            name: filename,
+            type: mimeType
+          });
+        });
+
+        const videoResponse = await ApiService.uploadReviewVideos(videoFormData);
+        if (videoResponse.success && videoResponse.videos) {
+          videos.push(...videoResponse.videos);
+          setUploadedVideos(videoResponse.videos);
+          console.log(`✅ Uploaded ${videoResponse.videos.length} videos`);
+        }
+      }
+
+      setUploadingMedia(false);
+      return { photos, videos };
+    } catch (error) {
+      setUploadingMedia(false);
+      console.error('Error uploading media:', error);
+      throw error;
+    }
+  };
+
   // ==================== SUBMIT REVIEW ====================
   const handleSubmit = async () => {
     // Validation 1: Rating
@@ -743,16 +947,47 @@ export default function AddReviewScreen({ navigation, route }) {
           'Moved Away',
           `You've moved away from the business (${Math.round(finalDistance)}m away).\n\nPlease return to submit your review.`
         );
-        return;
+      return;
+    }
+
+      // Upload media to Cloudinary first (if any)
+      let uploadedMedia = { photos: [], videos: [] };
+      if (selectedPhotos.length > 0 || selectedVideos.length > 0) {
+        try {
+          console.log('📸 Uploading media to Cloudinary...');
+          uploadedMedia = await uploadMediaToCloudinary();
+          console.log('✅ Media uploaded successfully:', {
+            photos: uploadedMedia.photos.length,
+            videos: uploadedMedia.videos.length
+          });
+        } catch (error) {
+          Alert.alert(
+            'Upload Failed', 
+            'Failed to upload photos/videos. Continue without media?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { 
+                text: 'Continue', 
+                onPress: () => {
+                  // Continue without media
+                  uploadedMedia = { photos: [], videos: [] };
+                }
+              }
+            ]
+          );
+          return;
+        }
       }
 
-      // Submit to backend with ALL security metadata
-      dispatch(createReview({
-        business: business._id,
-        rating: formData.rating,
-        comment: formData.comment,
+      // Submit to backend with ALL security metadata + media
+    dispatch(createReview({
+      business: business._id,
+      rating: formData.rating,
+      comment: formData.comment,
         latitude: finalLocation.coords.latitude,
         longitude: finalLocation.coords.longitude,
+        images: uploadedMedia.photos, // Cloudinary URLs
+        videos: uploadedMedia.videos, // Cloudinary URLs
         // Security metadata
         locationAccuracy: finalLocation.coords.accuracy,
         verificationTime: VERIFICATION_TIME,
@@ -764,7 +999,7 @@ export default function AddReviewScreen({ navigation, route }) {
         devicePlatform: Platform.OS,
       }));
       
-      console.log('✅ Review submitted with full security metadata!');
+      console.log('✅ Review submitted with full security metadata + media!');
       
     } catch (error) {
       console.error('❌ Failed to get final location:', error);
@@ -909,61 +1144,156 @@ export default function AddReviewScreen({ navigation, route }) {
 
       <View className="px-6 py-6">
         {/* Business Info */}
-        <View className="bg-gray-50 rounded-xl p-4 mb-6">
-          <Text className="text-lg font-bold text-gray-900 mb-2">{business.name}</Text>
-          <View className="flex-row items-center">
-            <Icon name="location" size={16} color={COLORS.secondary} />
-            <Text className="text-sm text-gray-600 ml-1">
-              {business.address?.city || 'Unknown location'}
-            </Text>
-          </View>
+      <View className="bg-gray-50 rounded-xl p-4 mb-6">
+        <Text className="text-lg font-bold text-gray-900 mb-2">{business.name}</Text>
+        <View className="flex-row items-center">
+          <Icon name="location" size={16} color={COLORS.secondary} />
+          <Text className="text-sm text-gray-600 ml-1">
+            {business.address?.city || 'Unknown location'}
+          </Text>
         </View>
+      </View>
 
         {/* Rating */}
-        <Text className="text-xl font-bold text-gray-900 mb-4">Rate Your Experience</Text>
+      <Text className="text-xl font-bold text-gray-900 mb-4">Rate Your Experience</Text>
 
-        <View className="flex-row justify-center items-center mb-6 py-4">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <TouchableOpacity
-              key={star}
-              onPress={() => setFormData({ ...formData, rating: star })}
-              className="mx-1"
-            >
-              <Icon
-                name={formData.rating >= star ? 'star' : 'star-outline'}
-                size={48}
-                color={formData.rating >= star ? COLORS.secondary : '#E5E7EB'}
-              />
-            </TouchableOpacity>
-          ))}
-        </View>
+      <View className="flex-row justify-center items-center mb-6 py-4">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <TouchableOpacity
+            key={star}
+            onPress={() => setFormData({ ...formData, rating: star })}
+            className="mx-1"
+          >
+            <Icon
+              name={formData.rating >= star ? 'star' : 'star-outline'}
+              size={48}
+              color={formData.rating >= star ? COLORS.secondary : '#E5E7EB'}
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
 
-        {formData.rating > 0 && (
-          <Text className="text-center text-lg font-semibold mb-6" style={{ color: COLORS.secondary }}>
-            {formData.rating === 5 ? 'Excellent!' : 
-             formData.rating === 4 ? 'Great!' :
-             formData.rating === 3 ? 'Good' :
-             formData.rating === 2 ? 'Could be better' : 'Poor'}
-          </Text>
-        )}
+      {formData.rating > 0 && (
+        <Text className="text-center text-lg font-semibold mb-6" style={{ color: COLORS.secondary }}>
+          {formData.rating === 5 ? 'Excellent!' : 
+           formData.rating === 4 ? 'Great!' :
+           formData.rating === 3 ? 'Good' :
+           formData.rating === 2 ? 'Could be better' : 'Poor'}
+        </Text>
+      )}
 
         {/* Comment */}
-        <Text className="text-lg font-bold text-gray-900 mb-3">Write Your Review</Text>
-        
-        <TextInput
+      <Text className="text-lg font-bold text-gray-900 mb-3">Write Your Review</Text>
+      
+      <TextInput
           className="bg-gray-50 rounded-xl p-4 text-gray-900 mb-2"
-          placeholder="Share your experience..."
-          value={formData.comment}
-          onChangeText={(text) => setFormData({ ...formData, comment: text })}
-          multiline
-          numberOfLines={6}
-          textAlignVertical="top"
-          maxLength={500}
-        />
+        placeholder="Share your experience..."
+        value={formData.comment}
+        onChangeText={(text) => setFormData({ ...formData, comment: text })}
+        multiline
+        numberOfLines={6}
+        textAlignVertical="top"
+        maxLength={500}
+      />
 
-        <Text className="text-xs text-gray-500 mb-6 text-right">
-          {formData.comment.length}/500 characters
-        </Text>
+        <Text className="text-xs text-gray-500 mb-2 text-right">
+        {formData.comment.length}/500 characters
+      </Text>
+
+        {/* Add Photos & Videos Section */}
+        <View className="mb-6">
+          <Text className="text-lg font-bold text-gray-900 mb-3">Add Photos & Videos (Optional)</Text>
+          
+          {/* Photo & Video Buttons */}
+          <View className="flex-row gap-3 mb-4">
+            <TouchableOpacity
+              onPress={pickPhotos}
+              disabled={selectedPhotos.length >= 5}
+              className={`flex-1 bg-blue-50 rounded-xl py-4 items-center border-2 ${selectedPhotos.length >= 5 ? 'opacity-50' : ''}`}
+              style={{ borderColor: '#3B82F6', borderStyle: 'dashed' }}
+              activeOpacity={0.7}
+            >
+              <Icon name="image" size={28} color="#3B82F6" />
+              <Text className="text-blue-600 font-semibold mt-2">Add Photos</Text>
+              <Text className="text-xs text-gray-500 mt-1">{selectedPhotos.length}/5</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={pickVideos}
+              disabled={selectedVideos.length >= 2}
+              className={`flex-1 bg-purple-50 rounded-xl py-4 items-center border-2 ${selectedVideos.length >= 2 ? 'opacity-50' : ''}`}
+              style={{ borderColor: '#9333EA', borderStyle: 'dashed' }}
+              activeOpacity={0.7}
+            >
+              <Icon name="videocam" size={28} color="#9333EA" />
+              <Text className="text-purple-600 font-semibold mt-2">Add Videos</Text>
+              <Text className="text-xs text-gray-500 mt-1">{selectedVideos.length}/2</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Selected Photos Preview */}
+          {selectedPhotos.length > 0 && (
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-gray-700 mb-2">Selected Photos ({selectedPhotos.length})</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+                {selectedPhotos.map((photo, index) => (
+                  <View key={index} className="mr-3 relative">
+                    <Image
+                      source={{ uri: photo.uri }}
+                      className="w-24 h-24 rounded-lg"
+                      resizeMode="cover"
+                    />
+                    <TouchableOpacity
+                      onPress={() => removePhoto(index)}
+                      className="absolute -top-2 -right-2 bg-red-500 rounded-full w-6 h-6 items-center justify-center"
+                      style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4 }}
+                    >
+                      <Icon name="close" size={14} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Selected Videos Preview */}
+          {selectedVideos.length > 0 && (
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-gray-700 mb-2">Selected Videos ({selectedVideos.length})</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+                {selectedVideos.map((video, index) => (
+                  <View key={index} className="mr-3 relative">
+                    <View className="w-24 h-24 rounded-lg bg-gray-800 items-center justify-center">
+                      <Icon name="play-circle" size={40} color="#FFF" />
+                      <Text className="text-white text-xs mt-1">
+                        {video.duration ? `${Math.floor(video.duration / 1000)}s` : 'Video'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => removeVideo(index)}
+                      className="absolute -top-2 -right-2 bg-red-500 rounded-full w-6 h-6 items-center justify-center"
+                      style={{ shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 4 }}
+                    >
+                      <Icon name="close" size={14} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Media Upload Info */}
+          {(selectedPhotos.length > 0 || selectedVideos.length > 0) && (
+            <View className="bg-blue-50 rounded-xl p-3 border border-blue-200">
+              <View className="flex-row items-center">
+                <Icon name="information-circle" size={18} color="#3B82F6" />
+                <Text className="text-xs text-blue-700 ml-2 flex-1">
+                  Photos and videos will be uploaded when you submit your review
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
 
         {/* Verification Warning */}
         {!verificationComplete && (
@@ -978,53 +1308,44 @@ export default function AddReviewScreen({ navigation, route }) {
         )}
 
         {/* Coupon Reward */}
-        <View className="bg-green-50 rounded-xl p-4 mb-6">
-          <View className="flex-row items-center mb-2">
-            <Icon name="gift" size={20} color={COLORS.secondary} />
-            <Text className="text-sm font-bold text-green-700 ml-2">Earn a Coupon!</Text>
-          </View>
-          <Text className="text-xs text-green-600">
-            Complete verification and post your review to receive a special discount coupon valid for 2 hours!
-          </Text>
+      <View className="bg-green-50 rounded-xl p-4 mb-6">
+        <View className="flex-row items-center mb-2">
+          <Icon name="gift" size={20} color={COLORS.secondary} />
+          <Text className="text-sm font-bold text-green-700 ml-2">Earn a Coupon!</Text>
         </View>
+        <Text className="text-xs text-green-600">
+            Complete verification and post your review to receive a special discount coupon valid for 2 hours!
+        </Text>
+      </View>
 
         {/* Submit Button */}
-        <TouchableOpacity
-          onPress={handleSubmit}
-          disabled={loading || !verificationComplete}
-          activeOpacity={0.8}
-        >
-          <LinearGradient
+      <TouchableOpacity
+        onPress={handleSubmit}
+          disabled={loading || uploadingMedia || !verificationComplete}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
             colors={
-              loading || !verificationComplete
+              loading || uploadingMedia || !verificationComplete
                 ? ['#9CA3AF', '#6B7280']
                 : [COLORS.secondary, COLORS.secondaryDark]
             }
-            className="rounded-xl py-4 items-center shadow-lg"
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
+          className="rounded-xl py-4 items-center shadow-lg"
+        >
+            {(loading || uploadingMedia) ? (
+              <View className="flex-row items-center">
+                <ActivityIndicator color="#fff" size="small" />
+                <Text className="text-white font-semibold text-base ml-3">
+                  {uploadingMedia ? 'Uploading media...' : 'Submitting review...'}
+                </Text>
+              </View>
             ) : (
               <Text className="text-white font-bold text-lg">
                 {verificationComplete ? 'Submit Review' : `Wait ${verificationTimer}s`}
               </Text>
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* Debug Info (Remove in production) */}
-        {__DEV__ && (
-          <View className="mt-6 bg-gray-100 rounded-xl p-4">
-            <Text className="text-xs font-bold text-gray-700 mb-2">Debug Info:</Text>
-            <Text className="text-xs text-gray-600">Distance: {currentDistance?.toFixed(2)}m</Text>
-            <Text className="text-xs text-gray-600">Accuracy: {gpsAccuracy?.toFixed(2)}m</Text>
-            <Text className="text-xs text-gray-600">Timer: {verificationTimer}s</Text>
-            <Text className="text-xs text-gray-600">Motion: {motionDetected ? 'Yes' : 'No'}</Text>
-            <Text className="text-xs text-gray-600">Mock GPS: {isMockLocation ? 'Yes' : 'No'}</Text>
-            <Text className="text-xs text-gray-600">History: {locationHistory.length} points</Text>
-            <Text className="text-xs text-gray-600">Suspicious: {suspiciousActivities.length} events</Text>
-          </View>
-        )}
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
       </View>
     </ScrollView>
   );

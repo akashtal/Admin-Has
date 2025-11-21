@@ -1,0 +1,69 @@
+# Dependencies (will be installed during build)
+node_modules/
+
+# Expo build artifacts
+.expo/
+.expo-shared/
+dist/
+web-build/
+
+# Git
+.git/
+.gitignore
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment files (sensitive data)
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+build/
+*.apk
+*.aab
+*.ipa
+
+# Documentation (not needed for build)
+README.md
+*.md
+!CHANGELOG.md
+
+# Test files
+**/__tests__/
+**/*.test.js
+**/*.test.ts
+**/*.spec.js
+**/*.spec.ts
+coverage/
+
+# Cache
+.cache/
+.npm/
+.yarn/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# User profile paths (Windows)
+%USERPROFILE%/
+%ProgramData%/
+

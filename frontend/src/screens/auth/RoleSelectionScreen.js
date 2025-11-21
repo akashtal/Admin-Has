@@ -19,11 +19,26 @@ export default function RoleSelectionScreen({ navigation }) {
       <View className="flex-1 justify-center items-center px-6">
         {/* Logo */}
         <View className="items-center mb-12">
-          <Image
-            source={require('../../../assets/HashViewlogo-01.png')}
-            style={{ width: 200, height: 200, marginBottom: 20 }}
-            resizeMode="contain"
-          />
+          <View style={{
+            width: 220,
+            height: 220,
+            borderRadius: 110,
+            backgroundColor: '#FFF',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 20,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.2,
+            shadowRadius: 12,
+            elevation: 8
+          }}>
+            <Image
+              source={require('../../../assets/HashViewlogo-01.png')}
+              style={{ width: 200, height: 200 }}
+              resizeMode="contain"
+            />
+          </View>
           <Text className="text-3xl font-bold text-white text-center mb-2">
             Welcome to HashView
           </Text>

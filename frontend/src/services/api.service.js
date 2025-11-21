@@ -141,6 +141,8 @@ const ApiService = {
   updateBusinessCoupon: (id, data) => apiClient.put(`/business-coupons/${id}`, data),
   deleteBusinessCoupon: (id) => apiClient.delete(`/business-coupons/${id}`),
   toggleCouponStatus: (id) => apiClient.patch(`/business-coupons/${id}/toggle-status`),
+  scanAndRedeemCoupon: (qrCodeData) => apiClient.post('/business-coupons/scan-redeem', { qrCodeData }),
+  getRedemptionStats: (businessId) => apiClient.get(`/business-coupons/redemption-stats/${businessId}`),
   
   // Coupon Template APIs (for review rewards)
   getBusinessCouponTemplate: (businessId) => apiClient.get(`/coupons/template/${businessId}`),
@@ -155,6 +157,9 @@ const ApiService = {
   
   // Admin APIs - Full management capabilities
   getDashboardStats: () => apiClient.get(API_CONFIG.ENDPOINTS.GET_DASHBOARD_STATS),
+  
+  // Admin Notifications
+  sendAdminNotification: (data) => apiClient.post('/admin/notifications/send', data),
   
   // Category Management
   createCategory: (data) => apiClient.post('/categories', data),
@@ -253,6 +258,18 @@ const ApiService = {
   },
   deleteUploadedFile: (publicId) => apiClient.delete(`/upload/${publicId}`),
   getUploadStats: () => apiClient.get('/upload/stats'),
+  
+  // Review media uploads
+  uploadReviewPhotos: (formData) => {
+    return apiClient.post('/upload/review/photos', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  uploadReviewVideos: (formData) => {
+    return apiClient.post('/upload/review/videos', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
   
   // Business image management
   updateBusinessImages: (businessId, data) => apiClient.put(

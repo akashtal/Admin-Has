@@ -1,4 +1,5 @@
 import React from 'react';
+import { View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useSelector } from 'react-redux';
@@ -28,6 +29,7 @@ import BusinessDashboardScreen from '../screens/business/BusinessDashboardScreen
 import BusinessRegistrationScreen from '../screens/business/BusinessRegistrationScreen';
 import VerifyBusinessScreen from '../screens/business/VerifyBusinessScreen';
 import ManageCouponsScreen from '../screens/business/ManageCouponsScreen';
+import ManageUpdatesScreen from '../screens/business/ManageUpdatesScreen';
 import ViewReviewsScreen from '../screens/business/ViewReviewsScreen';
 import AnalyticsDashboardScreen from '../screens/business/AnalyticsDashboardScreen';
 import EditBusinessInfoScreen from '../screens/business/EditBusinessInfoScreen';
@@ -36,6 +38,7 @@ import BusinessReviewsScreen from '../screens/business/BusinessReviewsScreen';
 import BusinessAnalyticsScreen from '../screens/business/BusinessAnalyticsScreen';
 import CouponManagementScreen from '../screens/business/CouponManagementScreen';
 import ManageCouponsNew from '../screens/business/ManageCouponsNew';
+import CouponQRScannerScreen from '../screens/business/CouponQRScannerScreen';
 
 // Admin Screens - Full Management
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
@@ -45,6 +48,7 @@ import UserManagementScreen from '../screens/admin/UserManagementScreen';
 import ReviewManagementScreen from '../screens/admin/ReviewManagementScreen';
 import AdminCouponManagementScreen from '../screens/admin/AdminCouponManagementScreen';
 import TripAdvisorManagementScreen from '../screens/admin/TripAdvisorManagementScreen';
+import NotificationManagementScreen from '../screens/admin/NotificationManagementScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -86,6 +90,7 @@ function BusinessStack() {
       <Stack.Screen name="BusinessRegistration" component={BusinessRegistrationScreen} />
       <Stack.Screen name="VerifyBusiness" component={VerifyBusinessScreen} />
       <Stack.Screen name="ManageCoupons" component={ManageCouponsScreen} />
+      <Stack.Screen name="ManageUpdates" component={ManageUpdatesScreen} />
       <Stack.Screen name="ViewReviews" component={ViewReviewsScreen} />
       <Stack.Screen name="AnalyticsDashboard" component={AnalyticsDashboardScreen} />
       <Stack.Screen name="EditBusinessInfo" component={EditBusinessInfoScreen} />
@@ -94,6 +99,8 @@ function BusinessStack() {
       <Stack.Screen name="BusinessAnalytics" component={BusinessAnalyticsScreen} />
       <Stack.Screen name="CouponManagement" component={CouponManagementScreen} />
       <Stack.Screen name="ManageCouponsNew" component={ManageCouponsNew} />
+      <Stack.Screen name="CouponQRScanner" component={CouponQRScannerScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }
@@ -118,6 +125,7 @@ export default function MainNavigator() {
         <Stack.Screen name="AdminCouponManagement" component={AdminCouponManagementScreen} />
         <Stack.Screen name="ReviewManagement" component={ReviewManagementScreen} />
         <Stack.Screen name="TripAdvisorManagement" component={TripAdvisorManagementScreen} />
+        <Stack.Screen name="NotificationManagement" component={NotificationManagementScreen} />
       </Stack.Navigator>
     );
   }
@@ -218,19 +226,82 @@ export default function MainNavigator() {
           let iconName;
           if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
           else if (route.name === 'Search') iconName = focused ? 'search' : 'search-outline';
+          else if (route.name === 'QRScanner') return null; // Custom icon for QR Scanner
           else if (route.name === 'History') iconName = focused ? 'time' : 'time-outline';
           else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
           return <Icon name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#4F46E5',
+        tabBarActiveTintColor: COLORS.secondary,
         tabBarInactiveTintColor: 'gray',
         headerShown: false,
+        tabBarStyle: {
+          height: 70,
+          paddingBottom: 10,
+          paddingTop: 10,
+          backgroundColor: '#FFF',
+          borderTopWidth: 1,
+          borderTopColor: '#F3F4F6',
+          elevation: 20,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.1,
+          shadowRadius: 12,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+        }
       })}
     >
-      <Tab.Screen name="Home" component={UserStack} />
-      <Tab.Screen name="Search" component={SearchScreen} />
-      <Tab.Screen name="History" component={HistoryScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen 
+        name="Home" 
+        component={UserStack}
+        options={{ title: 'Home' }}
+      />
+      <Tab.Screen 
+        name="Search" 
+        component={SearchScreen}
+        options={{ title: 'Search' }}
+      />
+      <Tab.Screen 
+        name="QRScanner" 
+        component={QRScannerScreen}
+        options={{
+          title: 'Scan',
+          tabBarLabel: () => null,
+          tabBarIcon: ({ focused }) => (
+            <View style={{
+              position: 'absolute',
+              top: -25,
+              width: 65,
+              height: 65,
+              borderRadius: 33,
+              backgroundColor: COLORS.secondary,
+              alignItems: 'center',
+              justifyContent: 'center',
+              shadowColor: COLORS.secondary,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.4,
+              shadowRadius: 12,
+              elevation: 8,
+              borderWidth: 5,
+              borderColor: '#FFF'
+            }}>
+              <Icon name="qr-code" size={32} color="#FFF" />
+            </View>
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="History" 
+        component={HistoryScreen}
+        options={{ title: 'History' }}
+      />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileScreen}
+        options={{ title: 'Profile' }}
+      />
     </Tab.Navigator>
   );
 }

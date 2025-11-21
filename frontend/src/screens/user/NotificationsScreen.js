@@ -95,7 +95,12 @@ export default function NotificationsScreen({ navigation }) {
       case 'review':
         return { icon: 'chatbubbles', color: '#3B82F6' };
       case 'business':
+      case 'business_verification':
         return { icon: 'business', color: '#8B5CF6' };
+      case 'admin_broadcast':
+      case 'announcement':
+      case 'promotion':
+        return { icon: 'megaphone', color: '#EF4444' };
       case 'system':
         return { icon: 'information-circle', color: '#F59E0B' };
       default:

@@ -81,11 +81,25 @@ export default function ConfirmEmailScreen({ navigation, route }) {
           </TouchableOpacity>
 
           <View className="items-center mt-8 mb-6">
-            <Image
-              source={require('../../../assets/HashViewlogo-01.png')}
-              style={{ width: 120, height: 120 }}
-              resizeMode="contain"
-            />
+            <View style={{
+              width: 140,
+              height: 140,
+              borderRadius: 70,
+              backgroundColor: '#FFF',
+              alignItems: 'center',
+              justifyContent: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 8,
+              elevation: 6
+            }}>
+              <Image
+                source={require('../../../assets/HashViewlogo-01.png')}
+                style={{ width: 120, height: 120 }}
+                resizeMode="contain"
+              />
+            </View>
           </View>
 
           <View className="flex-1 bg-white rounded-t-3xl px-6 pt-8">

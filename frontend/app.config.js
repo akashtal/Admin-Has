@@ -5,24 +5,30 @@ export default {
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/HashViewlogo-01.png",
-    splash: {
-      image: "./assets/HashViewlogo-01.png",
-      resizeMode: "contain",
-      backgroundColor: "#2D1B69"
-    },
     userInterfaceStyle: "automatic",
     assetBundlePatterns: ["**/*"],
+
+    splash: {
+      image: "./assets/HashViewSplash.png",
+      resizeMode: "contain",
+      backgroundColor: "#210059"
+    },
+
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.hashview.app",
       infoPlist: {
-        NSLocationWhenInUseUsageDescription: "HashView needs your location to show nearby businesses and verify reviews.",
-        NSLocationAlwaysUsageDescription: "HashView uses your location to provide accurate business information.",
+        NSLocationWhenInUseUsageDescription:
+          "HashView needs your location to show nearby businesses and verify reviews.",
+        NSLocationAlwaysUsageDescription:
+          "HashView uses your location to provide accurate business information.",
         NSCameraUsageDescription: "HashView needs camera access to scan QR codes and upload photos.",
-        NSPhotoLibraryUsageDescription: "HashView needs access to your photo library to upload images."
+        NSPhotoLibraryUsageDescription: "HashView needs access to your photo library to upload images.",
+        ITSAppUsesNonExemptEncryption: false
       },
       buildNumber: "1"
     },
+
     android: {
       package: "com.hashview.app",
       versionCode: 1,
@@ -36,13 +42,15 @@ export default {
       ],
       config: {
         googleMaps: {
-          apiKey: process.env.GOOGLE_MAPS_API_KEY || "AIzaSyCgafT4Tw62CuxxN5DwbkqWIK9pVflKEXI"
+          apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || "AIzaSyCgafT4Tw62CuxxN5DwbkqWIK9pVflKEXI"
         }
       }
     },
+
     web: {
       bundler: "metro"
     },
+
     plugins: [
       "expo-dev-client",
       [
@@ -65,14 +73,22 @@ export default {
         }
       ],
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          image: "./assets/HashViewSplash.png",
+          resizeMode: "contain",
+          backgroundColor: "#210059"
+        }
+      ]
     ],
+
     extra: {
       eas: {
-        projectId: "your-eas-project-id"
+        projectId: "d4838e65-984b-45e4-b2d8-a03d28a6fb43"
       }
     },
-    owner: "your-expo-username"
+    owner: "hashview"
   }
 };
-

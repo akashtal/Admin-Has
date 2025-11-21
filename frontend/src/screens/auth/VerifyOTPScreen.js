@@ -73,12 +73,42 @@ export default function VerifyOTPScreen({ navigation, route }) {
         navigation.navigate('ResetPassword', { email, otpCode });
       } else {
         try {
+          const addressPayload = userData ? {
+            buildingNumber: userData.buildingNumber || '',
+            street: userData.street || '',
+            city: userData.city || '',
+            county: userData.county || '',
+            postcode: userData.postcode || '',
+            country: userData.country || 'United Kingdom',
+            landmark: userData.landmark || '',
+            fullAddress: userData.address || [
+              userData.buildingNumber,
+              userData.street,
+              userData.city,
+              userData.county,
+              userData.postcode,
+              userData.country || 'United Kingdom'
+            ]
+              .filter(Boolean)
+              .join(', ')
+          } : null;
+
           const registrationData = {
             name: userData.name,
             email: userData.email.toLowerCase().trim(),
             password: userData.password,
             phone: userData.phone,
-            role: userData.role || 'customer'
+            role: userData.role || 'customer',
+            ...(addressPayload && {
+              address: addressPayload,
+              buildingNumber: addressPayload.buildingNumber,
+              street: addressPayload.street,
+              city: addressPayload.city,
+              county: addressPayload.county,
+              postcode: addressPayload.postcode,
+              country: addressPayload.country,
+              landmark: addressPayload.landmark
+            })
           };
           
           console.log('Registering user with data:', { ...registrationData, password: '***' });
@@ -154,11 +184,25 @@ export default function VerifyOTPScreen({ navigation, route }) {
         </TouchableOpacity>
 
         <View className="items-center mt-8 mb-6">
-          <Image
-            source={require('../../../assets/HashViewlogo-01.png')}
-            style={{ width: 120, height: 120 }}
-            resizeMode="contain"
-          />
+          <View style={{
+            width: 140,
+            height: 140,
+            borderRadius: 70,
+            backgroundColor: '#FFF',
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 8,
+            elevation: 6
+          }}>
+            <Image
+              source={require('../../../assets/HashViewlogo-01.png')}
+              style={{ width: 120, height: 120 }}
+              resizeMode="contain"
+            />
+          </View>
         </View>
 
         <View className="flex-1 bg-white rounded-t-3xl px-6 pt-8">
