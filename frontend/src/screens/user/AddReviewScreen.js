@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  View, Text, TextInput, TouchableOpacity, ScrollView, 
-  ActivityIndicator, Alert, StatusBar, Platform, AppState, Image 
+import {
+  View, Text, TextInput, TouchableOpacity, ScrollView,
+  ActivityIndicator, Alert, StatusBar, Platform, AppState, Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDispatch, useSelector } from 'react-redux';
@@ -18,25 +18,26 @@ export default function AddReviewScreen({ navigation, route }) {
   const dispatch = useDispatch();
   const { business } = route.params;
   const { loading, successMessage, error } = useSelector((state) => state.review);
-  
+
   // Form state
   const [formData, setFormData] = useState({
     rating: 0,
     comment: '',
+    emotion: null, // Add emotion field
   });
-  
+
   // Media state
   const [selectedPhotos, setSelectedPhotos] = useState([]);
   const [selectedVideos, setSelectedVideos] = useState([]);
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [uploadedPhotos, setUploadedPhotos] = useState([]);
   const [uploadedVideos, setUploadedVideos] = useState([]);
-  
+
   // 🔒 COMPREHENSIVE GEOFENCING STATE
   const [location, setLocation] = useState(null);
   const [checkingLocation, setCheckingLocation] = useState(true);
   const [showGeofenceInfo, setShowGeofenceInfo] = useState(true);
-  
+
   // Security & Monitoring State
   const [gpsAccuracy, setGpsAccuracy] = useState(null);
   const [currentDistance, setCurrentDistance] = useState(null);
@@ -49,13 +50,13 @@ export default function AddReviewScreen({ navigation, route }) {
   const [gpsSignalLost, setGpsSignalLost] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [deviceFingerprint, setDeviceFingerprint] = useState(null);
-  
+
   // Refs for subscriptions & cleanup
   const locationSubscription = useRef(null);
   const timerInterval = useRef(null);
   const accelerometerSubscription = useRef(null);
   const appState = useRef(AppState.currentState);
-  
+
   // Configuration
   const MAX_ALLOWED_RADIUS = business.radius || 50;
   const MAX_GPS_ACCURACY = 50; // meters
@@ -117,7 +118,7 @@ export default function AddReviewScreen({ navigation, route }) {
     setVerificationComplete(false);
     setLocationHistory([]);
     setCurrentDistance(null);
-    
+
     // Clean up subscriptions
     if (locationSubscription.current) {
       locationSubscription.current.remove();
@@ -131,7 +132,7 @@ export default function AddReviewScreen({ navigation, route }) {
       accelerometerSubscription.current.remove();
       accelerometerSubscription.current = null;
     }
-    
+
     console.log('🔄 Business changed — forcing fresh GPS verification for:', business.name);
   }, [business._id]);
 
@@ -155,7 +156,7 @@ export default function AddReviewScreen({ navigation, route }) {
         appVersion: Constants.expoConfig?.version || '1.0.0',
         timestamp: Date.now()
       };
-      
+
       setDeviceFingerprint(fingerprint);
       console.log('🔐 Device fingerprint created:', fingerprint);
     } catch (error) {
@@ -178,7 +179,7 @@ export default function AddReviewScreen({ navigation, route }) {
       let bestAccuracy = 999;
 
       try {
-        
+
         subscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.Highest,
@@ -208,7 +209,7 @@ export default function AddReviewScreen({ navigation, route }) {
           if (!gotFresh) {
             console.log(`⏱️ GPS timeout after 10s - using best reading (${bestAccuracy.toFixed(1)}m)`);
             if (subscription) subscription.remove();
-            
+
             // Accept best reading if it's reasonable (≤ 50m)
             if (bestReading && bestAccuracy <= 50) {
               console.log('✅ Accepting best available GPS reading');
@@ -219,10 +220,10 @@ export default function AddReviewScreen({ navigation, route }) {
           }
         }, 10000);
 
-    } catch (error) {
+      } catch (error) {
         if (subscription) subscription.remove();
         reject(error);
-    }
+      }
     });
   };
 
@@ -279,7 +280,7 @@ export default function AddReviewScreen({ navigation, route }) {
   const detectMockLocation = (locationData) => {
     // Check if location provider is suspicious
     const provider = locationData.mocked; // Android provides this
-    
+
     if (provider === true || locationData.isMocked === true) {
       console.log('🚨 MOCK LOCATION DETECTED!');
       logSuspiciousActivity('MOCK_LOCATION', { provider: 'mock/fake' });
@@ -294,7 +295,7 @@ export default function AddReviewScreen({ navigation, route }) {
         const perfectAccuracyCount = locationHistory.filter(
           loc => loc.accuracy < 5
         ).length;
-        
+
         if (perfectAccuracyCount > 5) {
           console.log('🚨 SUSPICIOUS: Too perfect GPS accuracy');
           logSuspiciousActivity('PERFECT_ACCURACY', { count: perfectAccuracyCount });
@@ -312,7 +313,7 @@ export default function AddReviewScreen({ navigation, route }) {
       timestamp: Date.now(),
       metadata: metadata
     };
-    
+
     setSuspiciousActivities(prev => [...prev, activity]);
     console.log(`⚠️ Suspicious activity logged: ${activityType}`, metadata);
   };
@@ -321,11 +322,11 @@ export default function AddReviewScreen({ navigation, route }) {
   const handleGPSSignalLoss = async () => {
     console.log('📡 GPS signal lost, attempting recovery...');
     setGpsSignalLost(true);
-    
+
     if (retryCount < MAX_RETRY_ATTEMPTS) {
       const delay = RETRY_DELAYS[retryCount] || 10000;
-      console.log(`⏳ Retrying in ${delay/1000} seconds...`);
-      
+      console.log(`⏳ Retrying in ${delay / 1000} seconds...`);
+
       setTimeout(async () => {
         setRetryCount(prev => prev + 1);
         await retryLocationCheck();
@@ -343,7 +344,7 @@ export default function AddReviewScreen({ navigation, route }) {
   const retryLocationCheck = async () => {
     try {
       console.log(`🔄 Retry attempt ${retryCount + 1}/${MAX_RETRY_ATTEMPTS}`);
-      
+
       const newLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
         maximumAge: 0,
@@ -353,7 +354,7 @@ export default function AddReviewScreen({ navigation, route }) {
       setGpsSignalLost(false);
       setRetryCount(0);
       await processLocationUpdate(newLocation);
-      
+
       console.log('✅ GPS signal recovered!');
     } catch (error) {
       console.error(`❌ Retry ${retryCount + 1} failed:`, error);
@@ -364,7 +365,7 @@ export default function AddReviewScreen({ navigation, route }) {
   // ==================== CONTINUOUS LOCATION MONITORING ====================
   const startContinuousLocationMonitoring = async () => {
     console.log('📍 Starting continuous location monitoring...');
-    
+
     try {
       locationSubscription.current = await Location.watchPositionAsync(
         {
@@ -376,7 +377,7 @@ export default function AddReviewScreen({ navigation, route }) {
           await processLocationUpdate(newLocation);
         }
       );
-      
+
       console.log('✅ Location monitoring started');
     } catch (error) {
       console.error('❌ Failed to start location monitoring:', error);
@@ -387,7 +388,7 @@ export default function AddReviewScreen({ navigation, route }) {
   // ==================== PROCESS LOCATION UPDATES ====================
   const processLocationUpdate = async (newLocation) => {
     const coords = newLocation.coords;
-    
+
     // Check GPS accuracy
     if (coords.accuracy > MAX_GPS_ACCURACY) {
       console.log(`⚠️ GPS accuracy too low: ${coords.accuracy.toFixed(1)}m`);
@@ -453,7 +454,7 @@ export default function AddReviewScreen({ navigation, route }) {
         'MOVED_AWAY',
         false
       );
-      
+
       // Stop monitoring and verification
       if (locationSubscription.current) {
         locationSubscription.current.remove();
@@ -463,7 +464,7 @@ export default function AddReviewScreen({ navigation, route }) {
         clearInterval(timerInterval.current);
         timerInterval.current = null;
       }
-      
+
       setVerificationComplete(false);
       navigation.goBack();
     }
@@ -474,13 +475,13 @@ export default function AddReviewScreen({ navigation, route }) {
   // ==================== MOTION SENSOR VERIFICATION ====================
   const startMotionSensorMonitoring = () => {
     console.log('📱 Starting motion sensor monitoring...');
-    
+
     Accelerometer.setUpdateInterval(1000);
-    
+
     accelerometerSubscription.current = Accelerometer.addListener(accelerometerData => {
       const { x, y, z } = accelerometerData;
       const magnitude = Math.sqrt(x * x + y * y + z * z);
-      
+
       // Detect if user is moving (magnitude > 1.2 indicates movement)
       if (magnitude > 1.2) {
         setMotionDetected(true);
@@ -492,11 +493,11 @@ export default function AddReviewScreen({ navigation, route }) {
   // ==================== 30-SECOND TIMER VERIFICATION ====================
   const start30SecondTimer = () => {
     console.log('⏱️ Starting 30-second verification timer...');
-    
+
     timerInterval.current = setInterval(() => {
       setVerificationTimer(prev => {
         const newTime = prev - 1;
-        
+
         if (newTime <= 0) {
           clearInterval(timerInterval.current);
           setVerificationComplete(true);
@@ -507,7 +508,7 @@ export default function AddReviewScreen({ navigation, route }) {
             [{ text: 'Great!', style: 'default' }]
           );
         }
-        
+
         return newTime;
       });
     }, 1000);
@@ -517,7 +518,7 @@ export default function AddReviewScreen({ navigation, route }) {
   const initializeLocationVerification = async () => {
     try {
       console.log('\n🔒 ========== COMPREHENSIVE GEOFENCING STARTED ==========');
-      
+
       // Step 1: Request permissions
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -544,7 +545,7 @@ export default function AddReviewScreen({ navigation, route }) {
 
       // Step 3: Get TRULY FRESH GPS (use the updated getFreshLocation function)
       console.log('📍 Getting fresh GPS location...');
-      
+
       const coords = await getFreshLocation();
       const initialLocation = { coords };
 
@@ -606,13 +607,13 @@ export default function AddReviewScreen({ navigation, route }) {
 
       // Step 11: Ready to write review
       setCheckingLocation(false);
-      
+
       console.log('✅ Comprehensive verification initialized!');
       console.log('========================================================\n');
-      
+
     } catch (error) {
       console.error('❌ Location verification error:', error);
-      
+
       if (error.code === 'E_LOCATION_TIMEOUT') {
         showDetailedError(
           'GPS Timeout',
@@ -641,7 +642,7 @@ export default function AddReviewScreen({ navigation, route }) {
   // ==================== DETAILED ERROR WITH REPORT ISSUE ====================
   const showDetailedError = (title, message, errorCode, showReportButton) => {
     const buttons = [];
-    
+
     // Report Issue button
     if (showReportButton) {
       buttons.push({
@@ -661,7 +662,7 @@ export default function AddReviewScreen({ navigation, route }) {
                     suspiciousActivities: suspiciousActivities,
                     deviceFingerprint: deviceFingerprint
                   });
-                  
+
                   Alert.alert('Report Submitted', 'Our team will review your case. Thank you!');
                   navigation.goBack();
                 }
@@ -672,7 +673,7 @@ export default function AddReviewScreen({ navigation, route }) {
         }
       });
     }
-    
+
     // Retry button (for certain errors)
     if (['GPS_LOST', 'TIMEOUT', 'UNAVAILABLE', 'POOR_ACCURACY'].includes(errorCode)) {
       buttons.push({
@@ -684,14 +685,14 @@ export default function AddReviewScreen({ navigation, route }) {
         }
       });
     }
-    
+
     // Cancel/OK button
     buttons.push({
       text: errorCode === 'OUT_OF_RANGE' || errorCode === 'MOCK_LOCATION' ? 'OK' : 'Cancel',
       onPress: () => navigation.goBack(),
       style: 'cancel'
     });
-    
+
     Alert.alert(title, message, buttons, { cancelable: false });
   };
 
@@ -836,13 +837,13 @@ export default function AddReviewScreen({ navigation, route }) {
       if (selectedPhotos.length > 0) {
         setUploadingMedia(true);
         const photoFormData = new FormData();
-        
+
         selectedPhotos.forEach((photo, index) => {
           const filename = photo.uri.split('/').pop() || `photo_${Date.now()}_${index}.jpg`;
           const match = /\.(\w+)$/.exec(filename);
           const extension = match ? match[1].toLowerCase() : 'jpg';
           const mimeType = `image/${extension === 'jpg' ? 'jpeg' : extension}`;
-          
+
           photoFormData.append('photos', {
             uri: photo.uri,
             name: filename,
@@ -862,13 +863,13 @@ export default function AddReviewScreen({ navigation, route }) {
       if (selectedVideos.length > 0) {
         setUploadingMedia(true);
         const videoFormData = new FormData();
-        
+
         selectedVideos.forEach((video, index) => {
           const filename = video.uri.split('/').pop() || `video_${Date.now()}_${index}.mp4`;
           const match = /\.(\w+)$/.exec(filename);
           const extension = match ? match[1].toLowerCase() : 'mp4';
           const mimeType = `video/${extension}`;
-          
+
           videoFormData.append('videos', {
             uri: video.uri,
             name: filename,
@@ -925,7 +926,7 @@ export default function AddReviewScreen({ navigation, route }) {
 
     // Validation 5: Motion detection (removed - not required)
     // Motion sensor still runs for metadata, but doesn't block submission
-    
+
     // Get fresh location one more time before submit
     console.log('🔄 Getting final fresh location before submit...');
     try {
@@ -947,8 +948,8 @@ export default function AddReviewScreen({ navigation, route }) {
           'Moved Away',
           `You've moved away from the business (${Math.round(finalDistance)}m away).\n\nPlease return to submit your review.`
         );
-      return;
-    }
+        return;
+      }
 
       // Upload media to Cloudinary first (if any)
       let uploadedMedia = { photos: [], videos: [] };
@@ -962,12 +963,12 @@ export default function AddReviewScreen({ navigation, route }) {
           });
         } catch (error) {
           Alert.alert(
-            'Upload Failed', 
+            'Upload Failed',
             'Failed to upload photos/videos. Continue without media?',
             [
               { text: 'Cancel', style: 'cancel' },
-              { 
-                text: 'Continue', 
+              {
+                text: 'Continue',
                 onPress: () => {
                   // Continue without media
                   uploadedMedia = { photos: [], videos: [] };
@@ -980,10 +981,11 @@ export default function AddReviewScreen({ navigation, route }) {
       }
 
       // Submit to backend with ALL security metadata + media
-    dispatch(createReview({
-      business: business._id,
-      rating: formData.rating,
-      comment: formData.comment,
+      dispatch(createReview({
+        business: business._id,
+        rating: formData.rating,
+        comment: formData.comment,
+        emotion: formData.emotion, // Add emotion field
         latitude: finalLocation.coords.latitude,
         longitude: finalLocation.coords.longitude,
         images: uploadedMedia.photos, // Cloudinary URLs
@@ -998,9 +1000,9 @@ export default function AddReviewScreen({ navigation, route }) {
         deviceFingerprint: deviceFingerprint,
         devicePlatform: Platform.OS,
       }));
-      
+
       console.log('✅ Review submitted with full security metadata + media!');
-      
+
     } catch (error) {
       console.error('❌ Failed to get final location:', error);
       Alert.alert('Location Error', 'Could not verify your final location. Please try again.');
@@ -1015,11 +1017,11 @@ export default function AddReviewScreen({ navigation, route }) {
           <View className="items-center mb-4">
             <Icon name="shield-checkmark" size={56} color={COLORS.secondary} />
           </View>
-          
+
           <Text className="text-2xl font-bold text-gray-900 text-center mb-3">
             Comprehensive Location Verification
           </Text>
-          
+
           <Text className="text-gray-600 text-center mb-4 leading-6">
             To ensure authentic reviews, we'll verify:
           </Text>
@@ -1042,13 +1044,13 @@ export default function AddReviewScreen({ navigation, route }) {
               <Text className="text-gray-700 ml-2">Real device & GPS detection</Text>
             </View>
           </View>
-          
+
           <View className="bg-yellow-50 rounded-xl p-4 mb-4 border border-yellow-200">
             <Text className="text-sm text-gray-700 text-center">
               This comprehensive verification prevents fake reviews and ensures all reviews are from real visitors.
             </Text>
           </View>
-          
+
           <TouchableOpacity
             onPress={() => {
               setShowGeofenceInfo(false);
@@ -1063,7 +1065,7 @@ export default function AddReviewScreen({ navigation, route }) {
               <Text className="text-white font-bold text-lg">Start Verification</Text>
             </LinearGradient>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             className="mt-3 py-3 items-center"
@@ -1084,11 +1086,11 @@ export default function AddReviewScreen({ navigation, route }) {
           Verifying Your Location...
         </Text>
         <Text className="text-gray-500 text-sm mt-2 text-center">
-          {gpsSignalLost 
+          {gpsSignalLost
             ? `Recovering GPS signal... (Attempt ${retryCount + 1}/${MAX_RETRY_ATTEMPTS})`
             : 'This may take 5-10 seconds'}
         </Text>
-        
+
         {gpsSignalLost && (
           <View className="mt-4 bg-yellow-50 rounded-xl p-4 border border-yellow-200">
             <Text className="text-gray-700 text-center text-sm">
@@ -1111,16 +1113,16 @@ export default function AddReviewScreen({ navigation, route }) {
         <View className="flex-row items-center justify-between">
           <View className="flex-1">
             <View className="flex-row items-center mb-1">
-              <Icon 
-                name={verificationComplete ? "checkmark-circle" : "time"} 
-                size={20} 
-                color={verificationComplete ? "#10B981" : "#F59E0B"} 
+              <Icon
+                name={verificationComplete ? "checkmark-circle" : "time"}
+                size={20}
+                color={verificationComplete ? "#10B981" : "#F59E0B"}
               />
               <Text className={`ml-2 font-bold ${verificationComplete ? 'text-green-700' : 'text-yellow-700'}`}>
                 {verificationComplete ? 'Verified ✓' : `Verifying... ${verificationTimer}s`}
               </Text>
             </View>
-            
+
             <View className="flex-row items-center space-x-2">
               <Text className="text-xs text-gray-600">
                 📏 {currentDistance?.toFixed(0) || '?'}m away
@@ -1144,66 +1146,119 @@ export default function AddReviewScreen({ navigation, route }) {
 
       <View className="px-6 py-6">
         {/* Business Info */}
-      <View className="bg-gray-50 rounded-xl p-4 mb-6">
-        <Text className="text-lg font-bold text-gray-900 mb-2">{business.name}</Text>
-        <View className="flex-row items-center">
-          <Icon name="location" size={16} color={COLORS.secondary} />
-          <Text className="text-sm text-gray-600 ml-1">
-            {business.address?.city || 'Unknown location'}
-          </Text>
+        <View className="bg-gray-50 rounded-xl p-4 mb-6">
+          <Text className="text-lg font-bold text-gray-900 mb-2">{business.name}</Text>
+          <View className="flex-row items-center">
+            <Icon name="location" size={16} color={COLORS.secondary} />
+            <Text className="text-sm text-gray-600 ml-1">
+              {business.address?.city || 'Unknown location'}
+            </Text>
+          </View>
         </View>
-      </View>
 
         {/* Rating */}
-      <Text className="text-xl font-bold text-gray-900 mb-4">Rate Your Experience</Text>
+        <Text className="text-xl font-bold text-gray-900 mb-4">Rate Your Experience</Text>
 
-      <View className="flex-row justify-center items-center mb-6 py-4">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <TouchableOpacity
-            key={star}
-            onPress={() => setFormData({ ...formData, rating: star })}
-            className="mx-1"
-          >
-            <Icon
-              name={formData.rating >= star ? 'star' : 'star-outline'}
-              size={48}
-              color={formData.rating >= star ? COLORS.secondary : '#E5E7EB'}
-            />
-          </TouchableOpacity>
-        ))}
-      </View>
+        <View className="flex-row justify-center items-center mb-6 py-4">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <TouchableOpacity
+              key={star}
+              onPress={() => setFormData({ ...formData, rating: star })}
+              className="mx-1"
+            >
+              <Icon
+                name={formData.rating >= star ? 'star' : 'star-outline'}
+                size={48}
+                color={formData.rating >= star ? COLORS.secondary : '#E5E7EB'}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      {formData.rating > 0 && (
-        <Text className="text-center text-lg font-semibold mb-6" style={{ color: COLORS.secondary }}>
-          {formData.rating === 5 ? 'Excellent!' : 
-           formData.rating === 4 ? 'Great!' :
-           formData.rating === 3 ? 'Good' :
-           formData.rating === 2 ? 'Could be better' : 'Poor'}
-        </Text>
-      )}
+        {formData.rating > 0 && (
+          <Text className="text-center text-lg font-semibold mb-4" style={{ color: COLORS.secondary }}>
+            {formData.rating === 5 ? 'Excellent!' :
+              formData.rating === 4 ? 'Great!' :
+                formData.rating === 3 ? 'Good' :
+                  formData.rating === 2 ? 'Could be better' : 'Poor'}
+          </Text>
+        )}
+
+        {/* Emotion Selector - Facebook Style */}
+        <View className="mb-6">
+          <Text className="text-lg font-bold text-gray-900 mb-3">How are you feeling?</Text>
+          <View className="flex-row justify-center items-center flex-wrap px-2">
+            {[
+              { emoji: '😊', label: 'happy', value: 'happy' },
+              { emoji: '😇', label: 'blessed', value: 'blessed' },
+              { emoji: '😍', label: 'loved', value: 'loved' },
+              { emoji: '😢', label: 'sad', value: 'sad' },
+              { emoji: '🥰', label: 'lovely', value: 'lovely' },
+              { emoji: '😃', label: 'thankful', value: 'thankful' },
+              { emoji: '⭐😁', label: 'excited', value: 'excited' },
+              { emoji: '😘', label: 'in love', value: 'in_love' },
+              { emoji: '😂', label: 'crazy', value: 'crazy' },
+              { emoji: '😅', label: 'grateful', value: 'grateful' },
+              { emoji: '😊', label: 'blissful', value: 'blissful' },
+              { emoji: '😂', label: 'fantastic', value: 'fantastic' },
+              { emoji: '😛', label: 'silly', value: 'silly' },
+              { emoji: '🎉', label: 'festive', value: 'festive' },
+              { emoji: '😊', label: 'wonderful', value: 'wonderful' },
+              { emoji: '😎', label: 'cool', value: 'cool' },
+              { emoji: '😊', label: 'amused', value: 'amused' },
+              { emoji: '😌', label: 'relaxed', value: 'relaxed' },
+              { emoji: '😊', label: 'positive', value: 'positive' },
+              { emoji: '😌', label: 'chill', value: 'chill' },
+            ].map((emotion) => (
+              <TouchableOpacity
+                key={emotion.value}
+                onPress={() => setFormData({ ...formData, emotion: emotion.value })}
+                className={`m-1.5 items-center justify-center rounded-xl py-2 px-3 ${formData.emotion === emotion.value ? 'bg-blue-50 border-2' : 'bg-white border'
+                  }`}
+                style={{
+                  borderColor: formData.emotion === emotion.value ? '#3B82F6' : '#E5E7EB',
+                  minWidth: 75,
+                  shadowColor: formData.emotion === emotion.value ? '#3B82F6' : '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: formData.emotion === emotion.value ? 0.2 : 0.05,
+                  shadowRadius: 2,
+                  elevation: formData.emotion === emotion.value ? 2 : 1,
+                }}
+              >
+                <Text className="text-2xl mb-0.5">{emotion.emoji}</Text>
+                <Text
+                  className={`text-xs font-medium ${formData.emotion === emotion.value ? 'text-blue-700' : 'text-gray-600'
+                    }`}
+                >
+                  {emotion.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
         {/* Comment */}
-      <Text className="text-lg font-bold text-gray-900 mb-3">Write Your Review</Text>
-      
-      <TextInput
+        <Text className="text-lg font-bold text-gray-900 mb-3">Write Your Review</Text>
+
+        <TextInput
           className="bg-gray-50 rounded-xl p-4 text-gray-900 mb-2"
-        placeholder="Share your experience..."
-        value={formData.comment}
-        onChangeText={(text) => setFormData({ ...formData, comment: text })}
-        multiline
-        numberOfLines={6}
-        textAlignVertical="top"
-        maxLength={500}
-      />
+          placeholder="Share your experience..."
+          value={formData.comment}
+          onChangeText={(text) => setFormData({ ...formData, comment: text })}
+          multiline
+          numberOfLines={6}
+          textAlignVertical="top"
+          maxLength={500}
+        />
 
         <Text className="text-xs text-gray-500 mb-2 text-right">
-        {formData.comment.length}/500 characters
-      </Text>
+          {formData.comment.length}/500 characters
+        </Text>
 
         {/* Add Photos & Videos Section */}
         <View className="mb-6">
           <Text className="text-lg font-bold text-gray-900 mb-3">Add Photos & Videos (Optional)</Text>
-          
+
           {/* Photo & Video Buttons */}
           <View className="flex-row gap-3 mb-4">
             <TouchableOpacity
@@ -1308,30 +1363,30 @@ export default function AddReviewScreen({ navigation, route }) {
         )}
 
         {/* Coupon Reward */}
-      <View className="bg-green-50 rounded-xl p-4 mb-6">
-        <View className="flex-row items-center mb-2">
-          <Icon name="gift" size={20} color={COLORS.secondary} />
-          <Text className="text-sm font-bold text-green-700 ml-2">Earn a Coupon!</Text>
-        </View>
-        <Text className="text-xs text-green-600">
+        <View className="bg-green-50 rounded-xl p-4 mb-6">
+          <View className="flex-row items-center mb-2">
+            <Icon name="gift" size={20} color={COLORS.secondary} />
+            <Text className="text-sm font-bold text-green-700 ml-2">Earn a Coupon!</Text>
+          </View>
+          <Text className="text-xs text-green-600">
             Complete verification and post your review to receive a special discount coupon valid for 2 hours!
-        </Text>
-      </View>
+          </Text>
+        </View>
 
         {/* Submit Button */}
-      <TouchableOpacity
-        onPress={handleSubmit}
+        <TouchableOpacity
+          onPress={handleSubmit}
           disabled={loading || uploadingMedia || !verificationComplete}
-        activeOpacity={0.8}
-      >
-        <LinearGradient
+          activeOpacity={0.8}
+        >
+          <LinearGradient
             colors={
               loading || uploadingMedia || !verificationComplete
                 ? ['#9CA3AF', '#6B7280']
                 : [COLORS.secondary, COLORS.secondaryDark]
             }
-          className="rounded-xl py-4 items-center shadow-lg"
-        >
+            className="rounded-xl py-4 items-center shadow-lg"
+          >
             {(loading || uploadingMedia) ? (
               <View className="flex-row items-center">
                 <ActivityIndicator color="#fff" size="small" />
@@ -1343,9 +1398,9 @@ export default function AddReviewScreen({ navigation, route }) {
               <Text className="text-white font-bold text-lg">
                 {verificationComplete ? 'Submit Review' : `Wait ${verificationTimer}s`}
               </Text>
-          )}
-        </LinearGradient>
-      </TouchableOpacity>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,9 +29,17 @@ export default function QRScannerScreen({ navigation }) {
     }
   }, []);
 
+  // Reset scanner state when screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      setScanned(false);
+      setLoading(false);
+    }, [])
+  );
+
   const handleBarCodeScanned = async ({ type, data }) => {
     if (scanned) return; // Prevent multiple scans
-    
+
     setScanned(true);
     setLoading(true);
 
@@ -90,7 +99,8 @@ export default function QRScannerScreen({ navigation }) {
 
       if (response.data.success && response.data.business) {
         // Navigate to business detail screen
-        navigation.replace('BusinessDetail', {
+        setLoading(false);
+        navigation.navigate('BusinessDetail', {
           business: response.data.business,
           businessId: response.data.business._id,
           fromQR: true

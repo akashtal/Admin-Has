@@ -4,16 +4,18 @@
 export const API_CONFIG = {
   // API Base URL - defaults to production if not set
   BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hashview-backend.onrender.com/api',
-  
+  //BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.161.95.239:5000/api',
+
   // Socket.io URL - defaults to production if not set
   SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || 'https://hashview-backend.onrender.com',
-  
+  //SOCKET_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.161.95.239:5000',
   // Request timeout in milliseconds
   TIMEOUT: parseInt(process.env.EXPO_PUBLIC_API_TIMEOUT || '30000', 10),
-  
+
   // API Endpoints
   ENDPOINTS: {
     // Auth
+
     REGISTER: '/auth/register',
     LOGIN: '/auth/login',
     SEND_OTP: '/auth/send-otp',
@@ -25,7 +27,7 @@ export const API_CONFIG = {
     UPDATE_PUSH_TOKEN: '/auth/push-token',
     SEND_EMAIL_OTP: '/auth/send-email-otp',
     VERIFY_EMAIL_OTP: '/auth/verify-email-otp',
-    
+
     // User
     GET_PROFILE: '/users/profile',
     UPDATE_PROFILE: '/users/profile',
@@ -33,7 +35,7 @@ export const API_CONFIG = {
     GET_USER_COUPONS: '/users/coupons',
     GET_REWARD_HISTORY: '/users/rewards',
     UPLOAD_PROFILE_IMAGE: '/users/upload-image',
-    
+
     // Business
     REGISTER_BUSINESS: '/business/register',
     GET_NEARBY_BUSINESSES: '/business/nearby',
@@ -45,7 +47,7 @@ export const API_CONFIG = {
     SCAN_QR_CODE: '/business/qr/scan',
     UPDATE_BUSINESS_IMAGES: '/business/:id/images',
     GET_MY_BUSINESSES: '/business/my/businesses',
-    
+
     // Reviews
     CREATE_REVIEW: '/reviews',
     GET_BUSINESS_REVIEWS: '/reviews/business/:businessId',
@@ -53,7 +55,7 @@ export const API_CONFIG = {
     UPDATE_REVIEW: '/reviews/:id',
     DELETE_REVIEW: '/reviews/:id',
     MARK_HELPFUL: '/reviews/:id/helpful',
-    
+
     // Coupons
     GET_COUPONS: '/coupons',
     GET_COUPON: '/coupons/:id',
@@ -61,12 +63,12 @@ export const API_CONFIG = {
     VERIFY_COUPON: '/coupons/verify',
     REDEEM_COUPON: '/coupons/:id/redeem',
     GET_BUSINESS_COUPONS: '/coupons/business/:businessId',
-    
+
     // Notifications
     GET_NOTIFICATIONS: '/notifications',
     MARK_AS_READ: '/notifications/:id/read',
     MARK_ALL_READ: '/notifications/read-all',
-    
+
     // Admin
     GET_DASHBOARD_STATS: '/admin/dashboard',
     GET_ALL_USERS: '/admin/users',
@@ -75,12 +77,12 @@ export const API_CONFIG = {
     UPDATE_USER_STATUS: '/admin/users/:id/status',
     GET_ALL_REVIEWS: '/admin/reviews',
     SEND_NOTIFICATION: '/admin/notifications/send',
-    
+
     // Chat
     GET_CHAT_HISTORY: '/chat/:userId',
     SEND_MESSAGE: '/chat',
     GET_CONVERSATIONS: '/chat/conversations',
-    
+
     // External Reviews
     SYNC_GOOGLE_REVIEWS: '/external-reviews/:id/sync-google-reviews',
     SYNC_TRIPADVISOR_REVIEWS: '/external-reviews/:id/sync-tripadvisor-reviews',

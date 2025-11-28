@@ -39,7 +39,7 @@ apiClient.interceptors.response.use(
       await AsyncStorage.removeItem('user');
       // You can dispatch a logout action here if using Redux
     }
-    
+
     const errorMessage = error.response?.data?.message || error.message || 'Something went wrong';
     return Promise.reject(new Error(errorMessage));
   }
@@ -74,7 +74,7 @@ const ApiService = {
   updatePushToken: (data) => apiClient.put(API_CONFIG.ENDPOINTS.UPDATE_PUSH_TOKEN, data),
   sendEmailOTP: (data) => apiClient.post(API_CONFIG.ENDPOINTS.SEND_EMAIL_OTP, data),
   verifyEmailOTP: (data) => apiClient.post(API_CONFIG.ENDPOINTS.VERIFY_EMAIL_OTP, data),
-  
+
   // User APIs
   getProfile: () => apiClient.get(API_CONFIG.ENDPOINTS.GET_PROFILE),
   updateProfile: (data) => apiClient.put(API_CONFIG.ENDPOINTS.UPDATE_PROFILE, data),
@@ -85,25 +85,25 @@ const ApiService = {
   getUserReviews: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_USER_REVIEWS, { params }),
   getUserCoupons: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_USER_COUPONS, { params }),
   getRewardHistory: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_REWARD_HISTORY, { params }),
-  
+
   // Business APIs
   registerBusiness: (data) => {
     // Remove logo and coverImage from data (will be uploaded separately later)
     // For now, just send business data as JSON
     const { logo, coverImage, ...businessData } = data;
-    
+
     console.log('📤 API Service - Sending business registration:', businessData);
     console.log('🌍 Coordinates:', businessData.latitude, businessData.longitude);
-    
+
     // TODO: Upload images separately and get URLs
     // For now, register business without images
-    
+
     return apiClient.post(API_CONFIG.ENDPOINTS.REGISTER_BUSINESS, businessData);
   },
   getAllActiveBusinesses: (params) => apiClient.get('/business/all', { params }),
   getNearbyBusinesses: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_NEARBY_BUSINESSES, { params }),
   searchBusinesses: (params) => apiClient.get(API_CONFIG.ENDPOINTS.SEARCH_BUSINESSES, { params }),
-  
+
   // Category APIs
   getCategories: () => apiClient.get('/categories'),
   getCategory: (id) => apiClient.get(`/categories/${id}`),
@@ -116,25 +116,25 @@ const ApiService = {
   ),
   generateQR: (id) => apiClient.post(buildEndpoint(API_CONFIG.ENDPOINTS.GENERATE_QR, { id })),
   getMyBusinesses: () => apiClient.get(API_CONFIG.ENDPOINTS.GET_MY_BUSINESSES),
-  
+
   // Review APIs
   createReview: (data) => apiClient.post(API_CONFIG.ENDPOINTS.CREATE_REVIEW, data),
-  getBusinessReviews: (businessId, params) => 
+  getBusinessReviews: (businessId, params) =>
     apiClient.get(buildEndpoint(API_CONFIG.ENDPOINTS.GET_BUSINESS_REVIEWS, { businessId }), { params }),
   getReview: (id) => apiClient.get(buildEndpoint(API_CONFIG.ENDPOINTS.GET_REVIEW, { id })),
   updateReview: (id, data) => apiClient.put(buildEndpoint(API_CONFIG.ENDPOINTS.UPDATE_REVIEW, { id }), data),
   deleteReview: (id) => apiClient.delete(buildEndpoint(API_CONFIG.ENDPOINTS.DELETE_REVIEW, { id })),
   markHelpful: (id) => apiClient.post(buildEndpoint(API_CONFIG.ENDPOINTS.MARK_HELPFUL, { id })),
-  
+
   // Coupon APIs (Review-reward coupons)
   getCoupons: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_COUPONS, { params }),
   getCoupon: (id) => apiClient.get(buildEndpoint(API_CONFIG.ENDPOINTS.GET_COUPON, { id })),
   verifyCoupon: (data) => apiClient.post(API_CONFIG.ENDPOINTS.VERIFY_COUPON, data),
   redeemCoupon: (id) => apiClient.post(buildEndpoint(API_CONFIG.ENDPOINTS.REDEEM_COUPON, { id })),
-  getBusinessCoupons: (businessId) => 
+  getBusinessCoupons: (businessId) =>
     apiClient.get(buildEndpoint(API_CONFIG.ENDPOINTS.GET_BUSINESS_COUPONS, { businessId })),
   createCoupon: (data) => apiClient.post(API_CONFIG.ENDPOINTS.CREATE_COUPON, data),
-  
+
   // Business Promotional Coupon APIs
   getBusinessCouponsList: (businessId) => apiClient.get(`/business-coupons/business/${businessId}`),
   createBusinessCoupon: (data) => apiClient.post('/business-coupons', data),
@@ -143,46 +143,46 @@ const ApiService = {
   toggleCouponStatus: (id) => apiClient.patch(`/business-coupons/${id}/toggle-status`),
   scanAndRedeemCoupon: (qrCodeData) => apiClient.post('/business-coupons/scan-redeem', { qrCodeData }),
   getRedemptionStats: (businessId) => apiClient.get(`/business-coupons/redemption-stats/${businessId}`),
-  
+
   // Coupon Template APIs (for review rewards)
   getBusinessCouponTemplate: (businessId) => apiClient.get(`/coupons/template/${businessId}`),
   createCouponTemplate: (data) => apiClient.post('/coupons/template', data),
-  
+
   updateBusiness: (id, data) => apiClient.put(`/business/${id}`, data),
-  
+
   // Notification APIs
   getNotifications: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_NOTIFICATIONS, { params }),
   markAsRead: (id) => apiClient.put(buildEndpoint(API_CONFIG.ENDPOINTS.MARK_AS_READ, { id })),
   markAllRead: () => apiClient.put(API_CONFIG.ENDPOINTS.MARK_ALL_READ),
-  
+
   // Admin APIs - Full management capabilities
   getDashboardStats: () => apiClient.get(API_CONFIG.ENDPOINTS.GET_DASHBOARD_STATS),
-  
+
   // Admin Notifications
   sendAdminNotification: (data) => apiClient.post('/admin/notifications/send', data),
-  
+
   // Category Management
   createCategory: (data) => apiClient.post('/categories', data),
   updateCategory: (id, data) => apiClient.put(`/categories/${id}`, data),
   deleteCategory: (id) => apiClient.delete(`/categories/${id}`),
-  
+
   // Business Management
   adminGetAllBusinesses: () => apiClient.get('/admin/businesses'),
   adminGetBusiness: (id) => apiClient.get(`/admin/businesses/${id}`),
   adminUpdateBusiness: (id, data) => apiClient.put(`/admin/businesses/${id}`, data),
   adminUpdateBusinessKYC: (id, data) => apiClient.put(`/admin/businesses/${id}/kyc`, data),
   adminDeleteBusiness: (id) => apiClient.delete(`/admin/businesses/${id}`),
-  
+
   // User Management
   adminGetAllUsers: () => apiClient.get('/admin/users'),
   adminUpdateUserStatus: (id, data) => apiClient.put(`/admin/users/${id}/status`, data),
   adminDeleteUser: (id) => apiClient.delete(`/admin/users/${id}`),
   adminSuspendUser: (id, data) => apiClient.post(`/admin/users/${id}/suspend`, data),
-  
+
   // Review Management
   adminGetAllReviews: () => apiClient.get('/admin/reviews'),
   adminUpdateReviewStatus: (id, data) => apiClient.put(`/admin/reviews/${id}/status`, data),
-  
+
   // Coupon Management (Admin)
   adminGetAllCoupons: () => apiClient.get('/admin/coupons'),
   adminToggleCouponStatus: (id, data) => apiClient.put(`/admin/coupons/${id}/status`, data),
@@ -193,7 +193,7 @@ const ApiService = {
   // updateUserStatus: (id, data) => apiClient.put(API_CONFIG.ENDPOINTS.UPDATE_USER_STATUS.replace(':id', id), data),
   // getAllReviews: (params) => apiClient.get(API_CONFIG.ENDPOINTS.GET_ALL_REVIEWS, { params }),
   // sendNotification: (data) => apiClient.post(API_CONFIG.ENDPOINTS.SEND_NOTIFICATION, data),
-  
+
   // Chat APIs
   getChatHistory: (userId, params) => {
     if (!userId || !API_CONFIG.ENDPOINTS.GET_CHAT_HISTORY) {
@@ -203,20 +203,20 @@ const ApiService = {
   },
   sendMessage: (data) => apiClient.post(API_CONFIG.ENDPOINTS.SEND_MESSAGE, data),
   getConversations: () => apiClient.get(API_CONFIG.ENDPOINTS.GET_CONVERSATIONS),
-  
+
   // External Reviews APIs
   syncGoogleReviews: (businessId) => {
     const endpoint = API_CONFIG.ENDPOINTS.SYNC_GOOGLE_REVIEWS;
     if (!endpoint) return Promise.reject(new Error('Endpoint not configured'));
     return apiClient.post(buildEndpoint(endpoint, { id: businessId }) + '?ratingsOnly=true');
   },
-  
+
   syncTripAdvisorReviews: (businessId) => {
     const endpoint = API_CONFIG.ENDPOINTS.SYNC_TRIPADVISOR_REVIEWS;
     if (!endpoint) return Promise.reject(new Error('Endpoint not configured'));
     return apiClient.post(buildEndpoint(endpoint, { id: businessId }));
   },
-  
+
   // Manually update TripAdvisor rating
   updateTripAdvisorRating: (businessId, rating, reviewCount) => {
     return apiClient.put(`/business/${businessId}/tripadvisor-rating`, {
@@ -224,13 +224,13 @@ const ApiService = {
       reviewCount: parseInt(reviewCount)
     });
   },
-  
+
   getAllBusinessReviews: (businessId) => {
     const endpoint = API_CONFIG.ENDPOINTS.GET_ALL_BUSINESS_REVIEWS;
     if (!endpoint) return Promise.reject(new Error('Endpoint not configured'));
     return apiClient.get(buildEndpoint(endpoint, { id: businessId }));
   },
-  
+
   // Upload APIs
   uploadBusinessLogo: (formData, businessId) => {
     const url = businessId ? `/upload/business/logo?businessId=${businessId}` : '/upload/business/logo';
@@ -258,7 +258,7 @@ const ApiService = {
   },
   deleteUploadedFile: (publicId) => apiClient.delete(`/upload/${publicId}`),
   getUploadStats: () => apiClient.get('/upload/stats'),
-  
+
   // Review media uploads
   uploadReviewPhotos: (formData) => {
     return apiClient.post('/upload/review/photos', formData, {
@@ -270,16 +270,16 @@ const ApiService = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
-  
+
   // Business image management
   updateBusinessImages: (businessId, data) => apiClient.put(
-    buildEndpoint(API_CONFIG.ENDPOINTS.UPDATE_BUSINESS_IMAGES, { id: businessId }), 
+    buildEndpoint(API_CONFIG.ENDPOINTS.UPDATE_BUSINESS_IMAGES, { id: businessId }),
     data
   ),
-  
+
   // Support & Help APIs
   submitSupportTicket: (data) => apiClient.post('/support/ticket', data),
-  
+
   // Account Settings APIs
   updateAccountSettings: (settings) => apiClient.put('/users/account-settings', settings),
   exportUserData: () => apiClient.post('/users/export-data'),

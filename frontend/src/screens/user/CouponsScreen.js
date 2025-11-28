@@ -98,177 +98,139 @@ export default function CouponsScreen() {
         )}
       </View>
 
-      {/* QR Code Modal with Full Details */}
+
+      {/* QR Code Modal - Redesigned */}
       {selectedCoupon && (
         <TouchableOpacity
           onPress={() => setSelectedCoupon(null)}
-          className="absolute inset-0 bg-black/50 justify-center items-center"
+          className="absolute inset-0 bg-black/60 justify-center items-center"
           activeOpacity={1}
         >
-          <TouchableOpacity 
-            activeOpacity={1} 
+          <TouchableOpacity
+            activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
-            className="bg-white rounded-3xl m-6 max-w-sm w-full"
+            className="bg-white rounded-3xl m-6 max-w-sm w-full overflow-hidden"
           >
-            <ScrollView className="max-h-[90%]" showsVerticalScrollIndicator={false}>
-              {/* Header */}
-              <View className="p-6 pb-4 border-b border-gray-100">
-                <View className="flex-row items-center justify-between mb-3">
-                  <Text className="text-2xl font-bold text-gray-900 flex-1">
-                    {selectedCoupon.business?.name || 'Business'}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => setSelectedCoupon(null)}
-                    className="ml-2"
-                  >
-                    <Icon name="close-circle" size={28} color="#6B7280" />
-                  </TouchableOpacity>
-                </View>
-                
-                {/* Business Logo */}
-                {selectedCoupon.business?.logo?.url && (
-                  <View className="items-center mb-3">
-                    <Image
-                      source={{ uri: selectedCoupon.business.logo.url }}
-                      className="w-20 h-20 rounded-xl"
-                      resizeMode="cover"
-                    />
-                  </View>
-                )}
-                
-                {/* Coupon Code */}
-                <View className="bg-[#FFF9F0] rounded-xl px-4 py-3 items-center">
-                  <Text className="text-xs text-gray-600 mb-1">Coupon Code</Text>
-                  <Text className="text-lg font-bold" style={{ color: COLORS.secondary }}>
-                    {selectedCoupon.code}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Business Details */}
-              <View className="p-6 pt-4">
-                <Text className="text-lg font-bold text-gray-900 mb-4">Business Details</Text>
-                
-                {/* Address */}
-                {selectedCoupon.business?.address?.fullAddress && (
-                  <View className="flex-row items-start mb-3">
-                    <Icon name="location" size={20} color={COLORS.secondary} />
-                    <View className="flex-1 ml-3">
-                      <Text className="text-xs text-gray-500 mb-1">Address</Text>
-                      <Text className="text-sm text-gray-900">
-                        {selectedCoupon.business.address.fullAddress}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-
-                {/* Phone */}
-                {selectedCoupon.business?.phone && (
-                  <View className="flex-row items-center mb-3">
-                    <Icon name="call" size={20} color={COLORS.secondary} />
-                    <View className="flex-1 ml-3">
-                      <Text className="text-xs text-gray-500 mb-1">Phone</Text>
-                      <Text className="text-sm text-gray-900">{selectedCoupon.business.phone}</Text>
-                    </View>
-                  </View>
-                )}
-
-                {/* Category */}
-                {selectedCoupon.business?.category && (
-                  <View className="flex-row items-center mb-4">
-                    <Icon name="pricetag" size={20} color={COLORS.secondary} />
-                    <View className="flex-1 ml-3">
-                      <Text className="text-xs text-gray-500 mb-1">Category</Text>
-                      <Text className="text-sm text-gray-900 capitalize">
-                        {selectedCoupon.business.category}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-
-                {/* Divider */}
-                <View className="h-px bg-gray-200 my-4" />
-
-                {/* Coupon Details */}
-                <Text className="text-lg font-bold text-gray-900 mb-4">Coupon Details</Text>
-                
-                {/* Reward */}
-                <View className="bg-green-50 rounded-xl p-4 mb-3">
-                  <Text className="text-xs text-gray-600 mb-1">Discount</Text>
-                  <Text className="text-2xl font-bold text-green-700">
-                    {selectedCoupon.rewardType === 'percentage' 
-                      ? `${selectedCoupon.rewardValue}% OFF`
-                      : selectedCoupon.rewardType === 'fixed'
-                      ? `£${selectedCoupon.rewardValue} OFF`
-                      : selectedCoupon.rewardType === 'free_item' || selectedCoupon.rewardType === 'free_drink'
-                      ? `Free ${selectedCoupon.itemName || 'Item'}`
-                      : `${selectedCoupon.rewardValue}% OFF`}
-                  </Text>
-                </View>
-
-                {/* Description */}
-                {selectedCoupon.description && (
-                  <View className="mb-3">
-                    <Text className="text-xs text-gray-500 mb-1">Description</Text>
-                    <Text className="text-sm text-gray-700">{selectedCoupon.description}</Text>
-                  </View>
-                )}
-
-                {/* Validity */}
-                <View className="flex-row items-center mb-4">
-                  <Icon name="time" size={18} color="#6B7280" />
-                  <View className="flex-1 ml-2">
-                    <Text className="text-xs text-gray-500 mb-1">Valid Until</Text>
-                    <Text className="text-sm text-gray-900">
-                      {new Date(selectedCoupon.validUntil).toLocaleString()}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Terms */}
-                {selectedCoupon.terms && (
-                  <View className="mb-4">
-                    <Text className="text-xs text-gray-500 mb-1">Terms & Conditions</Text>
-                    <Text className="text-xs text-gray-600">{selectedCoupon.terms}</Text>
-                  </View>
-                )}
-
-                {/* QR Code Section */}
-                <View className="mt-4 pt-4 border-t border-gray-200">
-                  <Text className="text-center text-sm font-semibold text-gray-900 mb-3">
-                    Scan QR Code to Redeem
-                  </Text>
-                  
-                  <View className="bg-white p-6 rounded-2xl shadow-lg items-center border-2 border-gray-100">
-                    <QRCode
-                      value={selectedCoupon.qrCodeData || JSON.stringify({
-                        type: 'coupon',
-                        couponId: selectedCoupon._id,
-                        code: selectedCoupon.code,
-                        businessId: selectedCoupon.business?._id
-                      })}
-                      size={220}
-                      backgroundColor="white"
-                      color="black"
-                    />
-                  </View>
-
-                  <Text className="text-center text-xs text-gray-500 mt-3">
-                    Show this QR code to the business owner
-                  </Text>
-                </View>
-              </View>
-
-              {/* Close Button */}
-              <View className="px-6 pb-6 pt-2">
+            {/* Header */}
+            <LinearGradient
+              colors={[COLORS.primary, COLORS.primaryDark]}
+              className="p-6 pb-2"
+            >
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-white text-2xl font-bold flex-1">
+                  {selectedCoupon.business?.name || 'Business'}
+                </Text>
                 <TouchableOpacity
                   onPress={() => setSelectedCoupon(null)}
-                  className="bg-gray-100 rounded-xl py-3 items-center"
+                  className="ml-2"
                 >
-                  <Text className="text-gray-700 font-semibold">Close</Text>
+                  <Icon name="close-circle" size={28} color="#fff" />
                 </TouchableOpacity>
               </View>
+
+              {/* Coupon Code */}
+              <View className="bg-white/20 backdrop-blur rounded-xl px-2 py-2 items-center">
+                <Text className="text-white/80 text-xs mb-1">Coupon Code</Text>
+                <Text className="text-white text-2xl font-bold tracking-wider">
+                  {selectedCoupon.code}
+                </Text>
+              </View>
+            </LinearGradient>
+
+            <ScrollView className="max-h-[100%]" showsVerticalScrollIndicator={false}>
+              {/* QR Code Section - PROMINENT */}
+              <View className="p-2 items-center bg-gray-50">
+                <View className="bg-white p-6 rounded-2xl shadow-xl items-center border-4" style={{ borderColor: COLORS.secondary }}>
+                  <QRCode
+                    value={selectedCoupon.qrCodeData || JSON.stringify({
+                      type: 'coupon',
+                      couponId: selectedCoupon._id,
+                      code: selectedCoupon.code,
+                      businessId: selectedCoupon.business?._id,
+                      userId: selectedCoupon.user
+                    })}
+                    size={200}
+                    backgroundColor="white"
+                    color="black"
+                  />
+                </View>
+
+                <Text className="text-center text-xs text-gray-500 mt-3">
+                  Show this QR code to the business owner
+                </Text>
+              </View>
+
+              {/* Discount Badge */}
+              <View className="px-4 pb-2">
+                <View className="bg-green-50 rounded-2xl p-2 items-center border-2 border-green-200">
+                  <Text className="text-xs text-green-600 mb-1">Your Discount</Text>
+                  <Text className="text-3xl font-bold text-green-700">
+                    {selectedCoupon.rewardType === 'percentage'
+                      ? `${selectedCoupon.rewardValue}% OFF`
+                      : selectedCoupon.rewardType === 'fixed'
+                        ? `£${selectedCoupon.rewardValue} OFF`
+                        : selectedCoupon.rewardType === 'free_item' || selectedCoupon.rewardType === 'free_drink'
+                          ? `Free ${selectedCoupon.itemName || 'Item'}`
+                          : `${selectedCoupon.rewardValue}% OFF`}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Business Info - Compact */}
+              <View className="px-6 pb-4">
+                <Text className="text-sm font-bold text-gray-900 mb-3">Business Info</Text>
+
+                {selectedCoupon.business?.address?.fullAddress && (
+                  <View className="flex-row items-start mb-2">
+                    <Icon name="location" size={16} color={COLORS.secondary} />
+                    <Text className="text-xs text-gray-600 ml-2 flex-1">
+                      {selectedCoupon.business.address.fullAddress}
+                    </Text>
+                  </View>
+                )}
+
+                {selectedCoupon.business?.phone && (
+                  <View className="flex-row items-center mb-2">
+                    <Icon name="call" size={16} color={COLORS.secondary} />
+                    <Text className="text-xs text-gray-600 ml-2">
+                      {selectedCoupon.business.phone}
+                    </Text>
+                  </View>
+                )}
+
+                <View className="flex-row items-center">
+                  <Icon name="time" size={16} color="#EF4444" />
+                  <Text className="text-xs text-red-600 ml-2 font-semibold">
+                    Valid until {new Date(selectedCoupon.validUntil).toLocaleString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Terms - Compact */}
+              {selectedCoupon.terms && (
+                <View className="px-6 pb-4">
+                  <Text className="text-xs text-gray-400 italic">
+                    {selectedCoupon.terms}
+                  </Text>
+                </View>
+              )}
             </ScrollView>
+
+            {/* Close Button */}
+            {/* <View className="px-6 py-4 border-t border-gray-100">
+              <TouchableOpacity
+                onPress={() => setSelectedCoupon(null)}
+                className="rounded-xl py-3 items-center"
+                style={{ backgroundColor: COLORS.secondary }}
+              >
+                <Text className="text-white font-bold text-base">Close</Text>
+              </TouchableOpacity>
+            </View> */}
           </TouchableOpacity>
         </TouchableOpacity>
       )}
