@@ -27,7 +27,7 @@ import VerifyEmailScreen from '../screens/user/VerifyEmailScreen';
 // Business Screens
 import BusinessDashboardScreen from '../screens/business/BusinessDashboardScreen';
 import BusinessRegistrationScreen from '../screens/business/BusinessRegistrationScreen';
-import VerifyBusinessScreen from '../screens/business/VerifyBusinessScreen';
+
 import ManageCouponsScreen from '../screens/business/ManageCouponsScreen';
 import ManageUpdatesScreen from '../screens/business/ManageUpdatesScreen';
 import ViewReviewsScreen from '../screens/business/ViewReviewsScreen';
@@ -88,7 +88,7 @@ function BusinessStack() {
     >
       <Stack.Screen name="BusinessDashboard" component={BusinessDashboardScreen} />
       <Stack.Screen name="BusinessRegistration" component={BusinessRegistrationScreen} />
-      <Stack.Screen name="VerifyBusiness" component={VerifyBusinessScreen} />
+
       <Stack.Screen name="ManageCoupons" component={ManageCouponsScreen} />
       <Stack.Screen name="ManageUpdates" component={ManageUpdatesScreen} />
       <Stack.Screen name="ViewReviews" component={ViewReviewsScreen} />
@@ -164,13 +164,13 @@ export default function MainNavigator() {
           headerShown: false,
         })}
       >
-        <Tab.Screen 
-          name="Dashboard" 
+        <Tab.Screen
+          name="Dashboard"
           component={AdminDashboardStack}
           options={{ title: 'Admin Panel' }}
         />
-        <Tab.Screen 
-          name="Profile" 
+        <Tab.Screen
+          name="Profile"
           component={AdminProfileStack}
           options={{ title: 'Profile' }}
         />
@@ -253,18 +253,18 @@ export default function MainNavigator() {
         }
       })}
     >
-      <Tab.Screen 
-        name="Home" 
+      <Tab.Screen
+        name="Home"
         component={UserStack}
         options={{ title: 'Home' }}
       />
-      <Tab.Screen 
-        name="Search" 
+      <Tab.Screen
+        name="Search"
         component={SearchScreen}
         options={{ title: 'Search' }}
       />
-      <Tab.Screen 
-        name="QRScanner" 
+      <Tab.Screen
+        name="QRScanner"
         component={QRScannerScreen}
         options={{
           title: 'Scan',
@@ -292,13 +292,13 @@ export default function MainNavigator() {
           ),
         }}
       />
-      <Tab.Screen 
-        name="History" 
+      <Tab.Screen
+        name="History"
         component={HistoryScreen}
         options={{ title: 'History' }}
       />
-      <Tab.Screen 
-        name="Profile" 
+      <Tab.Screen
+        name="Profile"
         component={ProfileScreen}
         options={{ title: 'Profile' }}
       />

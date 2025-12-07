@@ -146,26 +146,8 @@ const BusinessDetails = () => {
     }
   };
 
-  const handleKYCAction = async (action) => {
-    if (action === 'reject' && !reason) {
-      alert('Please provide a reason for rejection');
-      return;
-    }
-
-    if (!confirm(`Are you sure you want to ${action} this business?`)) return;
-
-    setActionLoading(true);
-    try {
-      await adminApi.updateBusinessKYC(id, action, reason);
-      alert(`Business ${action}ed successfully!`);
-      fetchBusinessDetails();
-      setReason('');
-    } catch (error) {
-      alert(`Error ${action}ing business`);
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  // KYC Action Removed
+  // const handleKYCAction = ...
 
   const handleUpdateRadius = async () => {
     const radiusValue = parseInt(radius);
@@ -501,7 +483,7 @@ const BusinessDetails = () => {
                     </div>
                   </div>
                 </div>
-                
+
               </div>
             )}
           </div>
@@ -854,7 +836,7 @@ const BusinessDetails = () => {
                   <div>
                     <h2 className="text-xl font-bold text-gray-900">Business QR Code</h2>
                     <p className="text-sm text-gray-600 mt-0.5">
-                      {business.qrCode 
+                      {business.qrCode
                         ? 'Generated automatically when business was approved'
                         : 'QR code will be generated when business is approved'}
                     </p>
@@ -864,9 +846,9 @@ const BusinessDetails = () => {
               <div className="bg-white rounded-lg p-6 border border-purple-200 flex flex-col items-center">
                 {business.qrCode ? (
                   <>
-                    <img 
-                      src={business.qrCode} 
-                      alt="Business QR Code" 
+                    <img
+                      src={business.qrCode}
+                      alt="Business QR Code"
                       className="w-64 h-64 object-contain rounded-lg shadow-lg mb-4"
                       onError={(e) => {
                         console.error('QR code image failed to load');
@@ -969,38 +951,7 @@ const BusinessDetails = () => {
             </div>
           )}
 
-          {/* Didit Verification */}
-          {business.diditVerification && (
-            <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Didit Verification Status</h2>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm text-gray-500">Status</p>
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                    business.diditVerification.status === 'completed' ? 'bg-green-100 text-green-800' :
-                    business.diditVerification.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {business.diditVerification.status || 'Not Started'}
-                  </span>
-                </div>
-                {business.diditVerification.verificationLink && (
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Verification Link</p>
-                    <a href={business.diditVerification.verificationLink} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline text-sm">
-                      {business.diditVerification.verificationLink}
-                    </a>
-                  </div>
-                )}
-                {business.diditVerification.sessionId && (
-                  <div>
-                    <p className="text-sm text-gray-500">Session ID</p>
-                    <p className="text-gray-900 text-sm font-mono">{business.diditVerification.sessionId}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Didit Verification Removed */}
         </div>
 
         {/* Sidebar */}
@@ -1046,13 +997,12 @@ const BusinessDetails = () => {
                 <div>
                   <p className="text-sm text-gray-500">Business Status</p>
                   <span
-                    className={`inline-block px-3 py-1 text-sm font-medium rounded-full mt-1 ${
-                      business.status === 'active'
-                        ? 'bg-green-100 text-green-800'
-                        : business.status === 'pending'
+                    className={`inline-block px-3 py-1 text-sm font-medium rounded-full mt-1 ${business.status === 'active'
+                      ? 'bg-green-100 text-green-800'
+                      : business.status === 'pending'
                         ? 'bg-yellow-100 text-yellow-800'
                         : 'bg-red-100 text-red-800'
-                    }`}
+                      }`}
                   >
                     {business.status}
                   </span>
@@ -1060,15 +1010,14 @@ const BusinessDetails = () => {
                 <div>
                   <p className="text-sm text-gray-500">KYC Status</p>
                   <span
-                    className={`inline-block px-3 py-1 text-sm font-medium rounded-full mt-1 ${
-                      business.kycStatus === 'approved'
-                        ? 'bg-green-100 text-green-800'
-                        : business.kycStatus === 'in_review'
+                    className={`inline-block px-3 py-1 text-sm font-medium rounded-full mt-1 ${business.kycStatus === 'approved'
+                      ? 'bg-green-100 text-green-800'
+                      : business.kycStatus === 'in_review'
                         ? 'bg-blue-100 text-blue-800'
                         : business.kycStatus === 'rejected'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}
                   >
                     {business.kycStatus}
                   </span>

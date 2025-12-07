@@ -63,7 +63,7 @@ export default function HelpSupportScreen({ navigation }) {
     {
       id: 8,
       question: 'How can I become a business owner on HashView?',
-      answer: 'If you own a business, tap "Sign Up" and select "Business Owner" during registration. You\'ll need to complete a 4-step registration process including business details, document uploads, and KYC verification.'
+      answer: 'If you own a business, tap "Sign Up" and select "Business Owner" during registration. You\'ll need to complete a simple registration process including business details and document uploads.'
     },
     {
       id: 9,
@@ -77,36 +77,6 @@ export default function HelpSupportScreen({ navigation }) {
     }
   ];
 
-  const contactOptions = [
-    {
-      icon: 'mail-outline',
-      title: 'Email Support',
-      subtitle: 'support@hashview.com',
-      action: () => Linking.openURL('mailto:support@hashview.com'),
-      color: '#3B82F6'
-    },
-    {
-      icon: 'call-outline',
-      title: 'Phone Support',
-      subtitle: '+1 (800) 123-4567',
-      action: () => Linking.openURL('tel:+18001234567'),
-      color: '#10B981'
-    },
-    {
-      icon: 'logo-whatsapp',
-      title: 'WhatsApp',
-      subtitle: 'Chat with us',
-      action: () => Linking.openURL('https://wa.me/18001234567'),
-      color: '#25D366'
-    },
-    {
-      icon: 'chatbubbles-outline',
-      title: 'Live Chat',
-      subtitle: 'Available 9 AM - 6 PM',
-      action: () => Alert.alert('Live Chat', 'Live chat feature coming soon!'),
-      color: COLORS.secondary
-    }
-  ];
 
   const handleSubmitTicket = async () => {
     if (!contactForm.subject.trim() || !contactForm.message.trim()) {
@@ -120,10 +90,10 @@ export default function HelpSupportScreen({ navigation }) {
 
     try {
       setSending(true);
-      
+
       // API call to submit support ticket
       await ApiService.submitSupportTicket(contactForm);
-      
+
       showMessage({
         message: 'Ticket Submitted!',
         description: 'Our support team will get back to you within 24 hours',
@@ -132,7 +102,7 @@ export default function HelpSupportScreen({ navigation }) {
 
       // Clear form
       setContactForm({ subject: '', message: '' });
-      
+
       setSending(false);
     } catch (error) {
       setSending(false);
@@ -147,7 +117,7 @@ export default function HelpSupportScreen({ navigation }) {
   return (
     <View className="flex-1 bg-gray-50">
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-      
+
       {/* Header */}
       <LinearGradient
         colors={[COLORS.primary, COLORS.primaryDark]}
@@ -166,39 +136,6 @@ export default function HelpSupportScreen({ navigation }) {
 
       <ScrollView className="flex-1">
         <View className="px-6 py-4">
-          {/* Quick Contact Options */}
-          <View className="bg-white rounded-2xl p-6 shadow-sm mb-4">
-            <Text className="text-lg font-bold text-gray-900 mb-4">
-              Contact Us
-            </Text>
-
-            {contactOptions.map((option, index) => (
-              <TouchableOpacity
-                key={index}
-                onPress={option.action}
-                className={`flex-row items-center py-4 ${
-                  index < contactOptions.length - 1 ? 'border-b border-gray-100' : ''
-                }`}
-              >
-                <View
-                  className="w-12 h-12 rounded-full items-center justify-center mr-4"
-                  style={{ backgroundColor: `${option.color}15` }}
-                >
-                  <Icon name={option.icon} size={24} color={option.color} />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-base font-semibold text-gray-900">
-                    {option.title}
-                  </Text>
-                  <Text className="text-sm text-gray-500 mt-1">
-                    {option.subtitle}
-                  </Text>
-                </View>
-                <Icon name="chevron-forward" size={20} color="#D1D5DB" />
-              </TouchableOpacity>
-            ))}
-          </View>
-
           {/* Submit Ticket Form */}
           <View className="bg-white rounded-2xl p-6 shadow-sm mb-4">
             <Text className="text-lg font-bold text-gray-900 mb-4">

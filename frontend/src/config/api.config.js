@@ -4,7 +4,7 @@
 export const API_CONFIG = {
   // API Base URL - defaults to production if not set
   BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hashview-backend.onrender.com/api',
-  //BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.161.95.239:5000/api',
+  // BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.161.95.239:5000/api',
 
   // Socket.io URL - defaults to production if not set
   SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || 'https://hashview-backend.onrender.com',

@@ -1,6 +1,6 @@
 {
   "name": "hashview-mobile",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "HashView Mobile App - React Native Expo",
   "main": "index.js",
   "scripts": {

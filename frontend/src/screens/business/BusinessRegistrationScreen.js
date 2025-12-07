@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  ScrollView, 
-  ActivityIndicator, 
-  Alert, 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
   StatusBar,
   Image,
   Platform
@@ -26,7 +26,7 @@ import COLORS from '../../config/colors';
 export default function BusinessRegistrationScreen({ navigation }) {
   const dispatch = useDispatch();
   const { loading } = useSelector((state) => state.business);
-  
+
   const [formData, setFormData] = useState({
     businessName: '',
     firstName: '',
@@ -111,10 +111,10 @@ export default function BusinessRegistrationScreen({ navigation }) {
 
     try {
       setSearchingAddress(true);
-      
+
       // Get Google API key from environment
       const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY;
-      
+
       if (!GOOGLE_API_KEY) {
         console.error('❌ Google API key not configured');
         Alert.alert('Configuration Error', 'Google API key is missing. Please contact support.');
@@ -122,28 +122,28 @@ export default function BusinessRegistrationScreen({ navigation }) {
         setShowAddressSuggestions(false);
         return;
       }
-      
+
       // Step 1: Get place predictions using Places Autocomplete API (UK addresses only)
       const autocompleteResponse = await fetch(
         `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&components=country:gb&types=establishment|geocode&key=${GOOGLE_API_KEY}`
       );
-      
+
       if (!autocompleteResponse.ok) {
         console.error('Google Places API error:', autocompleteResponse.status);
         setAddressSuggestions([]);
         setShowAddressSuggestions(false);
         return;
       }
-      
+
       const autocompleteData = await autocompleteResponse.json();
-      
+
       if (autocompleteData.status !== 'OK' || !autocompleteData.predictions || autocompleteData.predictions.length === 0) {
         console.log(`ℹ️ Google Places API returned: ${autocompleteData.status}`);
         setAddressSuggestions([]);
         setShowAddressSuggestions(false);
         return;
       }
-      
+
       // Step 2: Get detailed information (lat/lng) for each prediction
       const detailedSuggestions = await Promise.all(
         autocompleteData.predictions.slice(0, 5).map(async (prediction) => {
@@ -151,20 +151,20 @@ export default function BusinessRegistrationScreen({ navigation }) {
             const placeDetailsResponse = await fetch(
               `https://maps.googleapis.com/maps/api/place/details/json?place_id=${prediction.place_id}&fields=formatted_address,geometry,address_component&key=${GOOGLE_API_KEY}`
             );
-            
+
             const placeDetailsData = await placeDetailsResponse.json();
-            
-              if (placeDetailsData.status === 'OK' && placeDetailsData.result) {
-                return {
-                  id: prediction.place_id,
-                  address: placeDetailsData.result.formatted_address || prediction.description,
-                  latitude: placeDetailsData.result.geometry.location.lat,
-                  longitude: placeDetailsData.result.geometry.location.lng,
-                  placeId: prediction.place_id,
-                  types: prediction.types || [],
-                  components: placeDetailsData.result.address_components || []
-                };
-              }
+
+            if (placeDetailsData.status === 'OK' && placeDetailsData.result) {
+              return {
+                id: prediction.place_id,
+                address: placeDetailsData.result.formatted_address || prediction.description,
+                latitude: placeDetailsData.result.geometry.location.lat,
+                longitude: placeDetailsData.result.geometry.location.lng,
+                placeId: prediction.place_id,
+                types: prediction.types || [],
+                components: placeDetailsData.result.address_components || []
+              };
+            }
             return null;
           } catch (error) {
             console.error('Error fetching place details:', error);
@@ -172,13 +172,13 @@ export default function BusinessRegistrationScreen({ navigation }) {
           }
         })
       );
-      
+
       // Filter out null results
       const validSuggestions = detailedSuggestions.filter(s => s !== null);
-      
+
       setAddressSuggestions(validSuggestions);
       setShowAddressSuggestions(validSuggestions.length > 0);
-      
+
       if (validSuggestions.length > 0) {
         console.log(`✅ Found ${validSuggestions.length} accurate address suggestions`);
       }
@@ -281,7 +281,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
     if (data.postcode) parts.push(data.postcode);
     if (data.country) parts.push(data.country);
     if (data.landmark) parts.push(`Near: ${data.landmark}`);
-    
+
     const fullAddress = parts.join(', ');
     if (shouldUpdateState) {
       setFormData(prev => ({ ...prev, address: fullAddress }));
@@ -325,10 +325,10 @@ export default function BusinessRegistrationScreen({ navigation }) {
   const getLocation = useCallback(async () => {
     try {
       setLocation(prev => ({ ...prev, loading: true, error: null }));
-      
+
       console.log('📍 Requesting location permission...');
       let { status } = await Location.requestForegroundPermissionsAsync();
-      
+
       if (status !== 'granted') {
         setLocation(prev => ({
           ...prev,
@@ -352,9 +352,9 @@ export default function BusinessRegistrationScreen({ navigation }) {
         timeInterval: 10000,
         distanceInterval: 0
       });
-      
+
       console.log('✅ Location obtained:', currentLocation.coords.latitude, currentLocation.coords.longitude);
-      
+
       setLocation({
         latitude: currentLocation.coords.latitude,
         longitude: currentLocation.coords.longitude,
@@ -419,7 +419,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
       try {
         setLoadingCategories(true);
         const response = await ApiService.getCategories();
-        
+
         if (response.success && response.categories) {
           const categoryOptions = [
             { label: 'Select Category', value: '' },
@@ -454,7 +454,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
         setLoadingCategories(false);
       }
     };
-    
+
     fetchCategories();
   }, []);
 
@@ -519,7 +519,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
       const mimeType = `image/${extension === 'jpg' ? 'jpeg' : extension}`;
 
       const fieldName = imageType === 'logo' ? 'logo' : imageType === 'coverImage' ? 'coverImage' : 'images';
-      
+
       formData.append(fieldName, {
         uri: imageUri,
         name: filename,
@@ -538,12 +538,12 @@ export default function BusinessRegistrationScreen({ navigation }) {
       if (response.success || response.data) {
         // Handle response format
         const data = response.data || response;
-        
+
         // For gallery, response has images array
         if (imageType === 'gallery' && response.images && response.images.length > 0) {
           return response.images[0]; // Return first image from array
         }
-        
+
         return {
           url: data.url || data.imageUrl,
           publicId: data.publicId || data.public_id
@@ -562,14 +562,14 @@ export default function BusinessRegistrationScreen({ navigation }) {
 
     try {
       const formData = new FormData();
-      
+
       // Append all gallery images to formData
       galleryImages.forEach((img, index) => {
         const filename = img.uri.split('/').pop() || `gallery_${Date.now()}_${index}.jpg`;
         const match = /\.(\w+)$/.exec(filename);
         const extension = match ? match[1].toLowerCase() : 'jpg';
         const mimeType = `image/${extension === 'jpg' ? 'jpeg' : extension}`;
-        
+
         formData.append('images', {
           uri: img.uri,
           name: filename,
@@ -578,7 +578,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
       });
 
       const response = await ApiService.uploadBusinessGallery(formData, businessId);
-      
+
       if (response.success && response.images && response.images.length > 0) {
         return response.images.map((img, index) => ({
           url: img.url,
@@ -586,7 +586,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
           originalUri: galleryImages[index]?.uri // Store original URI for matching
         }));
       }
-      
+
       throw new Error(response.message || 'Gallery upload failed');
     } catch (error) {
       console.error('Error uploading gallery images:', error);
@@ -691,17 +691,17 @@ export default function BusinessRegistrationScreen({ navigation }) {
 
       console.log('📝 Submitting business registration (images will be uploaded separately)...');
       const result = await dispatch(registerBusiness(businessData)).unwrap();
-      
+
       console.log('✅ Registration successful:', result);
       const businessId = result.business._id;
 
       // Upload images AFTER registration (non-blocking, with timeout)
       if (images.logo || images.coverImage || (images.gallery && images.gallery.length > 0)) {
         console.log('📸 Starting background image uploads...');
-        
+
         // Upload images in parallel with timeout
         const uploadPromises = [];
-        
+
         // Upload logo with timeout
         if (images.logo) {
           uploadPromises.push(
@@ -770,19 +770,19 @@ export default function BusinessRegistrationScreen({ navigation }) {
           console.log('📸 All image uploads completed');
         });
       }
-      
+
       // Navigate immediately (don't wait for image uploads)
       setTimeout(() => {
-        navigation.navigate('VerifyBusiness', { businessId });
+        navigation.navigate('BusinessDashboard');
       }, 100);
-      
+
     } catch (error) {
       console.error('❌ Registration failed:', error);
-      
+
       // Handle error object from Redux thunk
       let errorMessage = 'Failed to register business. Please check your internet connection and try again.';
       let errorDetails = [];
-      
+
       if (typeof error === 'string') {
         errorMessage = error;
       } else if (error?.message) {
@@ -792,7 +792,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
         errorMessage = error.response.data.message || errorMessage;
         errorDetails = error.response.data.errors || [];
       }
-      
+
       // Show detailed validation errors if available
       if (errorDetails.length > 0) {
         const detailedMessage = `${errorMessage}\n\n${errorDetails.join('\n')}`;
@@ -808,7 +808,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
   return (
     <View className="flex-1 bg-gray-50">
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-      
+
       {/* Header */}
       <LinearGradient
         colors={[COLORS.primary, COLORS.primaryDark]}
@@ -823,7 +823,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
       </LinearGradient>
 
       <ScrollView className="flex-1 px-6 py-6" showsVerticalScrollIndicator={false}>
-        
+
         {/* Location Status */}
         <View className="mb-4 bg-blue-50 rounded-xl p-4">
           <View className="flex-row items-center justify-between">
@@ -852,13 +852,13 @@ export default function BusinessRegistrationScreen({ navigation }) {
               <Icon name="map" size={24} color={COLORS.primary} />
             </TouchableOpacity>
           </View>
-          
+
           {location.latitude && location.longitude && (
             <Text className="mt-1 text-xs text-gray-500">
               Lat: {location.latitude.toFixed(6)}, Lng: {location.longitude.toFixed(6)}
             </Text>
           )}
-          
+
           {location.error && (
             <View className="mt-3 flex-row">
               <TouchableOpacity
@@ -878,58 +878,62 @@ export default function BusinessRegistrationScreen({ navigation }) {
         </View>
 
         {/* Business Name */}
-        <View className="mb-4">
-          <Text className="text-gray-900 font-semibold mb-2">Business Name</Text>
+        <View className="mb-5">
+          <Text className="text-gray-800 font-bold mb-2 text-base">Business Name *</Text>
           <TextInput
-            className="bg-white rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
-            placeholder="Relax Restaurant"
+            className="bg-white rounded-xl px-4 py-4 text-gray-900 border border-gray-300 shadow-sm"
+            placeholder="e.g., The Coffee House"
             placeholderTextColor="#9CA3AF"
             value={formData.businessName}
             onChangeText={(value) => handleInputChange('businessName', value)}
+            style={{ fontSize: 15, fontWeight: '500' }}
           />
         </View>
 
         {/* First Name & Last Name */}
-        <View className="flex-row mb-4">
+        <View className="flex-row mb-5">
           <View className="flex-1 mr-2">
-            <Text className="text-gray-900 font-semibold mb-2">First Name</Text>
+            <Text className="text-gray-800 font-bold mb-2 text-base">First Name *</Text>
             <TextInput
-              className="bg-white rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
-              placeholder="Enter First Name"
+              className="bg-white rounded-xl px-4 py-4 text-gray-900 border border-gray-300 shadow-sm"
+              placeholder="John"
               placeholderTextColor="#9CA3AF"
               value={formData.firstName}
               onChangeText={(value) => handleInputChange('firstName', value)}
+              style={{ fontSize: 15, fontWeight: '500' }}
             />
           </View>
           <View className="flex-1 ml-2">
-            <Text className="text-gray-900 font-semibold mb-2">Last Name</Text>
+            <Text className="text-gray-800 font-bold mb-2 text-base">Last Name *</Text>
             <TextInput
-              className="bg-white rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
-              placeholder="Enter Last Name"
+              className="bg-white rounded-xl px-4 py-4 text-gray-900 border border-gray-300 shadow-sm"
+              placeholder="Smith"
               placeholderTextColor="#9CA3AF"
               value={formData.lastName}
               onChangeText={(value) => handleInputChange('lastName', value)}
+              style={{ fontSize: 15, fontWeight: '500' }}
             />
           </View>
         </View>
 
         {/* Email */}
-        <View className="mb-4">
-          <Text className="text-gray-900 font-semibold mb-2">Email</Text>
+        <View className="mb-5">
+          <Text className="text-gray-800 font-bold mb-2 text-base">Email Address *</Text>
           <TextInput
-            className="bg-white rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
-            placeholder="Enter Valid Email Address"
+            className="bg-white rounded-xl px-4 py-4 text-gray-900 border border-gray-300 shadow-sm"
+            placeholder="john.smith@example.com"
             placeholderTextColor="#9CA3AF"
             keyboardType="email-address"
             autoCapitalize="none"
             value={formData.email}
             onChangeText={(value) => handleInputChange('email', value)}
+            style={{ fontSize: 15, fontWeight: '500' }}
           />
         </View>
 
         {/* Phone Number */}
-        <View className="mb-4">
-          <Text className="text-gray-900 font-semibold mb-2">Phone Number</Text>
+        <View className="mb-5">
+          <Text className="text-gray-800 font-bold mb-2 text-base">Phone Number *</Text>
           <PhoneInput
             ref={businessPhoneInputRef}
             defaultCode="GB"
@@ -951,16 +955,21 @@ export default function BusinessRegistrationScreen({ navigation }) {
               width: '100%',
               borderRadius: 12,
               borderWidth: 1,
-              borderColor: businessPhoneError ? '#EF4444' : '#E5E7EB',
-              backgroundColor: '#F9FAFB',
+              borderColor: businessPhoneError ? '#EF4444' : '#D1D5DB',
+              backgroundColor: '#FFFFFF',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.05,
+              shadowRadius: 2,
+              elevation: 1,
             }}
             textContainerStyle={{
               backgroundColor: 'transparent',
               borderTopRightRadius: 12,
               borderBottomRightRadius: 12,
             }}
-            textInputStyle={{ color: '#111827', fontSize: 16 }}
-            codeTextStyle={{ color: '#111827' }}
+            textInputStyle={{ color: '#111827', fontSize: 15, fontWeight: '500', paddingVertical: 4 }}
+            codeTextStyle={{ color: '#111827', fontWeight: '600' }}
           />
           {businessPhoneError ? (
             <Text className="text-red-500 text-xs mt-1">{businessPhoneError}</Text>
@@ -968,21 +977,22 @@ export default function BusinessRegistrationScreen({ navigation }) {
         </View>
 
         {/* Manual Address Entry Fields - UK Format */}
-        <View className="mb-4">
-          <Text className="text-gray-900 font-semibold mb-3">Business Address (UK)</Text>
+        <View className="mb-5">
+          <Text className="text-gray-800 font-bold mb-3 text-lg">📍 Business Address</Text>
 
           {/* Search Address */}
           <View className="mb-4">
-            <Text className="text-gray-700 font-medium mb-2">Search Business Address</Text>
-            <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
-              <Icon name="search" size={20} color="#9CA3AF" />
+            <Text className="text-gray-700 font-semibold mb-2 text-sm">🔍 Search Address</Text>
+            <View className="bg-white rounded-xl border border-gray-300 flex-row items-center px-4 py-3 shadow-sm">
+              <Icon name="search" size={20} color="#6B7280" />
               <TextInput
                 className="flex-1 ml-3 text-gray-900"
-                placeholder="e.g., Quay Hotel & Spa, Deganwy LL31"
+                placeholder="e.g., Quay Hotel & Spa, Deganwy"
                 placeholderTextColor="#9CA3AF"
                 value={addressSearchQuery}
                 onChangeText={(value) => setAddressSearchQuery(value)}
                 autoCapitalize="words"
+                style={{ fontSize: 15, fontWeight: '500' }}
               />
               {searchingAddress && <ActivityIndicator size="small" color={COLORS.primary} />}
             </View>
@@ -1001,15 +1011,15 @@ export default function BusinessRegistrationScreen({ navigation }) {
               </View>
             )}
           </View>
-          
+
           {/* Building Number & Street Name */}
           <View className="flex-row mb-3">
             <View className="w-28 mr-2">
-              <Text className="text-gray-700 font-medium mb-2">Building No. (Optional)</Text>
-              <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
+              <Text className="text-gray-700 font-semibold mb-2 text-sm">Building</Text>
+              <View className="bg-white rounded-xl border border-gray-300 flex-row items-center px-3 py-3 shadow-sm">
                 <TextInput
                   className="flex-1 text-gray-900 text-center"
-                  placeholder="e.g., 12A"
+                  placeholder="12A"
                   placeholderTextColor="#9CA3AF"
                   value={formData.buildingNumber || ''}
                   onChangeText={(value) => {
@@ -1018,17 +1028,18 @@ export default function BusinessRegistrationScreen({ navigation }) {
                     updateFullAddress(updated);
                     setManualAddressDirty(true);
                   }}
+                  style={{ fontSize: 15, fontWeight: '500' }}
                 />
               </View>
             </View>
-            
+
             <View className="flex-1">
-              <Text className="text-gray-700 font-medium mb-2">Street Name *</Text>
-              <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
-                <Icon name="business" size={20} color="#9CA3AF" />
+              <Text className="text-gray-700 font-semibold mb-2 text-sm">Street Name *</Text>
+              <View className="bg-white rounded-xl border border-gray-300 flex-row items-center px-3 py-3 shadow-sm">
+                <Icon name="business" size={18} color="#6B7280" />
                 <TextInput
                   className="flex-1 ml-3 text-gray-900"
-                  placeholder="e.g., High Street, Baker Street"
+                  placeholder="High Street"
                   placeholderTextColor="#9CA3AF"
                   value={formData.street || ''}
                   onChangeText={(value) => {
@@ -1037,6 +1048,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
                     updateFullAddress(updated);
                     setManualAddressDirty(true);
                   }}
+                  style={{ fontSize: 15, fontWeight: '500' }}
                 />
               </View>
             </View>
@@ -1044,12 +1056,12 @@ export default function BusinessRegistrationScreen({ navigation }) {
 
           {/* Town/City */}
           <View className="mb-3">
-            <Text className="text-gray-700 font-medium mb-2">Town/City *</Text>
-            <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
-              <Icon name="home" size={20} color="#9CA3AF" />
+            <Text className="text-gray-700 font-semibold mb-2 text-sm">Town/City *</Text>
+            <View className="bg-white rounded-xl border border-gray-300 flex-row items-center px-3 py-3 shadow-sm">
+              <Icon name="home" size={18} color="#6B7280" />
               <TextInput
                 className="flex-1 ml-3 text-gray-900"
-                placeholder="e.g., London, Manchester, Birmingham"
+                placeholder="London"
                 placeholderTextColor="#9CA3AF"
                 value={formData.city || ''}
                 onChangeText={(value) => {
@@ -1058,6 +1070,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
                   updateFullAddress(updated);
                   setManualAddressDirty(true);
                 }}
+                style={{ fontSize: 15, fontWeight: '500' }}
               />
             </View>
           </View>
@@ -1065,12 +1078,12 @@ export default function BusinessRegistrationScreen({ navigation }) {
           {/* County & Postcode in Row */}
           <View className="flex-row mb-3">
             <View className="flex-1 mr-2">
-              <Text className="text-gray-700 font-medium mb-2">County (Optional)</Text>
-              <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
-                <Icon name="flag" size={20} color="#9CA3AF" />
+              <Text className="text-gray-700 font-semibold mb-2 text-sm">County</Text>
+              <View className="bg-white rounded-xl border border-gray-300 flex-row items-center px-3 py-3 shadow-sm">
+                <Icon name="flag" size={18} color="#6B7280" />
                 <TextInput
                   className="flex-1 ml-2 text-gray-900"
-                  placeholder="e.g., Greater London"
+                  placeholder="Greater London"
                   placeholderTextColor="#9CA3AF"
                   value={formData.county || ''}
                   onChangeText={(value) => {
@@ -1079,14 +1092,15 @@ export default function BusinessRegistrationScreen({ navigation }) {
                     updateFullAddress(updated);
                     setManualAddressDirty(true);
                   }}
+                  style={{ fontSize: 15, fontWeight: '500' }}
                 />
               </View>
             </View>
-            
+
             <View className="flex-1 ml-2">
-              <Text className="text-gray-700 font-medium mb-2">Postcode *</Text>
-              <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
-                <Icon name="mail" size={20} color="#9CA3AF" />
+              <Text className="text-gray-700 font-semibold mb-2 text-sm">Postcode *</Text>
+              <View className="bg-white rounded-xl border border-gray-300 flex-row items-center px-3 py-3 shadow-sm">
+                <Icon name="mail" size={18} color="#6B7280" />
                 <TextInput
                   className="flex-1 ml-2 text-gray-900"
                   placeholder="SW1A 1AA"
@@ -1101,6 +1115,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
                   }}
                   autoCapitalize="characters"
                   maxLength={8}
+                  style={{ fontSize: 15, fontWeight: '600' }}
                 />
               </View>
             </View>
@@ -1108,10 +1123,10 @@ export default function BusinessRegistrationScreen({ navigation }) {
 
           {/* Country (Read-only) */}
           <View className="mb-3">
-            <Text className="text-gray-700 font-medium mb-2">Country</Text>
-            <View className="bg-gray-100 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
-              <Icon name="globe" size={20} color="#9CA3AF" />
-              <Text className="flex-1 ml-3 text-gray-900 font-semibold">
+            <Text className="text-gray-700 font-semibold mb-2 text-sm">Country</Text>
+            <View className="bg-gray-100 rounded-xl border border-gray-300 flex-row items-center px-3 py-3">
+              <Icon name="globe" size={18} color="#6B7280" />
+              <Text className="flex-1 ml-3 text-gray-900 font-bold" style={{ fontSize: 15 }}>
                 🇬🇧 United Kingdom
               </Text>
             </View>
@@ -1119,18 +1134,19 @@ export default function BusinessRegistrationScreen({ navigation }) {
 
           {/* Landmark (Optional) */}
           <View className="mb-4">
-            <Text className="text-gray-700 font-medium mb-2">Landmark (Optional)</Text>
-            <View className="bg-gray-50 rounded-lg border border-gray-200 flex-row items-center px-3 py-3">
-              <Icon name="navigate" size={20} color="#9CA3AF" />
+            <Text className="text-gray-700 font-semibold mb-2 text-sm">Landmark (Optional)</Text>
+            <View className="bg-white rounded-xl border border-gray-300 flex-row items-center px-3 py-3 shadow-sm">
+              <Icon name="navigate" size={18} color="#6B7280" />
               <TextInput
                 className="flex-1 ml-3 text-gray-900"
-                placeholder="e.g., Near Tesco, Opposite Post Office"
+                placeholder="Near Tesco, Opposite Post Office"
                 placeholderTextColor="#9CA3AF"
                 value={formData.landmark || ''}
                 onChangeText={(value) => {
                   setFormData({ ...formData, landmark: value });
                   updateFullAddress({ ...formData, landmark: value });
                 }}
+                style={{ fontSize: 15, fontWeight: '500' }}
               />
             </View>
           </View>
@@ -1196,24 +1212,25 @@ export default function BusinessRegistrationScreen({ navigation }) {
         </View>
 
         {/* Business Description */}
-        <View className="mb-4">
-          <Text className="text-gray-900 font-semibold mb-2">Business Description</Text>
+        <View className="mb-5">
+          <Text className="text-gray-800 font-bold mb-2 text-base">Business Description *</Text>
           <TextInput
-            className="bg-white rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
-            placeholder="Short Business Description..."
+            className="bg-white rounded-xl px-4 py-4 text-gray-900 border border-gray-300 shadow-sm"
+            placeholder="Tell customers about your business..."
             placeholderTextColor="#9CA3AF"
             multiline
             numberOfLines={4}
             textAlignVertical="top"
             value={formData.description}
             onChangeText={(value) => handleInputChange('description', value)}
+            style={{ fontSize: 15, fontWeight: '500', minHeight: 100 }}
           />
         </View>
 
         {/* Logo Upload */}
-        <View className="mb-4">
-          <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-gray-900 font-semibold">Logo</Text>
+        <View className="mb-5">
+          <View className="flex-row justify-between items-center mb-3">
+            <Text className="text-gray-800 font-bold text-base">📷 Business Logo</Text>
             {uploadedImages.logo && (
               <View className="flex-row items-center bg-green-100 px-3 py-1 rounded-full">
                 <Icon name="checkmark-circle" size={16} color="#10B981" />
@@ -1228,8 +1245,8 @@ export default function BusinessRegistrationScreen({ navigation }) {
           >
             {images.logo ? (
               <View className="items-center">
-                <Image 
-                  source={{ uri: images.logo.uri }} 
+                <Image
+                  source={{ uri: images.logo.uri }}
                   className="w-24 h-24 rounded-lg"
                   resizeMode="cover"
                 />
@@ -1254,9 +1271,9 @@ export default function BusinessRegistrationScreen({ navigation }) {
         </View>
 
         {/* Business Cover Image */}
-        <View className="mb-4">
-          <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-gray-900 font-semibold">Business Cover Image</Text>
+        <View className="mb-5">
+          <View className="flex-row justify-between items-center mb-3">
+            <Text className="text-gray-800 font-bold text-base">🖼️ Cover Image</Text>
             {uploadedImages.coverImage && (
               <View className="flex-row items-center bg-green-100 px-3 py-1 rounded-full">
                 <Icon name="checkmark-circle" size={16} color="#10B981" />
@@ -1271,8 +1288,8 @@ export default function BusinessRegistrationScreen({ navigation }) {
           >
             {images.coverImage ? (
               <View className="w-full relative">
-                <Image 
-                  source={{ uri: images.coverImage.uri }} 
+                <Image
+                  source={{ uri: images.coverImage.uri }}
                   className="w-full h-32 rounded-lg"
                   resizeMode="cover"
                 />
@@ -1312,18 +1329,18 @@ export default function BusinessRegistrationScreen({ navigation }) {
               <Text className="text-xs text-gray-500">Optional</Text>
             </View>
           </View>
-          
+
           {/* Gallery Images Grid */}
           {images.gallery.length > 0 && (
             <View className="flex-row flex-wrap mb-3">
               {images.gallery.map((img, index) => {
                 const isUploaded = uploadedImages.gallery.some(uploaded => uploaded.url === img.uri || uploaded.originalUri === img.uri);
                 const isUploading = uploadStatus.gallery && !isUploaded;
-                
+
                 return (
                   <View key={index} className="relative mr-2 mb-2">
-                    <Image 
-                      source={{ uri: img.uri }} 
+                    <Image
+                      source={{ uri: img.uri }}
                       className="w-20 h-20 rounded-lg"
                       resizeMode="cover"
                     />
@@ -1416,7 +1433,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
           {Object.keys(openHours).map((day) => (
             <View key={day} className="flex-row items-center justify-between mb-3">
               <Text className="text-gray-900 w-24 capitalize">{day}:</Text>
-              
+
               <View className="flex-row flex-1">
                 <View className="flex-1 mr-2 bg-white rounded-xl border border-gray-200">
                   <Picker
@@ -1509,7 +1526,24 @@ export default function BusinessRegistrationScreen({ navigation }) {
             loading: false,
             error: null
           });
-          setFormData(prev => ({ ...prev, address: selectedLocation.address }));
+
+          // Auto-fill address fields if components are available
+          if (selectedLocation.addressComponents) {
+            const { buildingNumber, street, city, county, postcode, country } = selectedLocation.addressComponents;
+            setFormData(prev => ({
+              ...prev,
+              address: selectedLocation.address,
+              buildingNumber: buildingNumber || prev.buildingNumber,
+              street: street || prev.street,
+              city: city || prev.city,
+              county: county || prev.county,
+              postcode: postcode || prev.postcode,
+              country: country || prev.country
+            }));
+          } else {
+            setFormData(prev => ({ ...prev, address: selectedLocation.address }));
+          }
+
           setAddressSearchQuery(selectedLocation.address);
           console.log('✅ Location selected:', selectedLocation);
         }}
