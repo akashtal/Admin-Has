@@ -19,11 +19,13 @@ export default {
       bundleIdentifier: "com.hashview.app",
       infoPlist: {
         NSLocationWhenInUseUsageDescription:
-          "HashView needs your location to show nearby businesses and verify reviews.",
+          "HashView needs your location to verify you are physically present at a business when posting a review (Geofencing) and to find nearby businesses.",
         NSLocationAlwaysUsageDescription:
-          "HashView uses your location to provide accurate business information.",
-        NSCameraUsageDescription: "HashView needs camera access to scan QR codes and upload photos.",
-        NSPhotoLibraryUsageDescription: "HashView needs access to your photo library to upload images.",
+          "HashView needs your location to notify you of nearby business offers even when the app is closed.",
+        NSCameraUsageDescription:
+          "HashView needs camera access to capture and upload photos of businesses, products, or reviews, and to scan QR codes.",
+        NSPhotoLibraryUsageDescription:
+          "HashView needs access to your photo library to let you select and upload photos for business listings, products, or user reviews.",
         ITSAppUsesNonExemptEncryption: false
       },
       buildNumber: "5"
@@ -54,22 +56,35 @@ export default {
     plugins: [
       "expo-dev-client",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0",
+            "extraGradleProps": {
+              "ndkVersion": "27.0.12077973"
+            }
+          }
+        }
+      ],
+      [
         "expo-location",
         {
-          locationAlwaysAndWhenInUsePermission: "Allow HashView to use your location."
+          locationAlwaysAndWhenInUsePermission: "Allow HashView to use your location to find nearby businesses and verify reviews."
         }
       ],
       "expo-notifications",
       [
         "expo-image-picker",
         {
-          photosPermission: "Allow HashView to access your photos."
+          photosPermission: "Allow HashView to access your photos to select images for business listings or reviews."
         }
       ],
       [
         "expo-camera",
         {
-          cameraPermission: "Allow HashView to access your camera."
+          cameraPermission: "Allow HashView to access your camera to capture photos for listings and scan QR codes."
         }
       ],
       "expo-font",

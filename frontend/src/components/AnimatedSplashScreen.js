@@ -14,7 +14,7 @@ import * as SplashScreen from 'expo-splash-screen';
 const { width, height } = Dimensions.get('window');
 
 // Keep splash screen visible while we prepare the app
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(console.warn);
 
 export default function AnimatedSplashScreen({ onAnimationComplete }) {
   const logoScale = useSharedValue(0);
@@ -73,7 +73,7 @@ export default function AnimatedSplashScreen({ onAnimationComplete }) {
         easing: Easing.ease,
       });
       setTimeout(() => {
-        SplashScreen.hideAsync();
+        SplashScreen.hideAsync().catch(console.warn);
         if (onAnimationComplete) {
           onAnimationComplete();
         }
@@ -148,7 +148,7 @@ export default function AnimatedSplashScreen({ onAnimationComplete }) {
   return (
     <Animated.View style={[styles.container, containerAnimatedStyle]}>
       <View style={styles.background} />
-      
+
       {/* White Circle */}
       <Animated.View style={[styles.whiteCircle, circleAnimatedStyle]}>
         {/* Hashtag Logo */}
@@ -160,7 +160,7 @@ export default function AnimatedSplashScreen({ onAnimationComplete }) {
             {/* Horizontal bars */}
             <View style={[styles.bar, styles.barHorizontal, styles.barTop]} />
             <View style={[styles.bar, styles.barHorizontal, styles.barBottom]} />
-            
+
             {/* Inner pattern lines */}
             <View style={styles.patternContainer}>
               <View style={[styles.patternLine, { top: 10, left: 15, transform: [{ rotate: '45deg' }] }]} />

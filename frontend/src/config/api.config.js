@@ -10,7 +10,7 @@ export const API_CONFIG = {
   SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || 'https://hashview-backend.onrender.com',
   //SOCKET_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.161.95.239:5000',
   // Request timeout in milliseconds
-  TIMEOUT: parseInt(process.env.EXPO_PUBLIC_API_TIMEOUT || '30000', 10),
+  TIMEOUT: parseInt(process.env.EXPO_PUBLIC_API_TIMEOUT || '60000', 10),
 
   // API Endpoints
   ENDPOINTS: {

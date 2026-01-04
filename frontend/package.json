@@ -31,6 +31,7 @@
     "expo": "~51.0.39",
     "expo-asset": "~10.0.0",
     "expo-barcode-scanner": "~13.0.0",
+    "expo-build-properties": "~0.12.5",
     "expo-camera": "~15.0.0",
     "expo-constants": "~16.0.0",
     "expo-dev-client": "~4.0.0",
@@ -69,6 +70,7 @@
   "devDependencies": {
     "@babel/core": "^7.24.0",
     "@types/react": "~18.2.79",
+    "eas-cli": "^16.28.0",
     "expo-module-scripts": "^5.0.7",
     "patch-package": "^8.0.1",
     "postcss": "^8.5.6",
