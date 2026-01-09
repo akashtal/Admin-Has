@@ -105,9 +105,11 @@ export default function UserHomeScreen({ navigation }) {
 
   useEffect(() => {
     initializeScreen();
-    fetchUnreadNotifications();
+    if (user && !user.isGuest) {
+      fetchUnreadNotifications();
+    }
     loadCategories();
-  }, []);
+  }, [user]);
 
   const initializeScreen = async () => {
     dispatch(getAllActiveBusinesses());
@@ -390,7 +392,7 @@ export default function UserHomeScreen({ navigation }) {
 
             {/* Distance badge */}
             {item.distance !== undefined && item.distance > 0 && (
-              <View className="absolute top-2 left-2 bg-white/90 rounded-full px-2 py-0.5 flex-row items-center shadow border border-gray-100">
+              <View className="absolute top-2 left-2 bg-white rounded-full px-2 py-0.5 flex-row items-center shadow border border-gray-100">
                 <Icon name="navigate" size={11} color={COLORS.secondary} />
                 <Text className="text-gray-800 font-semibold text-[10px] ml-1">
                   {item.distance < 1
@@ -449,7 +451,7 @@ export default function UserHomeScreen({ navigation }) {
         <View className="flex-row justify-between items-center mb-4">
           <View className="flex-1">
             <Text className="text-white text-2xl font-bold">
-              Hi {user?.name.split(' ')[0]} 👋
+              Hi {user?.name ? user.name.split(' ')[0] : 'Guest'} 👋
             </Text>
             <Text className="text-white/80 text-[13px] mt-0.5">
               Discover amazing businesses
@@ -457,26 +459,28 @@ export default function UserHomeScreen({ navigation }) {
           </View>
 
           <View className="flex-row gap-2.5">
-            {/* Notifications Bell */}
-            <TouchableOpacity
-              onPress={() => {
-                navigation.navigate('Notifications');
-                setUnreadNotifications(0);
-              }}
-              activeOpacity={0.7}
-              className="relative"
-            >
-              <View className="bg-white rounded-full w-11 h-11 items-center justify-center shadow-md">
-                <Icon name="notifications-outline" size={20} color={COLORS.primary} />
-                {unreadNotifications > 0 && (
-                  <View className="absolute -top-1 -right-1 bg-red-500 rounded-full min-w-[20px] h-5 items-center justify-center px-1.5 border-2 border-white">
-                    <Text className="text-white text-[11px] font-bold">
-                      {unreadNotifications > 99 ? '99+' : unreadNotifications}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
+            {/* Notifications Bell - Hide for Guest */}
+            {user?.name && !user?.isGuest && (
+              <TouchableOpacity
+                onPress={() => {
+                  navigation.navigate('Notifications');
+                  setUnreadNotifications(0);
+                }}
+                activeOpacity={0.7}
+                className="relative"
+              >
+                <View className="bg-white rounded-full w-11 h-11 items-center justify-center shadow-md">
+                  <Icon name="notifications-outline" size={20} color={COLORS.primary} />
+                  {unreadNotifications > 0 && (
+                    <View className="absolute -top-1 -right-1 bg-red-500 rounded-full min-w-[20px] h-5 items-center justify-center px-1.5 border-2 border-white">
+                      <Text className="text-white text-[11px] font-bold">
+                        {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            )}
 
             {/* Filter Button */}
             <TouchableOpacity

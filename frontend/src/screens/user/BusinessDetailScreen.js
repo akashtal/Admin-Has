@@ -15,6 +15,7 @@ export default function BusinessDetailScreen({ navigation, route }) {
   const { businessId, business, fromQR } = route.params || {};
   const { selectedBusiness, loading } = useSelector((state) => state.business);
   const { reviews } = useSelector((state) => state.review);
+  const { user } = useSelector((state) => state.auth);
   const [qrBusiness, setQrBusiness] = useState(null);
   const [activeTab, setActiveTab] = useState('reviews');
   const [isFavorite, setIsFavorite] = useState(false);
@@ -40,7 +41,7 @@ export default function BusinessDetailScreen({ navigation, route }) {
       setLoadingUpdates(true);
       const response = await fetch(`${API_CONFIG.BASE_URL}/business/${busId}/updates`);
       const data = await response.json();
-      
+
       if (data.success) {
         setUpdates(data.updates || []);
       }
@@ -130,7 +131,7 @@ export default function BusinessDetailScreen({ navigation, route }) {
   return (
     <View className="flex-1 bg-white">
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
+
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {/* Hero Image/Cover - Full Screen */}
         <View className="relative h-[350px]">
@@ -156,7 +157,7 @@ export default function BusinessDetailScreen({ navigation, route }) {
               <Icon name="business" size={80} color="rgba(255,255,255,0.3)" />
             </LinearGradient>
           )}
-          
+
           {/* Back Button */}
           <View className="absolute top-12 left-5">
             <TouchableOpacity
@@ -166,13 +167,13 @@ export default function BusinessDetailScreen({ navigation, route }) {
               <Icon name="arrow-back" size={26} color="#111" />
             </TouchableOpacity>
           </View>
-          
+
           {/* Gallery Thumbnails */}
           {displayBusiness.images && displayBusiness.images.length > 0 && (
             <View className="absolute bottom-5 left-0 right-0">
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false} 
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ paddingHorizontal: 20, gap: 10 }}
               >
                 {displayBusiness.images.map((img, index) => (
@@ -217,7 +218,7 @@ export default function BusinessDetailScreen({ navigation, route }) {
                 />
               </View>
             )}
-            
+
             <View className="flex-1">
               <Text className="text-2xl font-bold text-gray-900 mb-1.5">
                 {displayBusiness.name}
@@ -229,7 +230,7 @@ export default function BusinessDetailScreen({ navigation, route }) {
                 </Text>
               </View>
             </View>
-            
+
             <View className="items-center">
               <LinearGradient
                 colors={['#FFF9E6', '#FFF4CC']}
@@ -250,18 +251,18 @@ export default function BusinessDetailScreen({ navigation, route }) {
           <View className="flex-row items-center mb-4 flex-wrap gap-2">
             {/* Open/Closed Status */}
             {displayBusiness.openStatus && (
-              <View 
+              <View
                 className="flex-row items-center px-3 py-1.5 rounded-full border"
                 style={{
                   backgroundColor: displayBusiness.isOpenNow ? '#ECFDF5' : '#FEF2F2',
                   borderColor: displayBusiness.isOpenNow ? '#10B981' : '#EF4444'
                 }}
               >
-                <View 
+                <View
                   className="w-1.5 h-1.5 rounded-full mr-1.5"
                   style={{ backgroundColor: displayBusiness.isOpenNow ? '#10B981' : '#EF4444' }}
                 />
-                <Text 
+                <Text
                   className="text-xs font-semibold"
                   style={{ color: displayBusiness.isOpenNow ? '#10B981' : '#EF4444' }}
                 >
@@ -269,14 +270,14 @@ export default function BusinessDetailScreen({ navigation, route }) {
                 </Text>
               </View>
             )}
-            
+
             {/* Category Badge */}
             <View className="bg-[#FFF9F0] px-3 py-1.5 rounded-full">
               <Text className="text-xs font-semibold capitalize" style={{ color: COLORS.secondary }}>
                 {displayBusiness.category}
               </Text>
             </View>
-            
+
             {/* Review Count */}
             {displayBusiness.rating?.count > 0 && (
               <View className="bg-gray-100 px-3 py-1.5 rounded-full flex-row items-center">
@@ -327,7 +328,7 @@ export default function BusinessDetailScreen({ navigation, route }) {
               >
                 <View className="flex-row items-center">
                   <View className="bg-white w-5 h-5 rounded-full items-center justify-center mr-1.5">
-                    <Image 
+                    <Image
                       source={require('../../../assets/tripadvisor.png')}
                       className="w-3 h-3"
                       resizeMode="contain"
@@ -381,11 +382,11 @@ export default function BusinessDetailScreen({ navigation, route }) {
                     Opening Hours
                   </Text>
                   <View className="flex-row items-center">
-                    <View 
+                    <View
                       className="w-2 h-2 rounded-full mr-2"
                       style={{ backgroundColor: displayBusiness.isOpenNow ? '#10B981' : '#EF4444' }}
                     />
-                    <Text 
+                    <Text
                       className="text-sm font-semibold"
                       style={{ color: displayBusiness.isOpenNow ? '#10B981' : '#EF4444' }}
                     >
@@ -414,12 +415,12 @@ export default function BusinessDetailScreen({ navigation, route }) {
                 style={{ borderBottomColor: activeTab === tab.key ? COLORS.secondary : 'transparent' }}
               >
                 <View className="flex-row items-center">
-                  <Icon 
-                    name={tab.icon} 
-                    size={18} 
-                    color={activeTab === tab.key ? COLORS.secondary : '#9CA3AF'} 
+                  <Icon
+                    name={tab.icon}
+                    size={18}
+                    color={activeTab === tab.key ? COLORS.secondary : '#9CA3AF'}
                   />
-                  <Text 
+                  <Text
                     className={`ml-1.5 text-sm ${activeTab === tab.key ? 'font-bold' : 'font-semibold'}`}
                     style={{ color: activeTab === tab.key ? COLORS.secondary : '#6B7280' }}
                   >
@@ -495,7 +496,7 @@ export default function BusinessDetailScreen({ navigation, route }) {
                         </Text>
                       </View>
                     </View>
-                    
+
                     {/* Review Text */}
                     <Text className="text-[15px] text-gray-600 leading-5 mb-3">
                       {review.comment}
@@ -503,9 +504,9 @@ export default function BusinessDetailScreen({ navigation, route }) {
 
                     {/* Review Photos */}
                     {review.images && review.images.length > 0 && (
-                      <ScrollView 
-                        horizontal 
-                        showsHorizontalScrollIndicator={false} 
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
                         className="mb-2"
                         contentContainerStyle={{ gap: 8 }}
                       >
@@ -523,14 +524,14 @@ export default function BusinessDetailScreen({ navigation, route }) {
 
                     {/* Review Videos */}
                     {review.videos && review.videos.length > 0 && (
-                      <ScrollView 
-                        horizontal 
+                      <ScrollView
+                        horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={{ gap: 8 }}
                       >
                         {review.videos.map((video, idx) => (
-                          <TouchableOpacity 
-                            key={idx} 
+                          <TouchableOpacity
+                            key={idx}
                             activeOpacity={0.8}
                             className="w-24 h-24 rounded-xl bg-gray-800 items-center justify-center overflow-hidden"
                           >
@@ -590,7 +591,7 @@ export default function BusinessDetailScreen({ navigation, route }) {
                           className="absolute bottom-0 left-0 right-0 h-20"
                         />
                         {/* Type Badge on Image */}
-                        <View 
+                        <View
                           className="absolute top-4 right-4 rounded-full px-3.5 py-2 flex-row items-center shadow-md"
                           style={{ backgroundColor: update.type === 'offer' ? COLORS.secondary : COLORS.primary }}
                         >
@@ -601,12 +602,12 @@ export default function BusinessDetailScreen({ navigation, route }) {
                         </View>
                       </View>
                     )}
-                    
+
                     <View className="p-5">
                       {/* Date Badge if no image */}
                       {!update.image?.url && (
                         <View className="flex-row justify-between items-center mb-3">
-                          <View 
+                          <View
                             className="rounded-full px-3.5 py-2 flex-row items-center"
                             style={{ backgroundColor: update.type === 'offer' ? COLORS.secondary : COLORS.primary }}
                           >
@@ -710,8 +711,8 @@ export default function BusinessDetailScreen({ navigation, route }) {
               {displayBusiness.images && displayBusiness.images.length > 0 ? (
                 <View className="flex-row flex-wrap -mx-1.5">
                   {displayBusiness.images.map((img, index) => (
-                    <View 
-                      key={index} 
+                    <View
+                      key={index}
                       className="w-1/2 px-1.5 mb-3"
                     >
                       <TouchableOpacity
@@ -742,29 +743,31 @@ export default function BusinessDetailScreen({ navigation, route }) {
         </View>
       </ScrollView>
 
-      {/* Fixed Bottom Button */}
-      <View className="bg-white px-5 pt-4 pb-5 border-t border-gray-100 shadow-2xl">
-        <TouchableOpacity
-          onPress={handleAddReview}
-          activeOpacity={0.85}
-          className="shadow-xl"
-        >
-          <LinearGradient
-            colors={[COLORS.secondary, COLORS.secondaryDark]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            className="rounded-2xl py-4 items-center flex-row justify-center border border-white/20"
+      {/* Fixed Bottom Button - Hide for Guest */}
+      {(!user?.isGuest && user?.role !== 'guest') && (
+        <View className="bg-white px-5 pt-4 pb-5 border-t border-gray-100 shadow-2xl">
+          <TouchableOpacity
+            onPress={handleAddReview}
+            activeOpacity={0.85}
+            className="shadow-xl"
           >
-            <View className="bg-white/20 w-9 h-9 rounded-full items-center justify-center mr-3">
-              <Icon name="star" size={20} color="#FFF" />
-            </View>
-            <Text className="text-white text-[17px] font-bold tracking-wide">
-              Write a Review
-            </Text>
-            <Icon name="arrow-forward" size={20} color="#FFF" style={{ marginLeft: 8, opacity: 0.8 }} />
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+            <LinearGradient
+              colors={[COLORS.secondary, COLORS.secondaryDark]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              className="rounded-2xl py-4 items-center flex-row justify-center border border-white/20"
+            >
+              <View className="bg-white/20 w-9 h-9 rounded-full items-center justify-center mr-3">
+                <Icon name="star" size={20} color="#FFF" />
+              </View>
+              <Text className="text-white text-[17px] font-bold tracking-wide">
+                Write a Review
+              </Text>
+              <Icon name="arrow-forward" size={20} color="#FFF" style={{ marginLeft: 8, opacity: 0.8 }} />
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Image Viewer Modal */}
       <Modal

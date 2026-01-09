@@ -75,7 +75,7 @@ export default function SettingsScreen({ navigation }) {
               const keys = await AsyncStorage.getAllKeys();
               const cacheKeys = keys.filter(key => key.startsWith('cache_'));
               await AsyncStorage.multiRemove(cacheKeys);
-              
+
               showMessage({
                 message: 'Cache Cleared',
                 description: 'All cached data has been cleared',
@@ -112,15 +112,15 @@ export default function SettingsScreen({ navigation }) {
               autoSync: true,
               dataUsage: 'wifi',
             };
-            
+
             setSettings(defaultSettings);
-            
+
             // Clear all setting keys from AsyncStorage
             try {
               const keys = await AsyncStorage.getAllKeys();
               const settingKeys = keys.filter(key => key.startsWith('setting_'));
               await AsyncStorage.multiRemove(settingKeys);
-              
+
               showMessage({
                 message: 'Settings Reset',
                 description: 'All settings have been reset to default',
@@ -139,7 +139,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const openPrivacyPolicy = () => {
-    Linking.openURL('https://hashview.com/privacy-policy');
+    Linking.openURL('https://www.hashview.co.uk/privacy');
   };
 
   const openTermsOfService = () => {
@@ -149,7 +149,7 @@ export default function SettingsScreen({ navigation }) {
   return (
     <View className="flex-1 bg-gray-50">
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-      
+
       {/* Header */}
       <LinearGradient
         colors={[COLORS.primary, COLORS.primaryDark]}

@@ -28,7 +28,7 @@ export default {
           "HashView needs access to your photo library to let you select and upload photos for business listings, products, or user reviews.",
         ITSAppUsesNonExemptEncryption: false
       },
-      buildNumber: "5"
+      buildNumber: "6"
     },
 
     android: {

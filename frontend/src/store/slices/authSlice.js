@@ -8,9 +8,44 @@ export const login = createAsyncThunk(
   async (credentials, { rejectWithValue }) => {
     try {
       const response = await ApiService.login(credentials);
+
+      // Validate Role match
+      // If the user requested a specific role (and it's not admin), ensure the response matches
+      if (
+        credentials.role &&
+        response.user.role !== 'admin' &&
+        response.user.role !== credentials.role
+      ) {
+        throw new Error(
+          `Wrong account type. This is a ${response.user.role} account. Please login from the ${response.user.role} section.`
+        );
+      }
+
       await AsyncStorage.setItem('token', response.token);
       await AsyncStorage.setItem('user', JSON.stringify(response.user));
       return response;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const loginAsGuest = createAsyncThunk(
+  'auth/loginAsGuest',
+  async (_, { rejectWithValue }) => {
+    try {
+      const guestUser = {
+        _id: 'guest-user-id',
+        name: 'Guest User',
+        email: 'guest@hashview.app',
+        role: 'guest',
+        isGuest: true
+      };
+
+      return {
+        user: guestUser,
+        token: 'guest-token'
+      };
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -62,7 +97,7 @@ export const loadUser = createAsyncThunk(
         throw new Error('No token found');
       }
       const response = await ApiService.getMe();
-      return response;
+      return { user: response.user, token };
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -102,6 +137,13 @@ const authSlice = createSlice({
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+      // Login as Guest
+      .addCase(loginAsGuest.fulfilled, (state, action) => {
+        state.loading = false;
+        state.isAuthenticated = true;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
       })
       // Register
       .addCase(register.pending, (state) => {
@@ -147,6 +189,7 @@ const authSlice = createSlice({
         state.loading = false;
         state.isAuthenticated = true;
         state.user = action.payload.user;
+        state.token = action.payload.token;
       })
       .addCase(loadUser.rejected, (state) => {
         state.loading = false;

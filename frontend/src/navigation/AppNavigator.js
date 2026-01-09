@@ -18,9 +18,15 @@ export default function AppNavigator() {
     let isMounted = true;
     const initializeApp = async () => {
       try {
-        await dispatch(loadUser()).unwrap();
+        // Race between loadUser and a timeout
+        const loadUserPromise = dispatch(loadUser()).unwrap();
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Initialization timeout')), 15000)
+        );
+
+        await Promise.race([loadUserPromise, timeoutPromise]);
       } catch (error) {
-        console.log('No user logged in');
+        console.log('Initialization failed or timed out:', error);
       } finally {
         if (isMounted) {
           setIsReady(true);

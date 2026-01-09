@@ -61,8 +61,10 @@ export default function EditProfileScreen({ navigation }) {
       newErrors.email = 'Please enter a valid email';
     }
 
-    if (!formData.phone || !/^[0-9]{10,15}$/.test(formData.phone)) {
-      newErrors.phone = 'Phone number must be 10-15 digits';
+    if (Platform.OS !== 'ios') {
+      if (!formData.phone || !/^[0-9]{10,15}$/.test(formData.phone)) {
+        newErrors.phone = 'Phone number must be 10-15 digits';
+      }
     }
 
     setErrors(newErrors);
@@ -80,7 +82,7 @@ export default function EditProfileScreen({ navigation }) {
 
       if (!result.canceled) {
         setUploading(true);
-        
+
         // Create FormData for image upload
         const imageData = new FormData();
         imageData.append('profileImage', {
@@ -91,9 +93,9 @@ export default function EditProfileScreen({ navigation }) {
 
         // Upload image
         const uploadResponse = await ApiService.uploadProfileImage(imageData);
-        
+
         const newImageUrl = uploadResponse.url;
-        
+
         setFormData({
           ...formData,
           profileImage: newImageUrl,
@@ -155,7 +157,7 @@ export default function EditProfileScreen({ navigation }) {
       });
 
       setLoading(false);
-      
+
       // Navigate back after short delay
       setTimeout(() => {
         navigation.goBack();
@@ -175,7 +177,7 @@ export default function EditProfileScreen({ navigation }) {
   return (
     <View className="flex-1 bg-gray-50">
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-      
+
       {/* Header */}
       <LinearGradient
         colors={[COLORS.primary, COLORS.primaryDark]}
@@ -243,7 +245,7 @@ export default function EditProfileScreen({ navigation }) {
                   )}
                 </View>
               </TouchableOpacity>
-              
+
               <Text className="text-gray-500 text-sm mt-3">
                 Tap to change profile picture
               </Text>
@@ -302,27 +304,29 @@ export default function EditProfileScreen({ navigation }) {
           </View>
 
           {/* Phone Field */}
-          <View className="mb-4">
-            <Text className="text-sm font-medium text-gray-700 mb-2">Phone Number</Text>
-            <View className="flex-row items-center border border-gray-300 rounded-xl px-4 py-3 bg-gray-50">
-              <Icon name="call-outline" size={20} color="#9CA3AF" />
-              <TextInput
-                className="flex-1 ml-3 text-base text-gray-900"
-                placeholder="Enter your phone number"
-                value={formData.phone}
-                onChangeText={(text) => {
-                  setFormData({ ...formData, phone: text.replace(/[^0-9]/g, '') });
-                  if (errors.phone) setErrors({ ...errors, phone: null });
-                }}
-                keyboardType="phone-pad"
-                maxLength={15}
-                editable={!loading}
-              />
+          {Platform.OS !== 'ios' && (
+            <View className="mb-4">
+              <Text className="text-sm font-medium text-gray-700 mb-2">Phone Number</Text>
+              <View className="flex-row items-center border border-gray-300 rounded-xl px-4 py-3 bg-gray-50">
+                <Icon name="call-outline" size={20} color="#9CA3AF" />
+                <TextInput
+                  className="flex-1 ml-3 text-base text-gray-900"
+                  placeholder="Enter your phone number"
+                  value={formData.phone}
+                  onChangeText={(text) => {
+                    setFormData({ ...formData, phone: text.replace(/[^0-9]/g, '') });
+                    if (errors.phone) setErrors({ ...errors, phone: null });
+                  }}
+                  keyboardType="phone-pad"
+                  maxLength={15}
+                  editable={!loading}
+                />
+              </View>
+              {errors.phone && (
+                <Text className="text-red-500 text-xs mt-1 ml-2">{errors.phone}</Text>
+              )}
             </View>
-            {errors.phone && (
-              <Text className="text-red-500 text-xs mt-1 ml-2">{errors.phone}</Text>
-            )}
-          </View>
+          )}
 
           {/* Account Type (Read-only) */}
           <View className="mb-2">
@@ -361,7 +365,7 @@ export default function EditProfileScreen({ navigation }) {
                 </View>
                 <Text className="text-sm text-gray-500 mt-1 ml-7">{user?.email}</Text>
               </View>
-              
+
               {user?.emailVerified ? (
                 <View className="flex-row items-center">
                   <Icon name="checkmark-circle" size={20} color="#10B981" />
@@ -414,7 +418,7 @@ export default function EditProfileScreen({ navigation }) {
           <Text className="text-lg font-bold text-gray-900 mb-4">
             Account Information
           </Text>
-          
+
           <View className="flex-row justify-between items-center mb-3">
             <Text className="text-gray-600">Member Since</Text>
             <Text className="text-gray-900 font-medium">

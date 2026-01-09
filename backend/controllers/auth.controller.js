@@ -15,11 +15,11 @@ const emailOtpStore = new Map();
 // @access  Public
 exports.register = async (req, res, next) => {
   try {
-    const { 
-      name, 
-      email, 
-      phone, 
-      password, 
+    const {
+      name,
+      email,
+      phone,
+      password,
       role,
       address: addressInput,
       buildingNumber,
@@ -33,12 +33,12 @@ exports.register = async (req, res, next) => {
       landmark
     } = req.body;
 
-    console.log('\n📝 Registration attempt:', { 
-      name, 
-      email, 
-      phone, 
+    console.log('\n📝 Registration attempt:', {
+      name,
+      email,
+      phone,
       phoneLength: phone?.length,
-      role 
+      role
     });
 
     // Prevent admin registration through API
@@ -52,15 +52,15 @@ exports.register = async (req, res, next) => {
     // Validate role
     const allowedRoles = ['customer', 'business'];
     const userRole = role && allowedRoles.includes(role) ? role : 'customer';
-    
+
     console.log(`\n📋 Registration Role Check:`);
     console.log(`   - Requested role: ${role}`);
     console.log(`   - Final userRole: ${userRole}`);
 
     // Check if email is suspended
-    const suspendedAccount = await SuspendedAccount.findOne({ 
-      email: email.toLowerCase(), 
-      status: 'suspended' 
+    const suspendedAccount = await SuspendedAccount.findOne({
+      email: email.toLowerCase(),
+      status: 'suspended'
     });
 
     if (suspendedAccount) {
@@ -75,7 +75,7 @@ exports.register = async (req, res, next) => {
     // Check if email exists in SAME ROLE collection only (allow same email for different roles)
     console.log(`\n📧 Email Validation for role: ${userRole}`);
     const normalizedEmail = email.toLowerCase();
-    
+
     if (userRole === 'business') {
       // Check if email already exists as business owner (SAME ROLE - BLOCK)
       const existingBusinessOwnerByEmail = await BusinessOwner.findOne({ email: normalizedEmail });
@@ -116,7 +116,7 @@ exports.register = async (req, res, next) => {
 
     // Check if phone exists in SAME ROLE collection only (allow same phone for different roles)
     console.log(`\n📱 Phone Validation for role: ${userRole}`);
-    
+
     if (userRole === 'business') {
       // Check if phone already exists as business owner (SAME ROLE - BLOCK duplicate)
       const existingBusinessOwnerByPhone = await BusinessOwner.findOne({ phone });
@@ -269,7 +269,7 @@ exports.register = async (req, res, next) => {
 
       user = await BusinessOwner.create(businessOwnerData);
       console.log('✅ Business owner created successfully:', user._id);
-      
+
       // Generate token with userType to identify collection
       token = generateToken(user._id, 'business');
     } else {
@@ -297,7 +297,7 @@ exports.register = async (req, res, next) => {
 
       user = await User.create(userCreatePayload);
       console.log('✅ Customer created successfully:', user._id);
-      
+
       // Generate token with userType
       token = generateToken(user._id, 'customer');
     }
@@ -365,7 +365,7 @@ exports.login = async (req, res, next) => {
     } else {
       // Try User collection first (customer or admin)
       user = await User.findOne({ email }).select('+passwordHash');
-      
+
       if (user) {
         userType = user.role === 'admin' ? 'admin' : 'customer';
         console.log(`✅ Found ${userType} account for ${email}`);
@@ -387,9 +387,9 @@ exports.login = async (req, res, next) => {
     }
 
     // Check if email is suspended
-    const suspendedAccount = await SuspendedAccount.findOne({ 
-      email: email.toLowerCase(), 
-      status: 'suspended' 
+    const suspendedAccount = await SuspendedAccount.findOne({
+      email: email.toLowerCase(),
+      status: 'suspended'
     });
 
     if (suspendedAccount) {
@@ -403,7 +403,7 @@ exports.login = async (req, res, next) => {
 
     // Check password
     const isPasswordMatch = await user.comparePassword(password);
-    
+
     if (!isPasswordMatch) {
       return res.status(401).json({
         success: false,
@@ -486,7 +486,7 @@ exports.loginWithPhone = async (req, res, next) => {
 
     // Verify OTP
     const storedOTP = otpStore.get(phone);
-    
+
     if (!storedOTP) {
       return res.status(400).json({
         success: false,
@@ -512,14 +512,14 @@ exports.loginWithPhone = async (req, res, next) => {
     // Find user in both collections
     let user = await User.findOne({ phone });
     let userType = 'customer';
-    
+
     if (!user) {
       user = await BusinessOwner.findOne({ phone });
       if (user) {
         userType = 'business';
       }
     }
-    
+
     if (!user) {
       // Create new customer with phone
       user = await User.create({
@@ -571,7 +571,7 @@ exports.forgotPassword = async (req, res, next) => {
     const { email } = req.body;
 
     const user = await User.findOne({ email });
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -736,10 +736,10 @@ exports.sendEmailOTP = async (req, res, next) => {
       expiresAt: Date.now() + 10 * 60 * 1000
     });
 
-    // Send OTP via Email (Brevo API or SMTP)
-    const emailConfigured = process.env.BREVO_API_KEY || 
-                           (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
-    
+    // Send OTP via Email (SendGrid API or SMTP)
+    const emailConfigured = process.env.SENDGRID_API_KEY ||
+      (process.env.SMTP_USER && process.env.SMTP_PASS);
+
     if (emailConfigured) {
       try {
         await sendOTPEmail(normalizedEmail, otp);
@@ -793,7 +793,7 @@ exports.verifyEmailOTP = async (req, res, next) => {
 
     // Verify OTP
     const storedOTP = emailOtpStore.get(normalizedEmail);
-    
+
     if (!storedOTP) {
       console.log(`❌ No OTP found for email: ${normalizedEmail}\n`);
       return res.status(400).json({
@@ -871,7 +871,7 @@ exports.resetPasswordWithOTP = async (req, res, next) => {
 
     // Check if email was verified via OTP
     const verificationRecord = emailOtpStore.get(`verified_${normalizedEmail}`);
-    
+
     if (!verificationRecord) {
       return res.status(400).json({
         success: false,
@@ -890,14 +890,14 @@ exports.resetPasswordWithOTP = async (req, res, next) => {
     // Find user in both collections
     let user = await User.findOne({ email: normalizedEmail }).select('+passwordHash');
     let userType = 'customer';
-    
+
     if (!user) {
       user = await BusinessOwner.findOne({ email: normalizedEmail }).select('+passwordHash');
       if (user) {
         userType = 'business';
       }
     }
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,

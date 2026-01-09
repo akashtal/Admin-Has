@@ -58,19 +58,13 @@ export default function LoginScreen({ navigation, route }) {
         ...formData,
         role: role  // Add the role from route params
       };
-      
+
       const result = await dispatch(login(loginData)).unwrap();
-      
+
       // Check if user role matches selected role (except for admin)
       if (result.user.role === 'admin') {
         // Admin can login from any screen
         Alert.alert('Welcome Admin!', 'Redirecting to admin dashboard...');
-      } else if (result.user.role !== role) {
-        Alert.alert(
-          'Wrong Account Type',
-          `This is a ${result.user.role} account. Please login from the ${result.user.role} section.`
-        );
-        return;
       }
     } catch (error) {
       Alert.alert('Login Failed', error || 'Invalid email or password');
@@ -98,12 +92,12 @@ export default function LoginScreen({ navigation, route }) {
       className="flex-1"
     >
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-      
-      <KeyboardAvoidingView 
+
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
         >
@@ -159,7 +153,7 @@ export default function LoginScreen({ navigation, route }) {
             {/* Email Input */}
             <View className="mb-4">
               <Text className="text-gray-700 font-semibold mb-2">Email</Text>
-              <View 
+              <View
                 className="flex-row items-center bg-gray-50 rounded-xl px-4 py-4 border"
                 style={{ borderColor: errors.email ? COLORS.error : COLORS.gray200 }}
               >
@@ -186,7 +180,7 @@ export default function LoginScreen({ navigation, route }) {
             {/* Password Input */}
             <View className="mb-6">
               <Text className="text-gray-700 font-semibold mb-2">Password</Text>
-              <View 
+              <View
                 className="flex-row items-center bg-gray-50 rounded-xl px-4 py-4 border"
                 style={{ borderColor: errors.password ? COLORS.error : COLORS.gray200 }}
               >
@@ -216,7 +210,7 @@ export default function LoginScreen({ navigation, route }) {
             </View>
 
             {/* Forgot Password */}
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => navigation.navigate('ForgotPassword')}
               className="items-end mb-6"
             >

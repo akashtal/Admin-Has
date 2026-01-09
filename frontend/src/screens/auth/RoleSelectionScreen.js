@@ -1,10 +1,13 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StatusBar, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StatusBar, Image, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useDispatch } from 'react-redux';
+import { loginAsGuest } from '../../store/slices/authSlice';
 import COLORS from '../../config/colors';
 
 export default function RoleSelectionScreen({ navigation }) {
+  const dispatch = useDispatch();
   const handleRoleSelect = (role) => {
     navigation.navigate('Login', { role });
   };
@@ -15,7 +18,7 @@ export default function RoleSelectionScreen({ navigation }) {
       className="flex-1"
     >
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-      
+
       <View className="flex-1 justify-center items-center px-6">
         {/* Logo */}
         <View className="items-center mb-12">
@@ -62,7 +65,7 @@ export default function RoleSelectionScreen({ navigation }) {
               <View className="flex-row items-center">
                 <View className="bg-white/20 rounded-full p-4 mr-4">
                   <Icon name="person" size={32} color="white" />
-                  
+
                 </View>
                 <View className="flex-1">
                   <Text className="text-2xl font-bold text-white mb-1">
@@ -104,6 +107,40 @@ export default function RoleSelectionScreen({ navigation }) {
             </LinearGradient>
           </TouchableOpacity>
         </View>
+
+        {/* Guest Access - iOS Only */}
+        {Platform.OS === 'ios' && (
+          <TouchableOpacity
+            onPress={() => dispatch(loginAsGuest())}
+            activeOpacity={0.8}
+            className="mt-6 w-full"
+          >
+            <View
+              className="flex-row items-center justify-between p-4 rounded-3xl border border-white/20 bg-white/10"
+              style={{
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+              }}
+            >
+              <View className="flex-row items-center">
+                <View className="bg-white/20 rounded-full p-2.5 mr-3">
+                  <Icon name="planet-outline" size={20} color="white" />
+                </View>
+                <View>
+                  <Text className="text-lg font-bold text-white">
+                    Continue as Guest
+                  </Text>
+                  <Text className="text-white/70 text-xs">
+                    Explore without an account
+                  </Text>
+                </View>
+              </View>
+              <Icon name="arrow-forward-circle-outline" size={24} color="white" style={{ opacity: 0.8 }} />
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* Admin Login Hint */}
         <View className="mt-8">

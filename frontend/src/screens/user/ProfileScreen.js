@@ -24,7 +24,7 @@ export default function ProfileScreen({ navigation }) {
     try {
       setLoadingBusiness(true);
       console.log('🔍 User object for business ID:', JSON.stringify(user, null, 2));
-      
+
       // Check if already in user object
       if (user?.businesses?.[0]?._id) {
         setBusinessId(user.businesses[0]._id);
@@ -90,6 +90,27 @@ export default function ProfileScreen({ navigation }) {
         onPress: () => navigation.navigate('HelpSupport')
       },
     ];
+
+    // Guest specific menu items
+    if (user?.isGuest || user?.role === 'guest') {
+      return [
+        {
+          title: 'Login / Sign Up',
+          icon: 'log-in-outline',
+          onPress: () => dispatch(logout())
+        },
+        {
+          title: 'Settings',
+          icon: 'settings-outline',
+          onPress: () => navigation.navigate('Settings')
+        },
+        {
+          title: 'Help & Support',
+          icon: 'help-circle-outline',
+          onPress: () => navigation.navigate('HelpSupport')
+        },
+      ];
+    }
 
     // Customer-specific menu items
     if (user?.role === 'customer') {
@@ -186,10 +207,10 @@ export default function ProfileScreen({ navigation }) {
         className="pt-12 pb-20 px-6"
       >
         <Text className="text-white text-2xl font-bold mb-4">Profile</Text>
-        
+
         <View className="bg-white rounded-2xl p-6 shadow-lg -mb-16">
           <View className="items-center">
-            {user?.profileImage ? (
+            {user?.profileImage && !user?.isGuest ? (
               <Image
                 source={{ uri: user.profileImage }}
                 className="w-20 h-20 rounded-full mb-3"
@@ -198,16 +219,16 @@ export default function ProfileScreen({ navigation }) {
             ) : (
               <View className="w-20 h-20 rounded-full items-center justify-center mb-3" style={{ backgroundColor: '#FFF9F0' }}>
                 <Text className="text-3xl font-bold" style={{ color: COLORS.secondary }}>
-                  {user?.name?.charAt(0) || 'U'}
+                  {user?.name?.charAt(0) || 'G'}
                 </Text>
               </View>
             )}
-            <Text className="text-xl font-bold text-gray-900">{user?.name}</Text>
-            <Text className="text-sm text-gray-500 mb-2">{user?.email}</Text>
-            
+            <Text className="text-xl font-bold text-gray-900">{user?.name || 'Guest User'}</Text>
+            <Text className="text-sm text-gray-500 mb-2">{user?.email || 'Sign up to access more features'}</Text>
+
             <View className="rounded-full px-4 py-2 mt-2" style={{ backgroundColor: '#FFF9F0' }}>
               <Text className="text-sm font-semibold capitalize" style={{ color: COLORS.secondary }}>
-                {user?.role}
+                {user?.role || 'Guest'}
               </Text>
             </View>
           </View>
@@ -229,15 +250,17 @@ export default function ProfileScreen({ navigation }) {
           </TouchableOpacity>
         ))}
 
-        <TouchableOpacity
-          onPress={handleLogout}
-          className="bg-red-50 rounded-xl p-4 mt-4 shadow-sm flex-row items-center"
-        >
-          <View className="w-10 h-10 bg-red-100 rounded-full items-center justify-center mr-4">
-            <Icon name="log-out-outline" size={20} color="#EF4444" />
-          </View>
-          <Text className="flex-1 text-base text-red-600 font-semibold">Logout</Text>
-        </TouchableOpacity>
+        {!user?.isGuest && user?.role !== 'guest' && (
+          <TouchableOpacity
+            onPress={handleLogout}
+            className="bg-red-50 rounded-xl p-4 mt-4 shadow-sm flex-row items-center"
+          >
+            <View className="w-10 h-10 bg-red-100 rounded-full items-center justify-center mr-4">
+              <Icon name="log-out-outline" size={20} color="#EF4444" />
+            </View>
+            <Text className="flex-1 text-base text-red-600 font-semibold">Logout</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View className="px-6 pb-6">
