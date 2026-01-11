@@ -39,8 +39,8 @@
         "distribution": "store"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://hashview-backend.onrender.com/api",
-        "EXPO_PUBLIC_SOCKET_URL": "https://hashview-backend.onrender.com",
+        "EXPO_PUBLIC_API_BASE_URL": "http://44.249.50.162/api",
+        "EXPO_PUBLIC_SOCKET_URL": "http://44.249.50.162",
         "EXPO_PUBLIC_API_TIMEOUT": "30000"
       }
     }

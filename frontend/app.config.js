@@ -2,7 +2,7 @@ export default {
   expo: {
     name: "HashView",
     slug: "hashview",
-    version: "1.0.4",
+    version: "1.0.5",
     orientation: "portrait",
     icon: "./assets/HashViewlogo-01.png",
     userInterfaceStyle: "automatic",
@@ -28,12 +28,12 @@ export default {
           "HashView needs access to your photo library to let you select and upload photos for business listings, products, or user reviews.",
         ITSAppUsesNonExemptEncryption: false
       },
-      buildNumber: "6"
+      buildNumber: "7"
     },
 
     android: {
       package: "com.hashview.apps",
-      versionCode: 5,
+      versionCode: 13,
       permissions: [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
