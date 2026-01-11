@@ -29,10 +29,25 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle errors
+// Response interceptor to handle errors and implement Failover
 apiClient.interceptors.response.use(
   (response) => response.data,
   async (error) => {
+    const originalRequest = error.config;
+
+    // Check if network error or connection refused (Primary Down)
+    if (!originalRequest._retry && (error.code === 'ERR_NETWORK' || error.message.includes('Network Error'))) {
+
+      console.warn('⚠️ Primary server unreachable. Switching to Failover Server (Render)...');
+      originalRequest._retry = true; // Mark as retried
+
+      // Update Base URL to Secondary Request
+      originalRequest.baseURL = API_CONFIG.SECONDARY_BASE_URL;
+
+      // Retry the request
+      return apiClient(originalRequest);
+    }
+
     if (error.response?.status === 401) {
       // Token expired or invalid - logout user
       await AsyncStorage.removeItem('token');

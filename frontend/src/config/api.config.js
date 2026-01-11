@@ -4,11 +4,13 @@
 export const API_CONFIG = {
   // API Base URL - defaults to production if not set
   //BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.214.28.97:5001/api',
-  BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hashview-backend-production-7d6e.up.railway.app/api',
+  BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://44.249.50.162/api',
+  SECONDARY_BASE_URL: 'https://hashview-backend.onrender.com/api',
 
   // Socket.io URL - defaults to production if not set
   //SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || 'http://10.214.28.97:5001',
-  SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || 'https://hashview-backend-production-7d6e.up.railway.app',
+  SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || 'http://44.249.50.162',
+  SECONDARY_SOCKET_URL: 'https://hashview-backend.onrender.com',
   // Request timeout in milliseconds
   TIMEOUT: parseInt(process.env.EXPO_PUBLIC_API_TIMEOUT || '60000', 10),
 
