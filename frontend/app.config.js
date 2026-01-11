@@ -33,7 +33,7 @@ export default {
 
     android: {
       package: "com.hashview.apps",
-      versionCode: 13,
+      versionCode: 14,
       permissions: [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
