@@ -4,11 +4,11 @@
 export const API_CONFIG = {
   // API Base URL - defaults to production if not set
   //BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.214.28.97:5001/api',
-  BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://interchange.proxy.rlwy.net:24396/api',
+  BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hashview-backend-production-7d6e.up.railway.app/api',
 
   // Socket.io URL - defaults to production if not set
   //SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || 'http://10.214.28.97:5001',
-  SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || 'http://interchange.proxy.rlwy.net:24396',
+  SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || 'https://hashview-backend-production-7d6e.up.railway.app',
   // Request timeout in milliseconds
   TIMEOUT: parseInt(process.env.EXPO_PUBLIC_API_TIMEOUT || '60000', 10),
 

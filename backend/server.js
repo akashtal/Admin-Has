@@ -93,6 +93,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/external-reviews', externalReviewsRoutes);
+app.use('/api/verification', require('./routes/verification.routes'));
 app.use('/api/support', supportRoutes);
 
 // Socket.IO for real-time chat
