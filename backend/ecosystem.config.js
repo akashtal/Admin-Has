@@ -10,7 +10,8 @@ module.exports = {
         },
         env_production: {
             NODE_ENV: 'production',
-            PORT: 5000
+            PORT: 5000,
+            JWT_EXPIRE: '7d'
         }
     }]
 };

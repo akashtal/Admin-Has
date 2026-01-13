@@ -26,14 +26,18 @@ export default {
           "HashView needs camera access to capture and upload photos of businesses, products, or reviews, and to scan QR codes.",
         NSPhotoLibraryUsageDescription:
           "HashView needs access to your photo library to let you select and upload photos for business listings, products, or user reviews.",
-        ITSAppUsesNonExemptEncryption: false
+        ITSAppUsesNonExemptEncryption: false,
+        NSAppTransportSecurity: {
+          NSAllowsArbitraryLoads: true
+        }
       },
-      buildNumber: "7"
+      buildNumber: "8"
     },
 
     android: {
       package: "com.hashview.apps",
-      versionCode: 14,
+      versionCode: 15,
+      usesCleartextTraffic: true,
       permissions: [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
