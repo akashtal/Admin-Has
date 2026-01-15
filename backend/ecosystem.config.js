@@ -2,6 +2,7 @@ module.exports = {
     apps: [{
         name: 'hashview-backend',
         script: 'server.js',
+        watch: true,
         instances: 'max', // Use all available cores
         exec_mode: 'cluster', // Enable cluster mode for load balancing
         env: {

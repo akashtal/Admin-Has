@@ -291,6 +291,7 @@ export default function SignUpScreen({ navigation, route }) {
                   ref={phoneInputRef}
                   defaultCode="GB"
                   layout="first"
+                  withShadow={false}
                   defaultValue={rawPhoneValue}
                   value={rawPhoneValue}
                   onChangeText={(text) => {
@@ -312,7 +313,7 @@ export default function SignUpScreen({ navigation, route }) {
                     backgroundColor: '#F9FAFB',
                   }}
                   textContainerStyle={{
-                    backgroundColor: 'transparent',
+                    backgroundColor: '#F9FAFB',
                     borderTopRightRadius: 12,
                     borderBottomRightRadius: 12,
                   }}

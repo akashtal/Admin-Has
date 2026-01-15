@@ -386,6 +386,16 @@ exports.login = async (req, res, next) => {
       });
     }
 
+    // Check for role mismatch (except for admins who can login from anywhere)
+    if (role && userType !== 'admin' && userType !== role) {
+      console.log(`❌ Login blocked: Role mismatch. Requested: ${role}, Found: ${userType}`);
+      return res.status(401).json({
+        success: false,
+        message: `This email is registered as a ${userType} account. Please use the correct login section.`,
+        userType: userType
+      });
+    }
+
     // Check if email is suspended
     const suspendedAccount = await SuspendedAccount.findOne({
       email: email.toLowerCase(),

@@ -17,8 +17,8 @@ const businessOwnerSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: [true, 'Phone number is required'],
     unique: true,
+    sparse: true,
     trim: true,
     match: [/^\+?[0-9]{7,15}$/, 'Please provide a valid phone number with country code']
   },
@@ -111,11 +111,11 @@ const businessOwnerSchema = new mongoose.Schema({
 });
 
 // Hash password before saving
-businessOwnerSchema.pre('save', async function(next) {
+businessOwnerSchema.pre('save', async function (next) {
   if (!this.isModified('passwordHash')) {
     return next();
   }
-  
+
   try {
     const salt = await bcrypt.genSalt(10);
     this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
@@ -126,12 +126,12 @@ businessOwnerSchema.pre('save', async function(next) {
 });
 
 // Method to compare password
-businessOwnerSchema.methods.comparePassword = async function(candidatePassword) {
+businessOwnerSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.passwordHash);
 };
 
 // Method to get public profile
-businessOwnerSchema.methods.getPublicProfile = function() {
+businessOwnerSchema.methods.getPublicProfile = function () {
   return {
     id: this._id,
     name: this.name,
@@ -149,7 +149,7 @@ businessOwnerSchema.methods.getPublicProfile = function() {
 };
 
 // Remove sensitive data when converting to JSON
-businessOwnerSchema.methods.toJSON = function() {
+businessOwnerSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.passwordHash;
   delete obj.__v;

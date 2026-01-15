@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Image } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useSelector, useDispatch } from 'react-redux';
@@ -44,8 +44,12 @@ export default function AppNavigator() {
 
   if (!isReady) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#210059' }}>
-        <ActivityIndicator size="large" color="#ffffff" />
+      <View style={{ flex: 1, backgroundColor: '#210059', justifyContent: 'center', alignItems: 'center' }}>
+        <Image
+          source={require('../../assets/HashViewSplash.png')}
+          style={{ width: '100%', height: '100%', resizeMode: 'contain' }}
+        />
+        <ActivityIndicator size="large" color="#ffffff" style={{ position: 'absolute', bottom: 100 }} />
       </View>
     );
   }

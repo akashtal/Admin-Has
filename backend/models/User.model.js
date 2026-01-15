@@ -19,8 +19,8 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: [true, 'Phone number is required'],
     unique: true,
+    sparse: true,
     match: [/^\+?[0-9]{7,15}$/, 'Please provide a valid phone number with country code']
   },
   passwordHash: {
@@ -124,7 +124,7 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ location: '2dsphere' });
 
 // Hash password before saving
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function (next) {
   if (!this.isModified('passwordHash')) {
     return next();
   }
@@ -134,12 +134,12 @@ userSchema.pre('save', async function(next) {
 });
 
 // Method to compare passwords
-userSchema.methods.comparePassword = async function(candidatePassword) {
+userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.passwordHash);
 };
 
 // Method to get public profile
-userSchema.methods.getPublicProfile = function() {
+userSchema.methods.getPublicProfile = function () {
   return {
     id: this._id,
     name: this.name,

@@ -42,7 +42,7 @@ const schemas = {
   register: Joi.object({
     name: Joi.string().min(2).max(50).required(),
     email: Joi.string().email().required(),
-    phone: Joi.string().pattern(/^\+?[0-9]{7,15}$/).required(),
+    phone: Joi.string().allow('', null).pattern(/^\+?[0-9]{7,15}$/).optional(),
     password: Joi.string().min(6).required(),
     role: Joi.string().valid('customer', 'business').default('customer'),
     address: Joi.object({

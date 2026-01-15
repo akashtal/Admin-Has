@@ -224,15 +224,10 @@ export default function HelpSupportScreen({ navigation }) {
               App Information
             </Text>
 
-            <View className="flex-row justify-between items-center mb-3">
-              <Text className="text-gray-600">Version</Text>
-              <Text className="text-gray-900 font-medium">1.0.0</Text>
-            </View>
-
             <View className="border-t border-gray-100 my-3" />
 
             <TouchableOpacity
-              onPress={() => Linking.openURL('https://hashview.com/privacy-policy')}
+              onPress={() => Linking.openURL('https://www.hashview.co.uk/privacy')}
               className="flex-row items-center justify-between py-2"
             >
               <Text className="text-gray-900">Privacy Policy</Text>
@@ -242,7 +237,7 @@ export default function HelpSupportScreen({ navigation }) {
             <View className="border-t border-gray-100 my-3" />
 
             <TouchableOpacity
-              onPress={() => Linking.openURL('https://hashview.com/terms')}
+              onPress={() => Linking.openURL('https://www.hashview.co.uk/privacy')}
               className="flex-row items-center justify-between py-2"
             >
               <Text className="text-gray-900">Terms of Service</Text>
@@ -252,7 +247,7 @@ export default function HelpSupportScreen({ navigation }) {
             <View className="border-t border-gray-100 my-3" />
 
             <TouchableOpacity
-              onPress={() => Linking.openURL('https://hashview.com')}
+              onPress={() => Linking.openURL('https://www.hashview.co.uk')}
               className="flex-row items-center justify-between py-2"
             >
               <Text className="text-gray-900">Visit Website</Text>
