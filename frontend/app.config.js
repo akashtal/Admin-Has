@@ -2,7 +2,7 @@ export default {
   expo: {
     name: "HashView",
     slug: "hashview",
-    version: "1.0.7",
+    version: "1.0.8",
     orientation: "portrait",
     icon: "./assets/HashViewlogo-01.png",
     userInterfaceStyle: "automatic",
@@ -31,7 +31,7 @@ export default {
           NSAllowsArbitraryLoads: true
         }
       },
-      buildNumber: "10"
+      buildNumber: "11"
     },
 
     android: {
