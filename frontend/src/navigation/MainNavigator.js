@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useSelector } from 'react-redux';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import { COLORS } from '../config/colors';
 
 // User Screens
@@ -27,6 +27,7 @@ import VerifyEmailScreen from '../screens/user/VerifyEmailScreen';
 // Business Screens
 import BusinessDashboardScreen from '../screens/business/BusinessDashboardScreen';
 import BusinessRegistrationScreen from '../screens/business/BusinessRegistrationScreen';
+import BusinessKYCScreen from '../screens/business/BusinessKYCScreen';
 
 import ManageCouponsScreen from '../screens/business/ManageCouponsScreen';
 import ManageUpdatesScreen from '../screens/business/ManageUpdatesScreen';
@@ -88,6 +89,7 @@ function BusinessStack() {
     >
       <Stack.Screen name="BusinessDashboard" component={BusinessDashboardScreen} />
       <Stack.Screen name="BusinessRegistration" component={BusinessRegistrationScreen} />
+      <Stack.Screen name="BusinessKYC" component={BusinessKYCScreen} />
 
       <Stack.Screen name="ManageCoupons" component={ManageCouponsScreen} />
       <Stack.Screen name="ManageUpdates" component={ManageUpdatesScreen} />
@@ -101,6 +103,7 @@ function BusinessStack() {
       <Stack.Screen name="ManageCouponsNew" component={ManageCouponsNew} />
       <Stack.Screen name="CouponQRScanner" component={CouponQRScannerScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
     </Stack.Navigator>
   );
 }
@@ -126,6 +129,7 @@ export default function MainNavigator() {
         <Stack.Screen name="ReviewManagement" component={ReviewManagementScreen} />
         <Stack.Screen name="TripAdvisorManagement" component={TripAdvisorManagementScreen} />
         <Stack.Screen name="NotificationManagement" component={NotificationManagementScreen} />
+        <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
       </Stack.Navigator>
     );
   }
@@ -144,6 +148,7 @@ export default function MainNavigator() {
         <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
         <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
         <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+        <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
       </Stack.Navigator>
     );
   }
@@ -193,6 +198,7 @@ export default function MainNavigator() {
         <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
         <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
         <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+        <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
       </Stack.Navigator>
     );
   }

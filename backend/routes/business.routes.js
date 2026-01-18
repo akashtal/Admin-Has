@@ -30,6 +30,8 @@ router.get('/:id', getBusiness);
 router.post('/register', protect, authorize('business'), validate(schemas.createBusiness), registerBusiness);
 router.post('/:id/documents', protect, authorize('business'), upload.fields([
   { name: 'ownerIdProof', maxCount: 1 },
+  { name: 'addressProof', maxCount: 1 },
+  { name: 'selfie', maxCount: 1 },
   { name: 'foodSafetyCertificate', maxCount: 1 },
   { name: 'businessLicense', maxCount: 1 }
 ]), uploadDocuments);

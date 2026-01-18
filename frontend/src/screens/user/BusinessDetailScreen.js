@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StatusBar, Image, Dimensions, Linking, Share, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDispatch, useSelector } from 'react-redux';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import { getBusiness } from '../../store/slices/businessSlice';
 import { getBusinessReviews } from '../../store/slices/reviewSlice';
 import COLORS from '../../config/colors';

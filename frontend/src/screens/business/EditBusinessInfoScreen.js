@@ -11,7 +11,7 @@ import {
   Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Picker } from '@react-native-picker/picker';
 import ApiService from '../../services/api.service';
@@ -70,7 +70,7 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
   ];
 
   const timeSlots = [
-    'Closed', '00:00', '01:00', '02:00', '03:00', '04:00', '05:00', 
+    'Closed', '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
     '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
     '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00',
     '20:00', '21:00', '22:00', '23:00'
@@ -85,7 +85,7 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
       setLoading(true);
       const response = await ApiService.getBusiness(businessId);
       const business = response.business;
-      
+
       setFormData({
         name: business.name || '',
         email: business.email || '',
@@ -106,9 +106,9 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
         coverImage: business.coverImage?.url ? { uri: business.coverImage.url, url: business.coverImage.url, publicId: business.coverImage.publicId } : null,
         gallery: (business.images || []).map(img => ({ uri: img.url, url: img.url, publicId: img.publicId }))
       };
-      
+
       setOriginalImages(originalImgs);
-      
+
       if (business.logo?.url) {
         setImages(prev => ({ ...prev, logo: { uri: business.logo.url } }));
         setUploadedImages(prev => ({ ...prev, logo: { url: business.logo.url, publicId: business.logo.publicId } }));
@@ -193,7 +193,7 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
       const mimeType = `image/${extension === 'jpg' ? 'jpeg' : extension}`;
 
       const fieldName = imageType === 'logo' ? 'logo' : imageType === 'coverImage' ? 'coverImage' : 'images';
-      
+
       formData.append(fieldName, {
         uri: imageUri,
         name: filename,
@@ -212,11 +212,11 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
 
       if (response.success || response.data || response.url) {
         const data = response.data || response;
-        
+
         if (imageType === 'gallery' && response.images && response.images.length > 0) {
           return response.images[0];
         }
-        
+
         return {
           url: data.url || response.url || data.imageUrl,
           publicId: data.publicId || response.publicId || data.public_id
@@ -236,13 +236,13 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
 
     try {
       const formData = new FormData();
-      
+
       galleryImages.forEach((img, index) => {
         const filename = img.uri.split('/').pop() || `gallery_${Date.now()}_${index}.jpg`;
         const match = /\.(\w+)$/.exec(filename);
         const extension = match ? match[1].toLowerCase() : 'jpg';
         const mimeType = `image/${extension === 'jpg' ? 'jpeg' : extension}`;
-        
+
         formData.append('images', {
           uri: img.uri,
           name: filename,
@@ -251,7 +251,7 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
       });
 
       const response = await ApiService.uploadBusinessGallery(formData);
-      
+
       if (response.success && response.images && response.images.length > 0) {
         return response.images.map((img, index) => ({
           url: img.url,
@@ -259,7 +259,7 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
           originalUri: galleryImages[index]?.uri
         }));
       }
-      
+
       throw new Error(response.message || 'Gallery upload failed');
     } catch (error) {
       console.error('Error uploading gallery images:', error);
@@ -276,7 +276,7 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
     try {
       setSaving(true);
       setUploadingImages(true);
-      
+
       // Upload new images to Cloudinary if they've been changed
       let logoData = uploadedImages.logo;
       let coverImageData = uploadedImages.coverImage;
@@ -311,7 +311,7 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
       }
 
       // Check for new gallery images (images not in original)
-      const newGalleryImages = images.gallery.filter(img => 
+      const newGalleryImages = images.gallery.filter(img =>
         !originalImages.gallery.some(orig => orig.uri === img.uri)
       );
 
@@ -320,7 +320,7 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
           const uploadedNewGallery = await uploadGalleryImages(newGalleryImages);
           // Merge with existing gallery (keep original + new)
           galleryData = [
-            ...uploadedImages.gallery.filter(existing => 
+            ...uploadedImages.gallery.filter(existing =>
               images.gallery.some(img => img.uri === existing.url || img.uri === existing.originalUri)
             ),
             ...uploadedNewGallery
@@ -382,8 +382,8 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
       }
 
       // Update gallery if changed
-      if (images.gallery.length !== originalImages.gallery.length || 
-          images.gallery.some(img => !originalImages.gallery.some(orig => orig.uri === img.uri))) {
+      if (images.gallery.length !== originalImages.gallery.length ||
+        images.gallery.some(img => !originalImages.gallery.some(orig => orig.uri === img.uri))) {
         imageUpdateData.images = galleryData
           .filter(img => img && img.url)
           .map(img => ({
@@ -412,7 +412,7 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
         await ApiService.updateBusinessImages(businessId, imageUpdateData);
         console.log('✅ Business images updated in database');
       }
-      
+
       Alert.alert('Success', 'Business information updated successfully', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
@@ -438,7 +438,7 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
   return (
     <View className="flex-1 bg-gray-50">
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-      
+
       {/* Header */}
       <LinearGradient
         colors={[COLORS.primary, COLORS.primaryDark]}
@@ -453,7 +453,7 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
       </LinearGradient>
 
       <ScrollView className="flex-1 px-6 py-6" showsVerticalScrollIndicator={false}>
-        
+
         {/* Logo */}
         <View className="mb-4">
           <View className="flex-row justify-between items-center mb-2">
@@ -472,8 +472,8 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
           >
             {images.logo ? (
               <View className="items-center">
-                <Image 
-                  source={{ uri: images.logo.uri }} 
+                <Image
+                  source={{ uri: images.logo.uri }}
                   className="w-24 h-24 rounded-lg"
                   resizeMode="cover"
                 />
@@ -510,8 +510,8 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
           >
             {images.coverImage ? (
               <View className="w-full relative">
-                <Image 
-                  source={{ uri: images.coverImage.uri }} 
+                <Image
+                  source={{ uri: images.coverImage.uri }}
                   className="w-full h-32 rounded-lg"
                   resizeMode="cover"
                 />
@@ -536,17 +536,17 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
             <Text className="text-gray-900 font-semibold">Gallery Images</Text>
             <Text className="text-xs text-gray-500">Optional</Text>
           </View>
-          
+
           {/* Gallery Images Grid */}
           {images.gallery.length > 0 && (
             <View className="flex-row flex-wrap mb-3">
               {images.gallery.map((img, index) => {
                 const isNew = !originalImages.gallery.some(orig => orig.uri === img.uri);
-                
+
                 return (
                   <View key={index} className="relative mr-2 mb-2">
-                    <Image 
-                      source={{ uri: img.uri }} 
+                    <Image
+                      source={{ uri: img.uri }}
                       className="w-20 h-20 rounded-lg"
                       resizeMode="cover"
                     />
@@ -669,7 +669,7 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
           {Object.keys(openHours).map((day) => (
             <View key={day} className="flex-row items-center justify-between mb-3">
               <Text className="text-gray-900 w-24 capitalize">{day}:</Text>
-              
+
               <View className="flex-row flex-1">
                 <View className="flex-1 mr-2 bg-white rounded-xl border border-gray-200">
                   <Picker

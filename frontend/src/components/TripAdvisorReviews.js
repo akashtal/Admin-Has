@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Image, ScrollView, TouchableOpacity, Linking } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import COLORS from '../config/colors';
 

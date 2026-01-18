@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDispatch, useSelector } from 'react-redux';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { Accelerometer } from 'expo-sensors';
@@ -50,6 +50,7 @@ export default function AddReviewScreen({ navigation, route }) {
   const [gpsSignalLost, setGpsSignalLost] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [deviceFingerprint, setDeviceFingerprint] = useState(null);
+  const [accuracyStatus, setAccuracyStatus] = useState('Checking GPS...');
 
   // Refs for subscriptions & cleanup
   const locationSubscription = useRef(null);
@@ -394,10 +395,12 @@ export default function AddReviewScreen({ navigation, route }) {
       console.log(`⚠️ GPS accuracy too low: ${coords.accuracy.toFixed(1)}m`);
       logSuspiciousActivity('POOR_GPS_ACCURACY', { accuracy: coords.accuracy });
       setGpsAccuracy(coords.accuracy);
+      setAccuracyStatus(`Weak GPS (${Math.round(coords.accuracy)}m). Please move to an open area.`);
       return;
     }
 
     setGpsAccuracy(coords.accuracy);
+    setAccuracyStatus('Strong GPS Signal');
 
     // Check for mock location
     if (detectMockLocation(newLocation)) {
@@ -1140,6 +1143,9 @@ export default function AddReviewScreen({ navigation, route }) {
                 </>
               )}
             </View>
+            <Text className={`text-[10px] mt-1 font-semibold ${gpsAccuracy > MAX_GPS_ACCURACY ? 'text-red-500' : 'text-green-600'}`}>
+              📡 {accuracyStatus}
+            </Text>
           </View>
         </View>
       </View>

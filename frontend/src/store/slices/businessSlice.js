@@ -60,15 +60,27 @@ export const registerBusiness = createAsyncThunk(
     } catch (error) {
       console.error('❌ Business registration error:', error);
       const errorData = error?.response?.data;
-      const errorMessage = errorData?.message || 
-                          error?.message || 
-                          'Failed to register business. Please check your connection and try again.';
+      const errorMessage = errorData?.message ||
+        error?.message ||
+        'Failed to register business. Please check your connection and try again.';
       const errorDetails = errorData?.errors || [];
       console.error('Error details:', { message: errorMessage, errors: errorDetails });
       return rejectWithValue({
         message: errorMessage,
         errors: errorDetails
       });
+    }
+  }
+);
+
+export const uploadDocuments = createAsyncThunk(
+  'business/uploadDocuments',
+  async ({ id, formData }, { rejectWithValue }) => {
+    try {
+      const response = await ApiService.uploadDocuments(id, formData);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to upload documents');
     }
   }
 );

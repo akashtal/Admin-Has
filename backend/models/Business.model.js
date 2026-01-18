@@ -89,6 +89,45 @@ const businessSchema = new mongoose.Schema({
   },
   selfieUrl: String, // Owner selfie for face matching
   selfiePublicId: String,
+
+  documents: {
+    ownerIdProof: {
+      url: String,
+      publicId: String,
+      verified: { type: Boolean, default: false },
+      status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+      rejectionReason: String
+    },
+    addressProof: {
+      url: String,
+      publicId: String,
+      verified: { type: Boolean, default: false },
+      status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+      rejectionReason: String
+    },
+    selfie: {
+      url: String,
+      publicId: String,
+      verified: { type: Boolean, default: false },
+      status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+      rejectionReason: String
+    },
+    businessLicense: {
+      url: String,
+      publicId: String,
+      verified: { type: Boolean, default: false },
+      status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+      rejectionReason: String
+    },
+    foodSafetyCertificate: {
+      url: String,
+      publicId: String,
+      verified: { type: Boolean, default: false },
+      status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+      rejectionReason: String
+    }
+  },
+
   submittedForReviewAt: Date, // When documents were submitted
 
   // Didit Verification Removed

@@ -49,13 +49,17 @@ apiClient.interceptors.response.use(
     }
 
     if (error.response?.status === 401) {
-      // Token expired or invalid - logout user
       await AsyncStorage.removeItem('token');
       await AsyncStorage.removeItem('user');
-      // You can dispatch a logout action here if using Redux
     }
 
-    const errorMessage = error.response?.data?.message || error.message || 'Something went wrong';
+    const data = error.response?.data;
+    let errorMessage = data?.message || error.message || 'Something went wrong';
+
+    if (data?.reason) {
+      errorMessage = `${errorMessage} ${data.reason}`;
+    }
+
     return Promise.reject(new Error(errorMessage));
   }
 );
@@ -303,4 +307,3 @@ const ApiService = {
 };
 
 export default ApiService;
-

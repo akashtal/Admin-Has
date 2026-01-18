@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, StatusBar, ScrollView, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDispatch, useSelector } from 'react-redux';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import { getCoupons } from '../../store/slices/couponSlice';
 import COLORS from '../../config/colors';

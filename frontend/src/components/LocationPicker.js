@@ -7,11 +7,12 @@ import {
   Modal,
   StyleSheet,
   ActivityIndicator,
-  Alert
+  Alert,
+  Platform
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import COLORS from '../config/colors';
 
 export default function LocationPicker({ visible, onClose, onSelectLocation, initialLocation }) {
@@ -58,7 +59,7 @@ export default function LocationPicker({ visible, onClose, onSelectLocation, ini
     try {
       setLoading(true);
       const result = await Location.geocodeAsync(searchQuery);
-      
+
       if (result && result.length > 0) {
         const { latitude, longitude } = result[0];
         const newRegion = {
@@ -67,7 +68,7 @@ export default function LocationPicker({ visible, onClose, onSelectLocation, ini
           latitudeDelta: 0.01,
           longitudeDelta: 0.01
         };
-        
+
         setRegion(newRegion);
         setMarkerCoordinate({ latitude, longitude });
         getAddressFromCoordinates({ latitude, longitude });
@@ -86,7 +87,7 @@ export default function LocationPicker({ visible, onClose, onSelectLocation, ini
     try {
       setLoading(true);
       const { status } = await Location.requestForegroundPermissionsAsync();
-      
+
       if (status !== 'granted') {
         Alert.alert('Permission Denied', 'Location permission is required');
         return;
@@ -168,6 +169,7 @@ export default function LocationPicker({ visible, onClose, onSelectLocation, ini
         {/* Map */}
         <MapView
           style={styles.map}
+          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
           region={region}
           onRegionChangeComplete={setRegion}
           onPress={handleMapPress}

@@ -1,26 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  ScrollView, 
-  ActivityIndicator, 
-  Alert, 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
   StatusBar,
   Image
 } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { register } from '../../store/slices/authSlice';
 import { LinearGradient } from 'expo-linear-gradient';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import ApiService from '../../services/api.service';
 import COLORS from '../../config/colors';
+import { showErrorMessage, showSuccessMessage } from '../../utils/errorHandler';
 
 export default function VerifyOTPScreen({ navigation, route }) {
   const dispatch = useDispatch();
   const { email, userData, isPasswordReset } = route.params;
-  
+
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [resendDisabled, setResendDisabled] = useState(false);
@@ -57,9 +58,9 @@ export default function VerifyOTPScreen({ navigation, route }) {
 
   const handleContinue = async () => {
     const otpCode = otp.join('');
-    
+
     if (otpCode.length !== 6) {
-      Alert.alert('Error', 'Please enter the complete 6-digit code');
+      showErrorMessage('Please enter the complete 6-digit code');
       return;
     }
 
@@ -110,44 +111,26 @@ export default function VerifyOTPScreen({ navigation, route }) {
               landmark: addressPayload.landmark
             })
           };
-          
+
           console.log('Registering user with data:', { ...registrationData, password: '***' });
-          
+
           const result = await dispatch(register(registrationData)).unwrap();
           setLoading(false);
-          
-          Alert.alert(
-            'Success! 🎉', 
-            'Your account has been created successfully!',
-            [{ text: 'OK' }]
+
+          showSuccessMessage(
+            'Success! 🎉',
+            'Your account has been created successfully!'
           );
         } catch (error) {
           setLoading(false);
           console.error('Registration error:', error);
-          
-          // Check if it's a duplicate user error
-          const errorMessage = error?.message || error || 'Failed to create account. Please try again.';
-          
-          if (errorMessage.includes('already registered') || errorMessage.includes('already exists')) {
-            Alert.alert(
-              'Account Already Exists', 
-              errorMessage + '\n\nWould you like to login instead?',
-              [
-                { text: 'Try Again', style: 'cancel' },
-                { 
-                  text: 'Go to Login', 
-                  onPress: () => navigation.navigate('Login', { role: userData.role })
-                }
-              ]
-            );
-          } else {
-            Alert.alert('Registration Error', errorMessage);
-          }
+
+          showErrorMessage(error, { title: 'Registration Failed' });
         }
       }
     } catch (error) {
       setLoading(false);
-      Alert.alert('Error', error.message || 'Invalid verification code. Please try again.');
+      showErrorMessage(error, { title: 'Verification Failed' });
     }
   };
 
@@ -157,9 +140,9 @@ export default function VerifyOTPScreen({ navigation, route }) {
 
     try {
       await ApiService.sendEmailOTP({ email });
-      Alert.alert('Code Resent', 'A new verification code has been sent to your email.');
+      showSuccessMessage('Code Resent', 'A new verification code has been sent to your email.');
     } catch (error) {
-      Alert.alert('Error', 'Failed to resend code. Please try again.');
+      showErrorMessage('Failed to resend code. Please try again.');
       setResendDisabled(false);
       setCountdown(0);
     }
@@ -171,8 +154,8 @@ export default function VerifyOTPScreen({ navigation, route }) {
       className="flex-1"
     >
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-      
-      <ScrollView 
+
+      <ScrollView
         contentContainerStyle={{ flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
       >
@@ -252,7 +235,7 @@ export default function VerifyOTPScreen({ navigation, route }) {
               onPress={handleResend}
               disabled={resendDisabled}
             >
-              <Text 
+              <Text
                 style={{ color: resendDisabled ? COLORS.gray400 : COLORS.secondary }}
                 className="font-bold text-base"
               >

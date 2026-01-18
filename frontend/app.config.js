@@ -2,6 +2,7 @@ export default {
   expo: {
     name: "HashView",
     slug: "hashview",
+    scheme: "hashview",
     version: "1.0.8",
     orientation: "portrait",
     icon: "./assets/HashViewlogo-01.png",
@@ -31,13 +32,20 @@ export default {
           NSAllowsArbitraryLoads: true
         }
       },
-      buildNumber: "11"
+      buildNumber: "11",
+      config: {
+        googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || "AIzaSyCgafT4Tw62CuxxN5DwbkqWIK9pVflKEXI"
+      }
     },
 
     android: {
       package: "com.hashview.apps",
       versionCode: 16,
       usesCleartextTraffic: true,
+      adaptiveIcon: {
+        foregroundImage: "./assets/HashViewlogo-01.png",
+        backgroundColor: "#FFFFFF"
+      },
       permissions: [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -91,7 +99,19 @@ export default {
           cameraPermission: "Allow HashView to access your camera to capture photos for listings and scan QR codes."
         }
       ],
-      "expo-font",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/Ionicons.ttf",
+            "./assets/fonts/MaterialIcons.ttf",
+            "./assets/fonts/MaterialCommunityIcons.ttf",
+            "./assets/fonts/FontAwesome.ttf",
+            "./assets/fonts/Feather.ttf"
+          ]
+        }
+      ],
+      "expo-asset",
       "expo-secure-store",
       [
         "expo-splash-screen",

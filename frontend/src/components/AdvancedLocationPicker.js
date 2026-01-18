@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import COLORS from '../config/colors';
 
@@ -200,7 +200,7 @@ export default function AdvancedLocationPicker({
           <MapView
             ref={mapRef}
             style={styles.map}
-            provider={PROVIDER_GOOGLE}
+            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
             initialRegion={region}
             onRegionChange={onRegionChange}
             onRegionChangeComplete={onRegionChangeComplete}

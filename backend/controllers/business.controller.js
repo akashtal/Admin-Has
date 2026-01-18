@@ -21,6 +21,34 @@ exports.registerBusiness = async (req, res, next) => {
       website, tripAdvisorLink, googleBusinessName, openingHours
     } = req.body;
 
+    // Validate required fields for business registration
+    if (!phone || !phone.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Phone number is required for business registration',
+        field: 'phone'
+      });
+    }
+
+    // Validate address - require key address fields for business registration
+    // At minimum, we need street, city, and postcode/pincode
+    const hasRequiredAddressFields = (street && street.trim()) &&
+      (city && city.trim()) &&
+      (postcode && postcode.trim() || pincode && pincode.trim());
+
+    if (!hasRequiredAddressFields && !address) {
+      return res.status(400).json({
+        success: false,
+        message: 'Business address is required. Please provide street, city, and postcode.',
+        field: 'address',
+        errors: [
+          !street || !street.trim() ? 'Street is required' : null,
+          !city || !city.trim() ? 'City is required' : null,
+          (!postcode || !postcode.trim()) && (!pincode || !pincode.trim()) ? 'Postcode or pincode is required' : null
+        ].filter(Boolean)
+      });
+    }
+
     // Check if business already exists for this user
     const existingBusiness = await Business.findOne({ owner: req.user.id });
     if (existingBusiness) {
@@ -283,19 +311,38 @@ exports.uploadDocuments = async (req, res, next) => {
       if (req.files.ownerIdProof) {
         business.documents.ownerIdProof = {
           url: `/uploads/${req.files.ownerIdProof[0].filename}`,
-          verified: false
+          verified: false,
+          status: 'pending'
         };
+      }
+      if (req.files.addressProof) {
+        business.documents.addressProof = {
+          url: `/uploads/${req.files.addressProof[0].filename}`,
+          verified: false,
+          status: 'pending'
+        };
+      }
+      if (req.files.selfie) {
+        business.documents.selfie = {
+          url: `/uploads/${req.files.selfie[0].filename}`,
+          verified: false,
+          status: 'pending'
+        };
+        // Also update legacy root fields for backward compatibility if needed
+        business.selfieUrl = `/uploads/${req.files.selfie[0].filename}`;
       }
       if (req.files.foodSafetyCertificate) {
         business.documents.foodSafetyCertificate = {
           url: `/uploads/${req.files.foodSafetyCertificate[0].filename}`,
-          verified: false
+          verified: false,
+          status: 'pending'
         };
       }
       if (req.files.businessLicense) {
         business.documents.businessLicense = {
           url: `/uploads/${req.files.businessLicense[0].filename}`,
-          verified: false
+          verified: false,
+          status: 'pending'
         };
       }
     }
@@ -419,13 +466,17 @@ exports.getNearbyBusinesses = async (req, res, next) => {
     // Calculate distance for each business and add to response
     const businessesWithDistance = businesses.map((business, index) => {
       const businessObj = business.toObject();
-      if (business.location && business.location.coordinates) {
+      if (business.location && business.location.coordinates && business.location.coordinates.length === 2) {
+        const busLon = business.location.coordinates[0];
+        const busLat = business.location.coordinates[1];
+
         const distanceInMeters = calculateDistance(
           parseFloat(latitude),
           parseFloat(longitude),
-          business.location.coordinates[1], // latitude
-          business.location.coordinates[0]  // longitude
+          busLat,
+          busLon
         );
+
         const distanceInKm = distanceInMeters / 1000;
         businessObj.distance = distanceInKm; // Convert to KM for frontend
 
@@ -433,6 +484,9 @@ exports.getNearbyBusinesses = async (req, res, next) => {
         if (index < 3) {
           console.log(`      ${index + 1}. ${business.name}: ${distanceInKm.toFixed(2)}km (${distanceInMeters.toFixed(0)}m)`);
         }
+      } else {
+        console.log(`   ⚠️ Business ${business._id} (${business.name}) has missing or invalid coordinates`);
+        businessObj.distance = null;
       }
       return businessObj;
     });

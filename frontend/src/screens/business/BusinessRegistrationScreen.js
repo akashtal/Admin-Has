@@ -9,11 +9,15 @@ import {
   Alert,
   StatusBar,
   Image,
-  Platform
+  Platform,
+  Switch,
+  Modal,
+  Pressable
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Constants from 'expo-constants';
 import { useDispatch, useSelector } from 'react-redux';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { Picker } from '@react-native-picker/picker';
@@ -22,6 +26,14 @@ import PhoneInput from 'react-native-phone-number-input';
 import AdvancedLocationPicker from '../../components/AdvancedLocationPicker';
 import ApiService from '../../services/api.service';
 import COLORS from '../../config/colors';
+import { parseBackendErrors, showErrorMessage } from '../../utils/errorHandler';
+import ValidatedTextInput from '../../components/common/ValidatedTextInput';
+
+const GOOGLE_API_KEY =
+  process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ||
+  process.env.EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY ||
+  Constants.expoConfig?.android?.config?.googleMaps?.apiKey ||
+  Constants.expoConfig?.ios?.config?.googleMapsApiKey;
 
 export default function BusinessRegistrationScreen({ navigation }) {
   const dispatch = useDispatch();
@@ -47,6 +59,8 @@ export default function BusinessRegistrationScreen({ navigation }) {
     googleBusinessName: '',
     category: ''
   });
+
+  const [errors, setErrors] = useState({});
 
   const [images, setImages] = useState({
     logo: null,
@@ -97,6 +111,16 @@ export default function BusinessRegistrationScreen({ navigation }) {
     sunday: { open: '09:00 AM', close: '05:00 PM', closed: true }
   });
 
+  const [timePickerModal, setTimePickerModal] = useState({
+    visible: false,
+    day: null,
+    field: null // 'open' or 'close'
+  });
+
+  const [applyToAll, setApplyToAll] = useState(false);
+
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+
   const businessPhoneInputRef = useRef(null);
   const [businessPhoneRawValue, setBusinessPhoneRawValue] = useState('');
   const [businessPhoneError, setBusinessPhoneError] = useState('');
@@ -111,9 +135,6 @@ export default function BusinessRegistrationScreen({ navigation }) {
 
     try {
       setSearchingAddress(true);
-
-      // Get Google API key from environment
-      const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY;
 
       if (!GOOGLE_API_KEY) {
         console.error('❌ Google API key not configured');
@@ -236,7 +257,6 @@ export default function BusinessRegistrationScreen({ navigation }) {
   };
 
   const geocodeManualAddress = async (addressPayload) => {
-    const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY;
     if (!GOOGLE_API_KEY) return;
 
     const { buildingNumber, street, city, county, postcode } = addressPayload;
@@ -472,6 +492,10 @@ export default function BusinessRegistrationScreen({ navigation }) {
 
   const handleInputChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
+    // Clear error for this field if it exists
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: null }));
+    }
   };
 
   const pickImage = async (type) => {
@@ -595,47 +619,113 @@ export default function BusinessRegistrationScreen({ navigation }) {
   };
 
   const updateOpenHours = (day, field, value) => {
-    setOpenHours({
-      ...openHours,
-      [day]: {
-        ...openHours[day],
-        [field]: value,
-        closed: value === 'Closed'
-      }
+    if (applyToAll) {
+      const newOpenHours = {};
+      Object.keys(openHours).forEach(d => {
+        newOpenHours[d] = {
+          ...openHours[d],
+          [field]: value
+        };
+      });
+      setOpenHours(newOpenHours);
+    } else {
+      setOpenHours({
+        ...openHours,
+        [day]: {
+          ...openHours[day],
+          [field]: value
+        }
+      });
+    }
+  };
+
+  const toggleDayClosed = (day) => {
+    const isNowClosed = !openHours[day].closed;
+
+    if (applyToAll) {
+      const newOpenHours = {};
+      Object.keys(openHours).forEach(d => {
+        newOpenHours[d] = {
+          ...openHours[d],
+          closed: isNowClosed
+        };
+      });
+      setOpenHours(newOpenHours);
+    } else {
+      setOpenHours({
+        ...openHours,
+        [day]: {
+          ...openHours[day],
+          closed: isNowClosed
+        }
+      });
+    }
+  };
+
+  const openTimePicker = (day, field) => {
+    setTimePickerModal({
+      visible: true,
+      day,
+      field
     });
   };
 
+  const handleTimeSelect = (time) => {
+    const { day, field } = timePickerModal;
+    updateOpenHours(day, field, time);
+    setTimePickerModal({ ...timePickerModal, visible: false });
+  };
+
   const validateForm = () => {
-    if (!formData.businessName.trim()) {
-      Alert.alert('Error', 'Please enter business name');
+    if (!formData.businessName || !formData.businessName.trim()) {
+      showErrorMessage('Please enter business name');
       return false;
     }
-    if (!formData.firstName.trim() || !formData.lastName.trim()) {
-      Alert.alert('Error', 'Please enter your full name');
+    if (!formData.firstName || !formData.firstName.trim()) {
+      showErrorMessage('Please enter first name');
       return false;
     }
-    if (!formData.email.trim() || !formData.email.includes('@')) {
-      Alert.alert('Error', 'Please enter a valid email address');
+    if (!formData.lastName || !formData.lastName.trim()) {
+      showErrorMessage('Please enter last name');
       return false;
     }
-    if (!formData.phone.trim()) {
-      setBusinessPhoneError('Phone number is required');
-      Alert.alert('Error', 'Please enter phone number');
+    if (!formData.email || !formData.email.trim()) {
+      showErrorMessage('Please enter email address');
+      return false;
+    }
+    if (!formData.email.includes('@')) {
+      showErrorMessage('Please enter a valid email address');
       return false;
     }
     const isPhoneValid = businessPhoneInputRef.current?.isValidNumber(businessPhoneRawValue);
     if (!isPhoneValid) {
       setBusinessPhoneError('Please enter a valid phone number with country code');
-      Alert.alert('Error', 'Please enter a valid phone number with country code');
+      showErrorMessage('Please enter a valid phone number with country code');
+      return false;
+    }
+    const phoneLength = businessPhoneRawValue.replace(/\D/g, '').length;
+    if (phoneLength < 7 || phoneLength > 15) {
+      showErrorMessage('Please enter a valid phone number with country code');
       return false;
     }
     setBusinessPhoneError('');
-    if (!formData.address.trim()) {
-      Alert.alert('Error', 'Please enter business address');
+
+    // Validate required address fields for business registration
+    if (!formData.street || !formData.street.trim()) {
+      showErrorMessage('Please enter street name');
       return false;
     }
+    if (!formData.city || !formData.city.trim()) {
+      showErrorMessage('Please enter town/city');
+      return false;
+    }
+    if (!formData.postcode || !formData.postcode.trim()) {
+      showErrorMessage('Please enter postcode');
+      return false;
+    }
+
     if (!formData.category) {
-      Alert.alert('Error', 'Please select business category');
+      showErrorMessage('Please select business category');
       return false;
     }
     return true;
@@ -772,34 +862,20 @@ export default function BusinessRegistrationScreen({ navigation }) {
       }
 
       // Navigate immediately (don't wait for image uploads)
+      // Navigate to KYC screen for verification
       setTimeout(() => {
-        navigation.navigate('BusinessDashboard');
+        navigation.navigate('BusinessKYC', { businessId });
       }, 100);
 
     } catch (error) {
       console.error('❌ Registration failed:', error);
 
-      // Handle error object from Redux thunk
-      let errorMessage = 'Failed to register business. Please check your internet connection and try again.';
-      let errorDetails = [];
+      const { fieldErrors } = parseBackendErrors(error);
+      setErrors(fieldErrors);
 
-      if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error?.message) {
-        errorMessage = error.message;
-        errorDetails = error.errors || [];
-      } else if (error?.response?.data) {
-        errorMessage = error.response.data.message || errorMessage;
-        errorDetails = error.response.data.errors || [];
-      }
+      // Show detailed validation errors using flash message
+      showErrorMessage(error, { title: 'Registration Failed' });
 
-      // Show detailed validation errors if available
-      if (errorDetails.length > 0) {
-        const detailedMessage = `${errorMessage}\n\n${errorDetails.join('\n')}`;
-        Alert.alert('Registration Failed', detailedMessage);
-      } else {
-        Alert.alert('Registration Failed', errorMessage);
-      }
     } finally {
       setUploading(false);
     }
@@ -1212,20 +1288,21 @@ export default function BusinessRegistrationScreen({ navigation }) {
         </View>
 
         {/* Business Description */}
-        <View className="mb-5">
-          <Text className="text-gray-800 font-bold mb-2 text-base">Business Description *</Text>
-          <TextInput
-            className="bg-white rounded-xl px-4 py-4 text-gray-900 border border-gray-300 shadow-sm"
-            placeholder="Tell customers about your business..."
-            placeholderTextColor="#9CA3AF"
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-            value={formData.description}
-            onChangeText={(value) => handleInputChange('description', value)}
-            style={{ fontSize: 15, fontWeight: '500', minHeight: 100 }}
-          />
-        </View>
+        {/* Business Description */}
+        <ValidatedTextInput
+          label="Business Description"
+          fieldName="description"
+          value={formData.description}
+          onChangeText={(value) => handleInputChange('description', value)}
+          multiline
+          numberOfLines={4}
+          showCounter
+          maxLength={500}
+          required
+          hint="Describe your business, services, and amenities"
+          placeholder="Tell customers about your business..."
+          error={errors.description}
+        />
 
         {/* Logo Upload */}
         <View className="mb-5">
@@ -1423,68 +1500,117 @@ export default function BusinessRegistrationScreen({ navigation }) {
           </Text>
         </View>
 
-        {/* Open Hours */}
-        <View className="mb-4">
-          <View className="flex-row justify-between items-center mb-3">
-            <Text className="text-gray-900 font-semibold">Open Hours</Text>
-            <Text className="text-xs text-gray-500">Leave Unset if closed</Text>
+        {/* Open Hours Section */}
+        <View className="mb-6">
+          <View className="flex-row justify-between items-center mb-4 px-1">
+            <View>
+              <Text className="text-lg font-bold text-gray-900">Open Hours</Text>
+              <Text className="text-xs text-gray-500">Set your weekly schedule</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setApplyToAll(!applyToAll)}
+              activeOpacity={0.7}
+              className={`flex-row items-center px-3 py-1.5 rounded-full border ${applyToAll ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
+                }`}
+            >
+              <Text className={`text-[10px] font-bold mr-2 ${applyToAll ? 'text-blue-600' : 'text-gray-500'}`}>
+                APPLY TO ALL
+              </Text>
+              <Switch
+                value={applyToAll}
+                onValueChange={setApplyToAll}
+                trackColor={{ false: '#D1D5DB', true: '#93C5FD' }}
+                thumbColor={applyToAll ? '#2563EB' : '#F3F4F6'}
+                ios_backgroundColor="#D1D5DB"
+                style={{ transform: [{ scaleX: 0.7 }, { scaleY: 0.7 }] }}
+              />
+            </TouchableOpacity>
           </View>
 
           {Object.keys(openHours).map((day) => (
-            <View key={day} className="flex-row items-center justify-between mb-3">
-              <Text className="text-gray-900 w-24 capitalize">{day}:</Text>
-
-              <View className="flex-row flex-1">
-                <View className="flex-1 mr-2 bg-white rounded-xl border border-gray-200">
-                  <Picker
-                    selectedValue={openHours[day].open}
-                    onValueChange={(value) => updateOpenHours(day, 'open', value)}
-                    style={{ height: 50 }}
-                  >
-                    {timeSlots.map((time) => (
-                      <Picker.Item key={time} label={time} value={time} />
-                    ))}
-                  </Picker>
+            <View key={day} className="bg-white rounded-2xl p-4 mb-3 border border-gray-100 shadow-sm">
+              <View className="flex-row items-center justify-between mb-3">
+                <View className="flex-row items-center">
+                  <View className={`w-2 h-2 rounded-full mr-2 ${openHours[day].closed ? 'bg-red-400' : 'bg-green-400'}`} />
+                  <Text className="text-gray-900 font-bold capitalize text-base">{day}</Text>
                 </View>
-
-                <View className="flex-1 ml-2 bg-white rounded-xl border border-gray-200">
-                  <Picker
-                    selectedValue={openHours[day].close}
-                    onValueChange={(value) => updateOpenHours(day, 'close', value)}
-                    style={{ height: 50 }}
-                    enabled={openHours[day].open !== 'Closed'}
-                  >
-                    {timeSlots.map((time) => (
-                      <Picker.Item key={time} label={time} value={time} />
-                    ))}
-                  </Picker>
+                <View className="flex-row items-center">
+                  <Text className={`text-[10px] mr-2 font-bold ${openHours[day].closed ? 'text-red-500' : 'text-green-600'}`}>
+                    {openHours[day].closed ? 'CLOSED' : 'OPEN'}
+                  </Text>
+                  <Switch
+                    value={!openHours[day].closed}
+                    onValueChange={() => toggleDayClosed(day)}
+                    trackColor={{ false: '#FECACA', true: '#A7F3D0' }}
+                    thumbColor={!openHours[day].closed ? '#10B981' : '#EF4444'}
+                    ios_backgroundColor="#FECACA"
+                    style={{ transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }] }}
+                  />
                 </View>
               </View>
+
+              {!openHours[day].closed && (
+                <View className="flex-row items-center">
+                  <TouchableOpacity
+                    onPress={() => openTimePicker(day, 'open')}
+                    activeOpacity={0.7}
+                    className="flex-1 bg-gray-50 rounded-xl py-3 px-4 border border-gray-100 flex-row items-center justify-between"
+                  >
+                    <View>
+                      <Text className="text-[10px] text-gray-400 uppercase font-bold mb-0.5">Opens At</Text>
+                      <Text className="text-gray-900 font-bold">{openHours[day].open}</Text>
+                    </View>
+                    <Icon name="time-outline" size={18} color={COLORS.secondary} />
+                  </TouchableOpacity>
+
+                  <View className="w-10 items-center justify-center">
+                    <View className="w-4 h-[1px] bg-gray-200" />
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => openTimePicker(day, 'close')}
+                    activeOpacity={0.7}
+                    className="flex-1 bg-gray-50 rounded-xl py-3 px-4 border border-gray-100 flex-row items-center justify-between"
+                  >
+                    <View>
+                      <Text className="text-[10px] text-gray-400 uppercase font-bold mb-0.5">Closes At</Text>
+                      <Text className="text-gray-900 font-bold">{openHours[day].close}</Text>
+                    </View>
+                    <Icon name="time-outline" size={18} color={COLORS.secondary} />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           ))}
         </View>
 
-        {/* Business Category */}
-        <View className="mb-6">
-          <Text className="text-gray-900 font-semibold mb-2">Business Category</Text>
+        {/* Business Category Section */}
+        <View className="mb-8">
+          <Text className="text-lg font-bold text-gray-900 mb-3 ml-1">Business Category</Text>
           {loadingCategories ? (
-            <View className="bg-white rounded-xl border border-gray-200 py-4 items-center">
-              <ActivityIndicator size="small" color={COLORS.primary} />
-              <Text className="text-gray-500 text-sm mt-2">Loading categories...</Text>
+            <View className="bg-gray-50 rounded-2xl border border-gray-100 py-6 items-center shadow-sm">
+              <ActivityIndicator size="small" color={COLORS.secondary} />
+              <Text className="text-gray-500 text-xs mt-3 font-medium">Loading categories...</Text>
             </View>
           ) : (
-            <View className="bg-white rounded-xl border border-gray-200">
-              <Picker
-                selectedValue={formData.category}
-                onValueChange={(value) => handleInputChange('category', value)}
-                style={{ height: 50 }}
-                enabled={!loadingCategories}
-              >
-                {categories.map((cat) => (
-                  <Picker.Item key={cat.value} label={cat.label} value={cat.value} />
-                ))}
-              </Picker>
-            </View>
+            <TouchableOpacity
+              onPress={() => setCategoryModalVisible(true)}
+              activeOpacity={0.7}
+              className="bg-white rounded-2xl py-4 px-5 border border-gray-100 flex-row items-center justify-between shadow-sm"
+            >
+              <View className="flex-row items-center">
+                <View className="bg-blue-50 p-2 rounded-lg mr-4">
+                  <Icon name="pricetags-outline" size={20} color={COLORS.secondary} />
+                </View>
+                <View>
+                  <Text className="text-[10px] text-gray-400 uppercase font-bold mb-0.5">Category</Text>
+                  <Text className={`text-base font-bold ${formData.category ? 'text-gray-900' : 'text-gray-400'}`}>
+                    {categories.find(c => c.value === formData.category)?.label || 'Select Category'}
+                  </Text>
+                </View>
+              </View>
+              <Icon name="chevron-down-outline" size={20} color="#D1D5DB" />
+            </TouchableOpacity>
           )}
         </View>
 
@@ -1514,7 +1640,134 @@ export default function BusinessRegistrationScreen({ navigation }) {
 
       </ScrollView>
 
-      {/* Advanced Location Picker Modal - 3 modes: Search, Map, Manual */}
+      {/* Time Picker Modal */}
+      <Modal
+        visible={timePickerModal.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setTimePickerModal({ ...timePickerModal, visible: false })}
+      >
+        <Pressable
+          className="flex-1 bg-black/60 justify-end"
+          onPress={() => setTimePickerModal({ ...timePickerModal, visible: false })}
+        >
+          <View className="bg-white rounded-t-3xl p-6 shadow-2xl" style={{ maxHeight: '75%' }}>
+            <View className="flex-row justify-between items-center mb-6">
+              <View>
+                <Text className="text-xl font-bold text-gray-900 capitalize">
+                  {timePickerModal.day}
+                </Text>
+                <Text className="text-sm text-gray-500">
+                  Select {timePickerModal.field === 'open' ? 'opening' : 'closing'} time
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setTimePickerModal({ ...timePickerModal, visible: false })}
+                className="bg-gray-100 p-2 rounded-full"
+              >
+                <Icon name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} className="mb-4">
+              <View className="flex-row flex-wrap justify-between">
+                {timeSlots.filter(t => t !== 'Closed').map((time) => (
+                  <TouchableOpacity
+                    key={time}
+                    onPress={() => handleTimeSelect(time)}
+                    className={`w-[31%] py-3 mb-3 rounded-xl items-center border ${openHours[timePickerModal.day]?.[timePickerModal.field] === time
+                      ? 'bg-blue-50 border-blue-600 shadow-sm'
+                      : 'bg-white border-gray-100'
+                      }`}
+                  >
+                    <Text className={`font-bold text-xs ${openHours[timePickerModal.day]?.[timePickerModal.field] === time
+                      ? 'text-blue-700'
+                      : 'text-gray-900'
+                      }`}>
+                      {time}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => setTimePickerModal({ ...timePickerModal, visible: false })}
+              className="bg-gray-900 py-4 rounded-xl items-center mt-2"
+            >
+              <Text className="text-white font-bold text-base">Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Category Selection Modal */}
+      <Modal
+        visible={categoryModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setCategoryModalVisible(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black/60 justify-end"
+          onPress={() => setCategoryModalVisible(false)}
+        >
+          <View className="bg-white rounded-t-3xl p-6 shadow-2xl" style={{ maxHeight: '80%' }}>
+            <View className="flex-row justify-between items-center mb-6">
+              <View>
+                <Text className="text-2xl font-bold text-gray-900">Select Category</Text>
+                <Text className="text-sm text-gray-500">Pick the best category for your business</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setCategoryModalVisible(false)}
+                className="bg-gray-100 p-2 rounded-full"
+              >
+                <Icon name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} className="mb-4">
+              <View className="space-y-3">
+                {categories.filter(c => c.value !== '').map((cat) => (
+                  <TouchableOpacity
+                    key={cat.value}
+                    onPress={() => {
+                      handleInputChange('category', cat.value);
+                      setCategoryModalVisible(false);
+                    }}
+                    className={`py-4 px-5 rounded-2xl flex-row items-center justify-between border ${formData.category === cat.value
+                      ? 'bg-blue-50 border-blue-600 shadow-sm'
+                      : 'bg-white border-gray-100'
+                      }`}
+                  >
+                    <View className="flex-row items-center">
+                      <View className={`p-2 rounded-lg mr-4 ${formData.category === cat.value ? 'bg-blue-100' : 'bg-gray-50'
+                        }`}>
+                        <Icon name="pricetag-outline" size={20} color={formData.category === cat.value ? COLORS.secondary : '#9CA3AF'} />
+                      </View>
+                      <Text className={`font-bold text-base ${formData.category === cat.value ? 'text-blue-700' : 'text-gray-900'
+                        }`}>
+                        {cat.label}
+                      </Text>
+                    </View>
+                    {formData.category === cat.value && (
+                      <Icon name="checkmark-circle" size={24} color={COLORS.secondary} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => setCategoryModalVisible(false)}
+              className="bg-gray-900 py-4 rounded-xl items-center mt-2"
+            >
+              <Text className="text-white font-bold text-base">Close</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
       <AdvancedLocationPicker
         visible={showLocationPicker}
         onClose={() => setShowLocationPicker(false)}
@@ -1527,7 +1780,6 @@ export default function BusinessRegistrationScreen({ navigation }) {
             error: null
           });
 
-          // Auto-fill address fields if components are available
           if (selectedLocation.addressComponents) {
             const { buildingNumber, street, city, county, postcode, country } = selectedLocation.addressComponents;
             setFormData(prev => ({
@@ -1548,7 +1800,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
           console.log('✅ Location selected:', selectedLocation);
         }}
         initialLocation={location}
-        googleApiKey={process.env.EXPO_PUBLIC_GOOGLE_GEOCODING_API_KEY}
+        googleApiKey={GOOGLE_API_KEY}
       />
     </View>
   );

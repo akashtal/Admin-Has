@@ -42,8 +42,27 @@ exports.submitSupportTicket = async (req, res, next) => {
           <p>Thank you for contacting HashView Support!</p>
         `
       });
+
+      // Notify admin
+      await sendEmail({
+        to: 'hashview01@gmail.com',
+        subject: `New Support Ticket: ${ticket.subject}`,
+        html: `
+          <h2>New Support Ticket Received</h2>
+          <p><strong>From:</strong> ${req.user.name} (${req.user.email})</p>
+          <p><strong>Ticket ID:</strong> ${ticket._id}</p>
+          <p><strong>Subject:</strong> ${ticket.subject}</p>
+          <p><strong>Category:</strong> ${ticket.category}</p>
+          <p><strong>Priority:</strong> ${ticket.priority}</p>
+          <hr>
+          <p><strong>Message:</strong></p>
+          <p>${ticket.message}</p>
+          <hr>
+          <p>Please review and respond in the admin dashboard.</p>
+        `
+      });
     } catch (emailError) {
-      console.error('Failed to send ticket confirmation email:', emailError);
+      console.error('Failed to send ticket emails:', emailError);
     }
 
     res.status(201).json({

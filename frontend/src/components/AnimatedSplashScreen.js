@@ -16,7 +16,7 @@ const { width, height } = Dimensions.get('window');
 // Keep splash screen visible while we prepare the app
 SplashScreen.preventAutoHideAsync().catch(console.warn);
 
-export default function AnimatedSplashScreen({ onAnimationComplete }) {
+export default function AnimatedSplashScreen({ onAnimationComplete, isReady }) {
   const logoScale = useSharedValue(0);
   const logoRotation = useSharedValue(0);
   const circleScale = useSharedValue(0);
@@ -65,21 +65,27 @@ export default function AnimatedSplashScreen({ onAnimationComplete }) {
       -1,
       false
     );
-
-    // Fade out and complete
-    setTimeout(() => {
-      opacity.value = withTiming(0, {
-        duration: 500,
-        easing: Easing.ease,
-      });
-      setTimeout(() => {
-        SplashScreen.hideAsync().catch(console.warn);
-        if (onAnimationComplete) {
-          onAnimationComplete();
-        }
-      }, 500);
-    }, 2000); // Show for 2 seconds
   }, []);
+
+  // Handle splash completion once ready
+  useEffect(() => {
+    if (isReady) {
+      // Fade out and complete
+      const timer = setTimeout(() => {
+        opacity.value = withTiming(0, {
+          duration: 500,
+          easing: Easing.ease,
+        });
+        setTimeout(() => {
+          SplashScreen.hideAsync().catch(console.warn);
+          if (onAnimationComplete) {
+            onAnimationComplete();
+          }
+        }, 500);
+      }, 1000); // Give a bit of time for the entry animation to feel natural
+      return () => clearTimeout(timer);
+    }
+  }, [isReady]);
 
   const circleAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: circleScale.value }],

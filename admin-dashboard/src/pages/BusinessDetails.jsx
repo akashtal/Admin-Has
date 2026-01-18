@@ -146,8 +146,25 @@ const BusinessDetails = () => {
     }
   };
 
-  // KYC Action Removed
-  // const handleKYCAction = ...
+  const handleKYCAction = async (action) => {
+    if (action === 'reject' && !reason) {
+      alert('Please provide a reason for rejection');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      await adminApi.updateBusinessKYC(id, action, reason);
+      alert(`Business ${action}ed successfully`);
+      fetchBusinessDetails();
+      setReason('');
+    } catch (error) {
+      console.error('KYC action error:', error);
+      alert(error.response?.data?.message || 'Failed to update KYC status');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const handleUpdateRadius = async () => {
     const radiusValue = parseInt(radius);
@@ -951,7 +968,56 @@ const BusinessDetails = () => {
             </div>
           )}
 
-          {/* Didit Verification Removed */}
+          {/* KYC Documents */}
+          {business.documents && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">KYC Documents (Identity Verification)</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                {/* ID Proof */}
+                {business.documents.ownerIdProof && (
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <p className="font-medium text-gray-900 mb-2">Owner ID Proof</p>
+                    <a href={business.documents.ownerIdProof.url} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={business.documents.ownerIdProof.url}
+                        alt="ID Proof"
+                        className="w-full h-48 object-cover rounded-md bg-gray-50 border border-gray-100"
+                      />
+                    </a>
+                  </div>
+                )}
+
+                {/* Address Proof */}
+                {business.documents.addressProof && (
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <p className="font-medium text-gray-900 mb-2">Address Proof</p>
+                    <a href={business.documents.addressProof.url} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={business.documents.addressProof.url}
+                        alt="Address Proof"
+                        className="w-full h-48 object-cover rounded-md bg-gray-50 border border-gray-100"
+                      />
+                    </a>
+                  </div>
+                )}
+
+                {/* Selfie */}
+                {business.documents.selfie && (
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <p className="font-medium text-gray-900 mb-2">Owner Selfie</p>
+                    <a href={business.documents.selfie.url} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={business.documents.selfie.url}
+                        alt="Selfie"
+                        className="w-full h-48 object-cover rounded-md bg-gray-50 border border-gray-100"
+                      />
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}

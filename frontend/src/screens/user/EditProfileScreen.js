@@ -14,7 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { useDispatch, useSelector } from 'react-redux';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import { showMessage } from 'react-native-flash-message';
 import ApiService from '../../services/api.service';
 import { updateUser } from '../../store/slices/authSlice';
@@ -80,7 +80,7 @@ export default function EditProfileScreen({ navigation }) {
         quality: 0.8,
       });
 
-      if (!result.canceled) {
+      if (!result.canceled && result.assets && result.assets.length > 0) {
         setUploading(true);
 
         // Create FormData for image upload

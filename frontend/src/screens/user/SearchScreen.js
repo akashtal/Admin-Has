@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, TextInput, FlatList, TouchableOpacity, ActivityIndicator, ScrollView, StatusBar, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import ApiService from '../../services/api.service';
 import COLORS from '../../config/colors';
@@ -34,7 +34,10 @@ export default function SearchScreen({ navigation }) {
     try {
       const { status } = await Location.getForegroundPermissionsAsync();
       if (status === 'granted') {
-        const location = await Location.getCurrentPositionAsync({});
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+          timeout: 10000,
+        });
         setCurrentLocation({
           latitude: location.coords.latitude,
           longitude: location.coords.longitude
@@ -44,7 +47,7 @@ export default function SearchScreen({ navigation }) {
         setHasLocation(false);
       }
     } catch (error) {
-      console.error('Error getting location:', error);
+      console.error('Error checking location permission or getting location:', error);
       setHasLocation(false);
     }
   };
@@ -53,7 +56,7 @@ export default function SearchScreen({ navigation }) {
     try {
       setLoadingCategories(true);
       const response = await ApiService.getCategories();
-      
+
       // Add "All" category at the beginning
       const allCategory = {
         _id: 'all',
@@ -63,7 +66,7 @@ export default function SearchScreen({ navigation }) {
         color: COLORS.secondary,
         order: -1
       };
-      
+
       setCategories([allCategory, ...response.categories]);
     } catch (error) {
       console.error('Failed to load categories:', error);
@@ -86,19 +89,19 @@ export default function SearchScreen({ navigation }) {
     try {
       setSearchLoading(true);
       const params = {};
-      
+
       // Pass search query to backend (backend handles case-insensitive search)
       if (searchQuery && searchQuery.trim() !== '') {
         params.search = searchQuery.trim();
         console.log('🔍 Searching for:', params.search);
       }
-      
+
       // Pass category to backend (backend handles case-insensitive matching)
       if (selectedCategory && typeof selectedCategory === 'string' && selectedCategory.trim() !== '') {
         params.category = selectedCategory.trim();
         console.log('🏷️ Filtering by category:', params.category);
       }
-      
+
       console.log('📡 API params:', params);
 
       // Call API directly (not through Redux) to keep search screen independent
@@ -185,7 +188,7 @@ export default function SearchScreen({ navigation }) {
             <Text className="text-base font-bold text-gray-900 mb-1" numberOfLines={1}>
               {item.name}
             </Text>
-            
+
             {/* Ratings Row */}
             <View className="flex-row items-center mb-1 flex-wrap">
               <Icon name="star" size={14} color={COLORS.secondary} />
@@ -202,7 +205,7 @@ export default function SearchScreen({ navigation }) {
               )}
               {item.externalProfiles?.tripAdvisor?.rating && (
                 <>
-                  <Image 
+                  <Image
                     source={require('../../../assets/tripadvisor.png')}
                     style={{ width: 12, height: 12 }}
                     resizeMode="contain"
@@ -213,7 +216,7 @@ export default function SearchScreen({ navigation }) {
                 </>
               )}
             </View>
-            
+
             <View className="flex-row items-center">
               <Icon name="location-outline" size={12} color="#6B7280" />
               <Text className="text-xs text-gray-500 ml-1 flex-1" numberOfLines={1}>
@@ -221,7 +224,7 @@ export default function SearchScreen({ navigation }) {
               </Text>
             </View>
           </View>
-          
+
           <View className="flex-row items-center justify-between">
             <View className="rounded-full px-2 py-1" style={{ backgroundColor: '#FFF9F0' }}>
               <Text className="text-xs font-semibold capitalize" style={{ color: COLORS.secondary }}>
@@ -251,7 +254,7 @@ export default function SearchScreen({ navigation }) {
             <Icon name="close" size={28} color="#FFF" />
           </TouchableOpacity>
         </View>
-        
+
         <View className="flex-row items-center bg-white rounded-2xl px-4 py-3 shadow-lg">
           <Icon name="search" size={22} color={COLORS.secondary} />
           <TextInput
@@ -285,7 +288,7 @@ export default function SearchScreen({ navigation }) {
 
         {/* Search Results Dropdown - Shows results as user types, appears below search bar */}
         {searchQuery.length > 0 && (
-          <View 
+          <View
             className="bg-white rounded-2xl shadow-2xl mx-0 mt-2"
             style={{
               maxHeight: 320,
@@ -296,86 +299,86 @@ export default function SearchScreen({ navigation }) {
               elevation: 10, // For Android shadow
             }}
           >
-              {searchLoading ? (
-                <View className="py-6 items-center">
-                  <ActivityIndicator size="small" color={COLORS.secondary} />
-                  <Text className="text-gray-500 mt-2 text-sm">Searching...</Text>
-                </View>
-              ) : searchResults.length > 0 ? (
-                <ScrollView 
-                  className="max-h-80"
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                >
-                  {searchResults.slice(0, 10).map((business) => (
-                    <TouchableOpacity
-                      key={business._id}
-                      onPress={() => {
-                        setSearchQuery('');
-                        navigation.navigate('BusinessDetail', { businessId: business._id });
-                      }}
-                      className="px-4 py-3 border-b border-gray-100 active:bg-gray-50"
-                    >
-                      <View className="flex-row items-center">
-                        <View className="w-12 h-12 rounded-lg overflow-hidden mr-3 bg-gray-100">
-                          {business.coverImage?.url || business.logo?.url ? (
-                            <Image
-                              source={{ uri: optimizeImageUri(business.coverImage?.url || business.logo?.url, 100, 100) }}
-                              className="w-full h-full"
-                              resizeMode="cover"
-                            />
-                          ) : (
-                            <View className="w-full h-full items-center justify-center">
-                              <Icon name="business" size={20} color={COLORS.secondary} />
-                            </View>
-                          )}
-                        </View>
-                        <View className="flex-1">
-                          <Text className="text-base font-semibold text-gray-900" numberOfLines={1}>
-                            {business.name}
-                          </Text>
-                          <View className="flex-row items-center mt-1">
-                            <Icon name="location-outline" size={12} color="#6B7280" />
-                            <Text className="text-xs text-gray-500 ml-1 flex-1" numberOfLines={1}>
-                              {business.address?.fullAddress || business.address?.city || 'Location not specified'}
-                            </Text>
+            {searchLoading ? (
+              <View className="py-6 items-center">
+                <ActivityIndicator size="small" color={COLORS.secondary} />
+                <Text className="text-gray-500 mt-2 text-sm">Searching...</Text>
+              </View>
+            ) : searchResults.length > 0 ? (
+              <ScrollView
+                className="max-h-80"
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {searchResults.slice(0, 10).map((business) => (
+                  <TouchableOpacity
+                    key={business._id}
+                    onPress={() => {
+                      setSearchQuery('');
+                      navigation.navigate('BusinessDetail', { businessId: business._id });
+                    }}
+                    className="px-4 py-3 border-b border-gray-100 active:bg-gray-50"
+                  >
+                    <View className="flex-row items-center">
+                      <View className="w-12 h-12 rounded-lg overflow-hidden mr-3 bg-gray-100">
+                        {business.coverImage?.url || business.logo?.url ? (
+                          <Image
+                            source={{ uri: optimizeImageUri(business.coverImage?.url || business.logo?.url, 100, 100) }}
+                            className="w-full h-full"
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View className="w-full h-full items-center justify-center">
+                            <Icon name="business" size={20} color={COLORS.secondary} />
                           </View>
-                          {business.category && (
-                            <View className="mt-1">
-                              <Text className="text-xs text-gray-400 capitalize">{business.category}</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Icon name="chevron-forward" size={20} color="#D1D5DB" />
+                        )}
                       </View>
-                    </TouchableOpacity>
-                  ))}
-                  {searchResults.length > 10 && (
-                    <View className="px-4 py-3 border-t border-gray-100">
-                      <Text className="text-xs text-gray-500 text-center">
-                        Showing 10 of {searchResults.length} results
-                      </Text>
+                      <View className="flex-1">
+                        <Text className="text-base font-semibold text-gray-900" numberOfLines={1}>
+                          {business.name}
+                        </Text>
+                        <View className="flex-row items-center mt-1">
+                          <Icon name="location-outline" size={12} color="#6B7280" />
+                          <Text className="text-xs text-gray-500 ml-1 flex-1" numberOfLines={1}>
+                            {business.address?.fullAddress || business.address?.city || 'Location not specified'}
+                          </Text>
+                        </View>
+                        {business.category && (
+                          <View className="mt-1">
+                            <Text className="text-xs text-gray-400 capitalize">{business.category}</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Icon name="chevron-forward" size={20} color="#D1D5DB" />
                     </View>
-                  )}
-                </ScrollView>
-              ) : (
-                <View className="py-6 px-4 items-center">
-                  <Icon name="search-outline" size={32} color="#D1D5DB" />
-                  <Text className="text-gray-600 mt-2 text-sm font-medium">No results found</Text>
-                  <Text className="text-gray-400 mt-1 text-xs text-center">
-                    Try searching with different keywords
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
+                  </TouchableOpacity>
+                ))}
+                {searchResults.length > 10 && (
+                  <View className="px-4 py-3 border-t border-gray-100">
+                    <Text className="text-xs text-gray-500 text-center">
+                      Showing 10 of {searchResults.length} results
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
+            ) : (
+              <View className="py-6 px-4 items-center">
+                <Icon name="search-outline" size={32} color="#D1D5DB" />
+                <Text className="text-gray-600 mt-2 text-sm font-medium">No results found</Text>
+                <Text className="text-gray-400 mt-1 text-xs text-center">
+                  Try searching with different keywords
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
       </LinearGradient>
 
       <View className="px-6 mt-4">
         <View className="flex-row items-center justify-between mb-3">
           <Text className="text-lg font-bold text-gray-900">Browse by Category</Text>
           {selectedCategory && (
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setSelectedCategory(null)}
               className="px-3 py-1 rounded-full"
               style={{ backgroundColor: '#FEE2E2' }}
@@ -384,15 +387,15 @@ export default function SearchScreen({ navigation }) {
             </TouchableOpacity>
           )}
         </View>
-        
+
         {loadingCategories ? (
           <View className="py-10 items-center">
             <ActivityIndicator size="small" color={COLORS.secondary} />
           </View>
         ) : (
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
             className="mb-4"
             contentContainerStyle={{ paddingRight: 24, paddingBottom: 2, paddingTop: 2 }}
           >
@@ -402,11 +405,11 @@ export default function SearchScreen({ navigation }) {
               const filterValue = isAllCategory
                 ? null
                 : (category.slug || category.value || category.name || '').trim();
-              
+
               const isSelected = isAllCategory
                 ? (!selectedCategory || selectedCategory === null)
                 : (selectedCategory === filterValue && filterValue !== '');
-              
+
               return (
                 <TouchableOpacity
                   key={category._id}
@@ -427,8 +430,8 @@ export default function SearchScreen({ navigation }) {
                       width: 56,
                       height: 56,
                       borderRadius: 28,
-                      backgroundColor: isSelected 
-                        ? '#5e399e' 
+                      backgroundColor: isSelected
+                        ? '#5e399e'
                         : '#FFFFFF',
                       borderWidth: isSelected ? 0 : 1.5,
                       borderColor: '#E5E7EB',
@@ -450,9 +453,8 @@ export default function SearchScreen({ navigation }) {
                   </View>
                   {/* Category Label */}
                   <Text
-                    className={`text-[11px] font-medium text-center ${
-                      isSelected ? 'text-[#5e399e]' : 'text-gray-700'
-                    }`}
+                    className={`text-[11px] font-medium text-center ${isSelected ? 'text-[#5e399e]' : 'text-gray-700'
+                      }`}
                     numberOfLines={1}
                     style={{ lineHeight: 14 }}
                   >

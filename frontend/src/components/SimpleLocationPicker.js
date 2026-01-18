@@ -11,7 +11,7 @@ import {
   ScrollView
 } from 'react-native';
 import * as Location from 'expo-location';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import COLORS from '../config/colors';
 
 export default function SimpleLocationPicker({ visible, onClose, onSelectLocation, initialLocation }) {

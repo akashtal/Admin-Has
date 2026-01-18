@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  TouchableOpacity, 
-  ActivityIndicator, 
-  Alert, 
-  TextInput, 
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  TextInput,
   Modal,
   StatusBar,
   Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -27,7 +27,7 @@ export default function ManageUpdatesScreen({ navigation, route }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUpdate, setEditingUpdate] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  
+
   // Form state
   const [formData, setFormData] = useState({
     type: 'offer',
@@ -49,7 +49,7 @@ export default function ManageUpdatesScreen({ navigation, route }) {
       setLoading(true);
       const response = await fetch(`${API_CONFIG.BASE_URL}/business/${businessId}/updates`);
       const data = await response.json();
-      
+
       if (data.success) {
         setUpdates(data.updates || []);
       }
@@ -123,17 +123,17 @@ export default function ManageUpdatesScreen({ navigation, route }) {
 
     try {
       setSubmitting(true);
-      
+
       // Get auth token
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         Alert.alert('Error', 'You are not logged in. Please log in again.');
         return;
       }
-      
+
       // TODO: Upload image to Cloudinary if new image selected
       // For now, we'll just send the data
-      
+
       const payload = {
         type: formData.type,
         title: formData.title,
@@ -144,10 +144,10 @@ export default function ManageUpdatesScreen({ navigation, route }) {
         image: formData.image?.url || null
       };
 
-      const url = editingUpdate 
+      const url = editingUpdate
         ? `${API_CONFIG.BASE_URL}/updates/${editingUpdate._id}`
         : `${API_CONFIG.BASE_URL}/business/${businessId}/updates`;
-      
+
       const method = editingUpdate ? 'PUT' : 'POST';
 
       console.log('📤 Sending request to:', url);
@@ -254,7 +254,7 @@ export default function ManageUpdatesScreen({ navigation, route }) {
   return (
     <View className="flex-1 bg-gray-50">
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-      
+
       {/* Header */}
       <LinearGradient
         colors={[COLORS.primary, COLORS.primaryDark]}
@@ -294,15 +294,15 @@ export default function ManageUpdatesScreen({ navigation, route }) {
                     resizeMode="cover"
                   />
                 )}
-                
+
                 <View className="flex-row items-center justify-between mb-2">
-                  <View style={{ 
+                  <View style={{
                     backgroundColor: update.type === 'offer' ? COLORS.secondary + '20' : COLORS.primary + '20',
                     paddingHorizontal: 10,
                     paddingVertical: 4,
                     borderRadius: 12
                   }}>
-                    <Text style={{ 
+                    <Text style={{
                       color: update.type === 'offer' ? COLORS.secondary : COLORS.primary,
                       fontSize: 11,
                       fontWeight: 'bold',
@@ -311,26 +311,26 @@ export default function ManageUpdatesScreen({ navigation, route }) {
                       {update.type}
                     </Text>
                   </View>
-                  
+
                   <View className="flex-row items-center">
                     <TouchableOpacity
                       onPress={() => handleToggleActive(update)}
                       className="mr-3"
                     >
-                      <Icon 
-                        name={update.isActive ? "eye" : "eye-off"} 
-                        size={22} 
-                        color={update.isActive ? COLORS.primary : '#9CA3AF'} 
+                      <Icon
+                        name={update.isActive ? "eye" : "eye-off"}
+                        size={22}
+                        color={update.isActive ? COLORS.primary : '#9CA3AF'}
                       />
                     </TouchableOpacity>
-                    
+
                     <TouchableOpacity
                       onPress={() => handleOpenModal(update)}
                       className="mr-3"
                     >
                       <Icon name="pencil" size={22} color={COLORS.primary} />
                     </TouchableOpacity>
-                    
+
                     <TouchableOpacity onPress={() => handleDelete(update)}>
                       <Icon name="trash" size={22} color="#EF4444" />
                     </TouchableOpacity>
@@ -341,7 +341,7 @@ export default function ManageUpdatesScreen({ navigation, route }) {
                 <Text className="text-sm text-gray-600 mb-3">{update.description}</Text>
 
                 {update.type === 'offer' && update.discountValue > 0 && (
-                  <View style={{ 
+                  <View style={{
                     backgroundColor: COLORS.secondary + '10',
                     padding: 10,
                     borderRadius: 8,
@@ -349,7 +349,7 @@ export default function ManageUpdatesScreen({ navigation, route }) {
                     alignItems: 'center'
                   }}>
                     <Icon name="pricetag" size={16} color={COLORS.secondary} />
-                    <Text style={{ 
+                    <Text style={{
                       fontSize: 13,
                       fontWeight: 'bold',
                       color: COLORS.secondary,
@@ -370,19 +370,19 @@ export default function ManageUpdatesScreen({ navigation, route }) {
                   <Text className="text-xs text-gray-500 ml-1">
                     Created: {new Date(update.createdAt).toLocaleDateString()}
                   </Text>
-                  <View style={{ 
+                  <View style={{
                     marginLeft: 'auto',
                     flexDirection: 'row',
                     alignItems: 'center'
                   }}>
-                    <View style={{ 
+                    <View style={{
                       width: 8,
                       height: 8,
                       borderRadius: 4,
                       backgroundColor: update.isActive ? '#10B981' : '#EF4444',
                       marginRight: 6
                     }} />
-                    <Text className="text-xs font-semibold" style={{ 
+                    <Text className="text-xs font-semibold" style={{
                       color: update.isActive ? '#10B981' : '#EF4444'
                     }}>
                       {update.isActive ? 'Active' : 'Inactive'}
@@ -414,7 +414,7 @@ export default function ManageUpdatesScreen({ navigation, route }) {
       >
         <LinearGradient
           colors={[COLORS.secondary, COLORS.secondaryDark]}
-          style={{ 
+          style={{
             width: '100%',
             height: '100%',
             borderRadius: 30,
@@ -560,8 +560,8 @@ export default function ManageUpdatesScreen({ navigation, route }) {
                 className="bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 py-8 items-center justify-center"
               >
                 {formData.image ? (
-                  <Image 
-                    source={{ uri: formData.image.uri || formData.image.url }} 
+                  <Image
+                    source={{ uri: formData.image.uri || formData.image.url }}
                     className="w-full h-40 rounded-lg"
                     resizeMode="cover"
                   />

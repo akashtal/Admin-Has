@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import PhoneInput from 'react-native-phone-number-input';
 import { LinearGradient } from 'expo-linear-gradient';
 import COLORS from '../../config/colors';
@@ -80,20 +80,23 @@ export default function SignUpScreen({ navigation, route }) {
       newErrors.email = 'Please enter a valid email address';
     }
 
-    // Phone validation
-    if (Platform.OS !== 'ios') {
-      if (!formData.phone.trim()) {
-        newErrors.phone = 'Phone number is required';
-      } else {
-        const isValidPhone = phoneInputRef.current?.isValidNumber(rawPhoneValue);
-        if (!isValidPhone) {
-          newErrors.phone = 'Please enter a valid phone number';
-        }
+    // Phone validation - OPTIONAL for sign-up, but validate format if provided
+    if (formData.phone.trim()) {
+      const isValidPhone = phoneInputRef.current?.isValidNumber(rawPhoneValue);
+      if (!isValidPhone) {
+        newErrors.phone = 'Please enter a valid phone number';
       }
     }
 
-    // UK Address validation
-    if (Platform.OS !== 'ios') {
+    // UK Address validation - OPTIONAL for sign-up, but validate format if provided
+    // If any address field is filled, validate the required ones
+    const hasAnyAddressField = formData.buildingNumber.trim() ||
+      formData.street.trim() ||
+      formData.city.trim() ||
+      formData.postcode.trim();
+
+    if (hasAnyAddressField) {
+      // If user starts filling address, make key fields required
       if (!formData.buildingNumber.trim()) {
         newErrors.buildingNumber = 'Building number is required';
       }
@@ -148,21 +151,25 @@ export default function SignUpScreen({ navigation, route }) {
       .join(', ');
 
     // Navigate to email confirmation screen
+    // Only include phone and address if they were provided
     navigation.navigate('ConfirmEmail', {
       userData: {
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
-        phone: formData.phone.trim(),
+        phone: formData.phone.trim() || '', // Optional - empty string if not provided
         password: formData.password,
         role: role,
-        buildingNumber: formData.buildingNumber.trim(),
-        street: formData.street.trim(),
-        city: formData.city.trim(),
-        county: formData.county.trim(),
-        postcode: formData.postcode.trim().toUpperCase(),
-        country: formData.country,
-        landmark: formData.landmark.trim(),
-        address: formattedAddress
+        // Address fields - only include if address was provided
+        ...(formattedAddress && {
+          buildingNumber: formData.buildingNumber.trim() || '',
+          street: formData.street.trim() || '',
+          city: formData.city.trim() || '',
+          county: formData.county.trim() || '',
+          postcode: formData.postcode.trim().toUpperCase() || '',
+          country: formData.country || 'United Kingdom',
+          landmark: formData.landmark.trim() || '',
+          address: formattedAddress
+        })
       }
     });
   };
@@ -175,12 +182,14 @@ export default function SignUpScreen({ navigation, route }) {
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
         className="flex-1"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Back Button */}
           <TouchableOpacity
@@ -283,204 +292,200 @@ export default function SignUpScreen({ navigation, route }) {
               )}
             </View>
 
-            {/* Phone Number Input */}
-            {Platform.OS !== 'ios' && (
-              <View className="mb-3">
-                <Text className="text-gray-700 font-semibold mb-2 text-sm">Phone Number</Text>
-                <PhoneInput
-                  ref={phoneInputRef}
-                  defaultCode="GB"
-                  layout="first"
-                  withShadow={false}
-                  defaultValue={rawPhoneValue}
-                  value={rawPhoneValue}
-                  onChangeText={(text) => {
-                    setRawPhoneValue(text);
-                    if (errors.phone) setErrors({ ...errors, phone: null });
-                  }}
-                  onChangeFormattedText={(text) => {
-                    setFormData({ ...formData, phone: text });
-                  }}
-                  textInputProps={{
-                    placeholder: 'Enter phone number',
-                    placeholderTextColor: COLORS.gray400,
-                  }}
-                  containerStyle={{
-                    width: '100%',
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: errors.phone ? COLORS.error : COLORS.gray200,
-                    backgroundColor: '#F9FAFB',
-                  }}
-                  textContainerStyle={{
-                    backgroundColor: '#F9FAFB',
-                    borderTopRightRadius: 12,
-                    borderBottomRightRadius: 12,
-                  }}
-                  codeTextStyle={{ color: COLORS.gray900 }}
-                  textInputStyle={{ color: COLORS.gray900, fontSize: 16 }}
-                />
-                {errors.phone && (
-                  <Text className="text-red-500 text-xs mt-1">{errors.phone}</Text>
-                )}
-              </View>
-            )}
+            {/* Phone Number Input - shown for all platforms (OPTIONAL) */}
+            <View className="mb-3">
+              <Text className="text-gray-700 font-semibold mb-2 text-sm">Phone Number (Optional)</Text>
+              <PhoneInput
+                ref={phoneInputRef}
+                defaultCode="GB"
+                layout="first"
+                withShadow={false}
+                defaultValue={rawPhoneValue}
+                value={rawPhoneValue}
+                onChangeText={(text) => {
+                  setRawPhoneValue(text);
+                  if (errors.phone) setErrors({ ...errors, phone: null });
+                }}
+                onChangeFormattedText={(text) => {
+                  setFormData({ ...formData, phone: text });
+                }}
+                textInputProps={{
+                  placeholder: 'Enter phone number',
+                  placeholderTextColor: COLORS.gray400,
+                }}
+                containerStyle={{
+                  width: '100%',
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: errors.phone ? COLORS.error : COLORS.gray200,
+                  backgroundColor: '#F9FAFB',
+                }}
+                textContainerStyle={{
+                  backgroundColor: '#F9FAFB',
+                  borderTopRightRadius: 12,
+                  borderBottomRightRadius: 12,
+                }}
+                codeTextStyle={{ color: COLORS.gray900 }}
+                textInputStyle={{ color: COLORS.gray900, fontSize: 16 }}
+              />
+              {errors.phone && (
+                <Text className="text-red-500 text-xs mt-1">{errors.phone}</Text>
+              )}
+            </View>
 
-            {/* UK Address Fields */}
-            {Platform.OS !== 'ios' && (
-              <View className="mb-3">
-                <Text className="text-gray-900 font-semibold mb-2 text-sm">UK Address</Text>
+            {/* UK Address Fields - shown for all platforms (OPTIONAL) */}
+            <View className="mb-3">
+              <Text className="text-gray-900 font-semibold mb-2 text-sm">UK Address (Optional)</Text>
 
-                {/* Building Number & Street */}
-                <View className="flex-row">
-                  <View className="w-24 mr-2">
-                    <Text className="text-gray-700 font-medium mb-1 text-xs">Building No.</Text>
-                    <View
-                      className="bg-gray-50 rounded-xl px-3 py-2 border"
-                      style={{ borderColor: errors.buildingNumber ? COLORS.error : COLORS.gray200 }}
-                    >
-                      <TextInput
-                        className="text-center text-gray-900 text-sm"
-                        placeholder="123"
-                        placeholderTextColor={COLORS.gray400}
-                        value={formData.buildingNumber}
-                        onChangeText={(text) => {
-                          setFormData({ ...formData, buildingNumber: text });
-                          if (errors.buildingNumber) setErrors({ ...errors, buildingNumber: null });
-                        }}
-                      />
-                    </View>
-                    {errors.buildingNumber && (
-                      <Text className="text-red-500 text-xs mt-1">{errors.buildingNumber}</Text>
-                    )}
-                  </View>
-
-                  <View className="flex-1">
-                    <Text className="text-gray-700 font-medium mb-1 text-xs">Street Name</Text>
-                    <View
-                      className="flex-row items-center bg-gray-50 rounded-xl px-4 py-3 border"
-                      style={{ borderColor: errors.street ? COLORS.error : COLORS.gray200 }}
-                    >
-                      <Icon name="business" size={18} color={errors.street ? COLORS.error : COLORS.gray500} />
-                      <TextInput
-                        className="flex-1 ml-3 text-gray-900 text-sm"
-                        placeholder="e.g., Baker Street"
-                        placeholderTextColor={COLORS.gray400}
-                        value={formData.street}
-                        onChangeText={(text) => {
-                          setFormData({ ...formData, street: text });
-                          if (errors.street) setErrors({ ...errors, street: null });
-                        }}
-                        autoCapitalize="words"
-                      />
-                    </View>
-                    {errors.street && (
-                      <Text className="text-red-500 text-xs mt-1">{errors.street}</Text>
-                    )}
-                  </View>
-                </View>
-
-                {/* City */}
-                <View className="mt-3">
-                  <Text className="text-gray-700 font-medium mb-1 text-xs">Town/City</Text>
+              {/* Building Number & Street */}
+              <View className="flex-row">
+                <View className="w-24 mr-2">
+                  <Text className="text-gray-700 font-medium mb-1 text-xs">Building No.</Text>
                   <View
-                    className="flex-row items-center bg-gray-50 rounded-xl px-4 py-3 border"
-                    style={{ borderColor: errors.city ? COLORS.error : COLORS.gray200 }}
+                    className="bg-gray-50 rounded-xl px-3 py-2 border"
+                    style={{ borderColor: errors.buildingNumber ? COLORS.error : COLORS.gray200 }}
                   >
-                    <Icon name="home" size={18} color={errors.city ? COLORS.error : COLORS.gray500} />
                     <TextInput
-                      className="flex-1 ml-3 text-gray-900 text-sm"
-                      placeholder="e.g., London"
+                      className="text-center text-gray-900 text-sm"
+                      placeholder="123"
                       placeholderTextColor={COLORS.gray400}
-                      value={formData.city}
+                      value={formData.buildingNumber}
                       onChangeText={(text) => {
-                        setFormData({ ...formData, city: text });
-                        if (errors.city) setErrors({ ...errors, city: null });
+                        setFormData({ ...formData, buildingNumber: text });
+                        if (errors.buildingNumber) setErrors({ ...errors, buildingNumber: null });
                       }}
-                      autoCapitalize="words"
                     />
                   </View>
-                  {errors.city && (
-                    <Text className="text-red-500 text-xs mt-1">{errors.city}</Text>
+                  {errors.buildingNumber && (
+                    <Text className="text-red-500 text-xs mt-1">{errors.buildingNumber}</Text>
                   )}
                 </View>
 
-                {/* County & Postcode */}
-                <View className="flex-row mt-3">
-                  <View className="flex-1 mr-2">
-                    <Text className="text-gray-700 font-medium mb-1 text-xs">County (Optional)</Text>
-                    <View className="flex-row items-center bg-gray-50 rounded-xl px-4 py-3 border border-gray-200">
-                      <Icon name="flag" size={18} color={COLORS.gray500} />
-                      <TextInput
-                        className="flex-1 ml-3 text-gray-900 text-sm"
-                        placeholder="e.g., Greater London"
-                        placeholderTextColor={COLORS.gray400}
-                        value={formData.county}
-                        onChangeText={(text) => {
-                          setFormData({ ...formData, county: text });
-                        }}
-                        autoCapitalize="words"
-                      />
-                    </View>
-                  </View>
-
-                  <View className="flex-1 ml-2">
-                    <Text className="text-gray-700 font-medium mb-1 text-xs">Postcode</Text>
-                    <View
-                      className="flex-row items-center bg-gray-50 rounded-xl px-4 py-3 border"
-                      style={{ borderColor: errors.postcode ? COLORS.error : COLORS.gray200 }}
-                    >
-                      <Icon name="mail" size={18} color={errors.postcode ? COLORS.error : COLORS.gray500} />
-                      <TextInput
-                        className="flex-1 ml-3 text-gray-900 text-sm"
-                        placeholder="SW1A 1AA"
-                        placeholderTextColor={COLORS.gray400}
-                        value={formData.postcode}
-                        onChangeText={(text) => {
-                          const formatted = text.toUpperCase();
-                          setFormData({ ...formData, postcode: formatted });
-                          if (errors.postcode) setErrors({ ...errors, postcode: null });
-                        }}
-                        autoCapitalize="characters"
-                        maxLength={8}
-                      />
-                    </View>
-                    {errors.postcode && (
-                      <Text className="text-red-500 text-xs mt-1">{errors.postcode}</Text>
-                    )}
-                  </View>
-                </View>
-
-                {/* Country */}
-                <View className="mt-3">
-                  <Text className="text-gray-700 font-medium mb-1 text-xs">Country</Text>
-                  <View className="flex-row items-center bg-gray-100 rounded-xl px-4 py-3 border border-gray-200">
-                    <Icon name="globe" size={18} color={COLORS.gray500} />
-                    <Text className="flex-1 ml-3 text-gray-900 font-semibold text-sm">
-                      🇬🇧 {formData.country}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Landmark */}
-                <View className="mt-3">
-                  <Text className="text-gray-700 font-medium mb-1 text-xs">Landmark (Optional)</Text>
-                  <View className="flex-row items-center bg-gray-50 rounded-xl px-4 py-3 border border-gray-200">
-                    <Icon name="navigate" size={18} color={COLORS.gray500} />
+                <View className="flex-1">
+                  <Text className="text-gray-700 font-medium mb-1 text-xs">Street Name</Text>
+                  <View
+                    className="flex-row items-center bg-gray-50 rounded-xl px-4 py-3 border"
+                    style={{ borderColor: errors.street ? COLORS.error : COLORS.gray200 }}
+                  >
+                    <Icon name="business" size={18} color={errors.street ? COLORS.error : COLORS.gray500} />
                     <TextInput
                       className="flex-1 ml-3 text-gray-900 text-sm"
-                      placeholder="e.g., Near Tesco"
+                      placeholder="e.g., Baker Street"
                       placeholderTextColor={COLORS.gray400}
-                      value={formData.landmark}
+                      value={formData.street}
                       onChangeText={(text) => {
-                        setFormData({ ...formData, landmark: text });
+                        setFormData({ ...formData, street: text });
+                        if (errors.street) setErrors({ ...errors, street: null });
+                      }}
+                      autoCapitalize="words"
+                    />
+                  </View>
+                  {errors.street && (
+                    <Text className="text-red-500 text-xs mt-1">{errors.street}</Text>
+                  )}
+                </View>
+              </View>
+
+              {/* City */}
+              <View className="mt-3">
+                <Text className="text-gray-700 font-medium mb-1 text-xs">Town/City</Text>
+                <View
+                  className="flex-row items-center bg-gray-50 rounded-xl px-4 py-3 border"
+                  style={{ borderColor: errors.city ? COLORS.error : COLORS.gray200 }}
+                >
+                  <Icon name="home" size={18} color={errors.city ? COLORS.error : COLORS.gray500} />
+                  <TextInput
+                    className="flex-1 ml-3 text-gray-900 text-sm"
+                    placeholder="e.g., London"
+                    placeholderTextColor={COLORS.gray400}
+                    value={formData.city}
+                    onChangeText={(text) => {
+                      setFormData({ ...formData, city: text });
+                      if (errors.city) setErrors({ ...errors, city: null });
+                    }}
+                    autoCapitalize="words"
+                  />
+                </View>
+                {errors.city && (
+                  <Text className="text-red-500 text-xs mt-1">{errors.city}</Text>
+                )}
+              </View>
+
+              {/* County & Postcode */}
+              <View className="flex-row mt-3">
+                <View className="flex-1 mr-2">
+                  <Text className="text-gray-700 font-medium mb-1 text-xs">County (Optional)</Text>
+                  <View className="flex-row items-center bg-gray-50 rounded-xl px-4 py-3 border border-gray-200">
+                    <Icon name="flag" size={18} color={COLORS.gray500} />
+                    <TextInput
+                      className="flex-1 ml-3 text-gray-900 text-sm"
+                      placeholder="e.g., Greater London"
+                      placeholderTextColor={COLORS.gray400}
+                      value={formData.county}
+                      onChangeText={(text) => {
+                        setFormData({ ...formData, county: text });
                       }}
                       autoCapitalize="words"
                     />
                   </View>
                 </View>
+
+                <View className="flex-1 ml-2">
+                  <Text className="text-gray-700 font-medium mb-1 text-xs">Postcode</Text>
+                  <View
+                    className="flex-row items-center bg-gray-50 rounded-xl px-4 py-3 border"
+                    style={{ borderColor: errors.postcode ? COLORS.error : COLORS.gray200 }}
+                  >
+                    <Icon name="mail" size={18} color={errors.postcode ? COLORS.error : COLORS.gray500} />
+                    <TextInput
+                      className="flex-1 ml-3 text-gray-900 text-sm"
+                      placeholder="SW1A 1AA"
+                      placeholderTextColor={COLORS.gray400}
+                      value={formData.postcode}
+                      onChangeText={(text) => {
+                        const formatted = text.toUpperCase();
+                        setFormData({ ...formData, postcode: formatted });
+                        if (errors.postcode) setErrors({ ...errors, postcode: null });
+                      }}
+                      autoCapitalize="characters"
+                      maxLength={8}
+                    />
+                  </View>
+                  {errors.postcode && (
+                    <Text className="text-red-500 text-xs mt-1">{errors.postcode}</Text>
+                  )}
+                </View>
               </View>
-            )}
+
+              {/* Country */}
+              <View className="mt-3">
+                <Text className="text-gray-700 font-medium mb-1 text-xs">Country</Text>
+                <View className="flex-row items-center bg-gray-100 rounded-xl px-4 py-3 border border-gray-200">
+                  <Icon name="globe" size={18} color={COLORS.gray500} />
+                  <Text className="flex-1 ml-3 text-gray-900 font-semibold text-sm">
+                    🇬🇧 {formData.country}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Landmark */}
+              <View className="mt-3">
+                <Text className="text-gray-700 font-medium mb-1 text-xs">Landmark (Optional)</Text>
+                <View className="flex-row items-center bg-gray-50 rounded-xl px-4 py-3 border border-gray-200">
+                  <Icon name="navigate" size={18} color={COLORS.gray500} />
+                  <TextInput
+                    className="flex-1 ml-3 text-gray-900 text-sm"
+                    placeholder="e.g., Near Tesco"
+                    placeholderTextColor={COLORS.gray400}
+                    value={formData.landmark}
+                    onChangeText={(text) => {
+                      setFormData({ ...formData, landmark: text });
+                    }}
+                    autoCapitalize="words"
+                  />
+                </View>
+              </View>
+            </View>
 
             {/* Password Input */}
             <View className="mb-3">

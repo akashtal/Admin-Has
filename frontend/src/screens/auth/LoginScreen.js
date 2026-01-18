@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { login } from '../../store/slices/authSlice';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import COLORS from '../../config/colors';
 
@@ -29,6 +29,33 @@ export default function LoginScreen({ navigation, route }) {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
+
+  const getFriendlyErrorMessage = (rawError) => {
+    if (!rawError) {
+      return 'Something went wrong. Please try again.';
+    }
+
+    const message = typeof rawError === 'string' ? rawError : rawError.message || String(rawError);
+    const normalized = message.toLowerCase();
+
+    if (normalized.includes('no account found')) {
+      return 'No account found with this email. Please check your email or sign up to create a new account.';
+    }
+
+    if (normalized.includes('suspended')) {
+      return message;
+    }
+
+    if (normalized.includes('this email is registered as a')) {
+      return message;
+    }
+
+    if (normalized.includes('invalid credentials')) {
+      return 'Incorrect email or password. Please try again.';
+    }
+
+    return message;
+  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -52,22 +79,28 @@ export default function LoginScreen({ navigation, route }) {
       return;
     }
 
+    const loginData = {
+      ...formData,
+      role: role
+    };
+
     try {
-      // Include the role in login data
-      const loginData = {
-        ...formData,
-        role: role  // Add the role from route params
-      };
+      const safeEmail = loginData.email ? loginData.email.trim().toLowerCase() : '';
+      console.log('Login attempt', { email: safeEmail, role });
 
       const result = await dispatch(login(loginData)).unwrap();
 
-      // Check if user role matches selected role (except for admin)
+      console.log('Login successful', { userId: result.user._id, role: result.user.role });
+
       if (result.user.role === 'admin') {
-        // Admin can login from any screen
         Alert.alert('Welcome Admin!', 'Redirecting to admin dashboard...');
       }
     } catch (error) {
-      Alert.alert('Login Failed', error || 'Invalid email or password');
+      const safeEmail = loginData.email ? loginData.email.trim().toLowerCase() : '';
+      console.log('Login failed', { email: safeEmail, role, error: String(error) });
+
+      const message = getFriendlyErrorMessage(error);
+      Alert.alert('Login Failed', message);
     }
   };
 
@@ -94,12 +127,13 @@ export default function LoginScreen({ navigation, route }) {
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
         className="flex-1"
       >
         <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Back Button */}
           <TouchableOpacity

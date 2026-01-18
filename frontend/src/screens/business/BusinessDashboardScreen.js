@@ -2,7 +2,7 @@ import React, { useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, Modal, TextInput, Alert, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import ApiService from '../../services/api.service';
 import COLORS from '../../config/colors';
 

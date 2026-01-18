@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StatusBar, Image, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import { useDispatch } from 'react-redux';
 import { loginAsGuest } from '../../store/slices/authSlice';
 import COLORS from '../../config/colors';

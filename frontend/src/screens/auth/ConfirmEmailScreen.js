@@ -1,19 +1,20 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  ScrollView, 
-  ActivityIndicator, 
-  Alert, 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
   StatusBar,
   Image,
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { showErrorMessage, showSuccessMessage } from '../../utils/errorHandler';
 import ApiService from '../../services/api.service';
 import COLORS from '../../config/colors';
 
@@ -25,13 +26,13 @@ export default function ConfirmEmailScreen({ navigation, route }) {
 
   const handleContinue = async () => {
     if (!email) {
-      Alert.alert('Error', 'Please enter your email');
+      showErrorMessage('Please enter your email');
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      showErrorMessage('Please enter a valid email address');
       return;
     }
 
@@ -47,14 +48,13 @@ export default function ConfirmEmailScreen({ navigation, route }) {
         isPasswordReset
       });
 
-      Alert.alert(
-        'Verification Code Sent', 
-        `We've sent a 6-digit code to ${email}. Please check your email (including spam folder).`,
-        [{ text: 'OK' }]
+      showSuccessMessage(
+        'Verification Code Sent',
+        `We've sent a 6-digit code to ${email}. Please check your email (including spam folder).`
       );
     } catch (error) {
       setLoading(false);
-      Alert.alert('Error', error.message || 'Failed to send verification code. Please try again.');
+      showErrorMessage(error, { title: 'Failed to Send Code' });
     }
   };
 
@@ -64,14 +64,15 @@ export default function ConfirmEmailScreen({ navigation, route }) {
       className="flex-1"
     >
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-      
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
         className="flex-1"
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           <TouchableOpacity
             onPress={() => navigation.goBack()}

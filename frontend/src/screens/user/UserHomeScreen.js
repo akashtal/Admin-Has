@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, FlatList, RefreshControl, ActivityIndicator, Alert, StatusBar, Image, TextInput, Modal, Keyboard } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useDispatch, useSelector } from 'react-redux';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { getAllActiveBusinesses, getNearbyBusinesses, searchBusinesses } from '../../store/slices/businessSlice';
 import ApiService from '../../services/api.service';
@@ -168,12 +168,18 @@ export default function UserHomeScreen({ navigation }) {
 
   const getCurrentLocation = async () => {
     try {
-      const location = await Location.getCurrentPositionAsync({});
+      console.log('📡 Getting current position...');
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+        timeout: 10000,
+      });
+
       const coords = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude
       };
 
+      console.log('✅ Location retrieved:', coords);
       setCurrentLocation(coords);
       setHasLocation(true);
 
@@ -183,9 +189,15 @@ export default function UserHomeScreen({ navigation }) {
         radius: 50000
       }));
     } catch (error) {
-      console.error('Error getting location:', error);
+      console.error('❌ Error getting current location:', error);
       setHasLocation(false);
-      setCurrentLocation(null);
+
+      // Load businesses without location if it failed
+      dispatch(getNearbyBusinesses({
+        latitude: 51.5283, // Default to London coordinates if location fails
+        longitude: -0.1005,
+        radius: 50000
+      }));
     }
   };
 

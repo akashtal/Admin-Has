@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { useDispatch } from 'react-redux';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import ApiService from '../../services/api.service';
 import COLORS from '../../config/colors';
@@ -79,12 +79,13 @@ export default function ResetPasswordScreen({ navigation, route }) {
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
         className="flex-1"
       >
         <ScrollView 
           contentContainerStyle={{ flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           <TouchableOpacity
             onPress={() => navigation.goBack()}

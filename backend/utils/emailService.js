@@ -33,7 +33,7 @@ if (useSendGridAPI) {
   // Google SMTP (Gmail) - works in production (Elastic Beanstalk compatible)
   const smtpPort = parseInt(process.env.SMTP_PORT) || 587;
   const useSSL = smtpPort === 465;
-  
+
   transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: smtpPort,
@@ -143,7 +143,7 @@ const sendOTPEmail = async (to, otp, name = 'User') => {
   try {
     // Determine from email: use FROM_EMAIL or SMTP_USER
     const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || 'noreply@gmail.com';
-    
+
     const emailHtml = `
         <!DOCTYPE html>
         <html>
@@ -280,7 +280,7 @@ const sendOTPEmail = async (to, otp, name = 'User') => {
   } catch (error) {
     logger.error('❌ Error sending email:', error);
     console.error('❌ Error sending email:', error.message);
-    
+
     // Provide helpful error messages based on email service
     if (useSendGridAPI) {
       logger.error('💡 Check SENDGRID_API_KEY is valid and has Mail Send permissions');
@@ -291,7 +291,7 @@ const sendOTPEmail = async (to, otp, name = 'User') => {
       logger.error('   3. Check SMTP_USER and SMTP_PASS environment variables');
       logger.error('   4. Verify Elastic Beanstalk security group allows outbound port 587/465');
     }
-    
+
     throw error;
   }
 };
@@ -301,7 +301,7 @@ const sendPasswordResetEmail = async (to, otp, name = 'User') => {
   try {
     // Determine from email: use FROM_EMAIL or SMTP_USER
     const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || 'noreply@gmail.com';
-    
+
     const emailHtml = `
         <!DOCTYPE html>
         <html>
@@ -397,12 +397,55 @@ const sendPasswordResetEmail = async (to, otp, name = 'User') => {
     }
   } catch (error) {
     logger.error('❌ Error sending password reset email:', error);
-    
+
     // Provide helpful error messages based on email service
     if (useGoogleSMTP) {
       logger.error('💡 Google SMTP Error - Check Gmail App Password and environment variables');
     }
-    
+
+    throw error;
+  }
+};
+
+// Generic function to send any email
+const sendEmail = async ({ to, subject, html, text }) => {
+  try {
+    const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || 'noreply@gmail.com';
+
+    if (useSendGridAPI) {
+      // Use SendGrid API
+      const msg = {
+        to: to,
+        from: {
+          email: fromEmail,
+          name: 'HashView'
+        },
+        subject: subject,
+        html: html || text
+      };
+
+      const response = await sendGridClient.send(msg);
+      logger.info(`✅ Email sent successfully to ${to} via SendGrid API`);
+      return { messageId: response[0].headers['x-message-id'] || 'sent' };
+    } else {
+      // Use SMTP
+      const mailOptions = {
+        from: {
+          name: 'HashView',
+          address: fromEmail
+        },
+        to: to,
+        subject: subject,
+        html: html,
+        text: text
+      };
+
+      const info = await transporter.sendMail(mailOptions);
+      logger.info(`✅ Email sent successfully to ${to}`);
+      return info;
+    }
+  } catch (error) {
+    logger.error('❌ Error sending email:', error);
     throw error;
   }
 };
@@ -410,6 +453,7 @@ const sendPasswordResetEmail = async (to, otp, name = 'User') => {
 // Export functions
 module.exports = {
   sendOTPEmail,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendEmail
 };
 
