@@ -1,13 +1,13 @@
 // For EAS builds, set EXPO_PUBLIC_API_BASE_URL in eas.json
 export const API_CONFIG = {
 
-  BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.177.195.97:5001/api',
-  // BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hashview.44.249.50.162.nip.io/api',
-  // SECONDARY_BASE_URL: 'https://hashview-backend.onrender.com/api',
+  // BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'http://10.177.195.97:5001/api',
+  BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL || 'https://hashview.44.249.50.162.nip.io/api',
+  SECONDARY_BASE_URL: 'https://hashview-backend.onrender.com/api',
 
-  SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || 'http://10.177.195.97:5001',
-  // SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || 'https://hashview.44.249.50.162.nip.io',
-  // SECONDARY_SOCKET_URL: 'https://hashview-backend.onrender.com',
+  // SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || 'http://10.177.195.97:5001',
+  SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || 'https://hashview.44.249.50.162.nip.io',
+  SECONDARY_SOCKET_URL: 'https://hashview-backend.onrender.com',
 
   TIMEOUT: parseInt(process.env.EXPO_PUBLIC_API_TIMEOUT || '60000', 10),
 

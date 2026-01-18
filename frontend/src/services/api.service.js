@@ -37,7 +37,15 @@ apiClient.interceptors.response.use(
 
     // Check if network error or connection refused (Primary Down)
     if (!originalRequest._retry && (error.code === 'ERR_NETWORK' || error.message.includes('Network Error'))) {
-
+      console.log('🔍 Primary server error details:', {
+        code: error.code,
+        message: error.message,
+        config: {
+          url: originalRequest.url,
+          baseURL: originalRequest.baseURL,
+          timeout: originalRequest.timeout
+        }
+      });
       console.warn('⚠️ Primary server unreachable. Switching to Failover Server (Render)...');
       originalRequest._retry = true; // Mark as retried
 

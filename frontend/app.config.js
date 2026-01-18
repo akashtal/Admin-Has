@@ -3,7 +3,7 @@ export default {
     name: "HashView",
     slug: "hashview",
     scheme: "hashview",
-    version: "1.0.8",
+    version: "1.0.9",
     orientation: "portrait",
     icon: "./assets/HashViewlogo-01.png",
     userInterfaceStyle: "automatic",
@@ -32,7 +32,7 @@ export default {
           NSAllowsArbitraryLoads: true
         }
       },
-      buildNumber: "11",
+      buildNumber: "12",
       config: {
         googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY || "AIzaSyCgafT4Tw62CuxxN5DwbkqWIK9pVflKEXI"
       }
@@ -40,7 +40,7 @@ export default {
 
     android: {
       package: "com.hashview.apps",
-      versionCode: 16,
+      versionCode: 20,
       usesCleartextTraffic: true,
       adaptiveIcon: {
         foregroundImage: "./assets/HashViewlogo-01.png",
@@ -71,11 +71,12 @@ export default {
         "expo-build-properties",
         {
           "android": {
+            "minSdkVersion": 24,
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
             "buildToolsVersion": "35.0.0",
             "extraGradleProps": {
-              "ndkVersion": "27.0.12077973"
+              "ndkVersion": "28.0.12674087"
             }
           }
         }
