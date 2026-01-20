@@ -8,12 +8,12 @@ import {
   StatusBar,
   TextInput,
   Alert,
-  Image
+  Image,
+  Modal
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons as Icon } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Picker } from '@react-native-picker/picker';
 import ApiService from '../../services/api.service';
 import COLORS from '../../config/colors';
 
@@ -21,6 +21,13 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
   const { businessId } = route.params;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [categories, setCategories] = useState([]);
+
+  // Modal states
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [timePickerModal, setTimePickerModal] = useState({ visible: false, day: null, field: null });
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -56,18 +63,30 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
     sunday: { open: '09:00', close: '17:00', closed: true }
   });
 
-  const categories = [
-    { label: 'Restaurant', value: 'restaurant' },
-    { label: 'Café', value: 'cafe' },
-    { label: 'Retail Store', value: 'retail' },
-    { label: 'Services', value: 'services' },
-    { label: 'Healthcare', value: 'healthcare' },
-    { label: 'Education', value: 'education' },
-    { label: 'Entertainment', value: 'entertainment' },
-    { label: 'Salon & Spa', value: 'salon' },
-    { label: 'Hotel', value: 'hotel' },
-    { label: 'Gym & Fitness', value: 'gym' }
-  ];
+  useEffect(() => {
+    fetchCategories();
+    fetchBusinessData();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      setLoadingCategories(true);
+      const response = await ApiService.getCategories();
+
+      if (response.success && response.categories) {
+        const categoryOptions = response.categories.map(cat => ({
+          label: cat.name,
+          value: cat.value || cat.name.toLowerCase()
+        }));
+        setCategories(categoryOptions);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      Alert.alert('Error', 'Failed to load business categories');
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
 
   const timeSlots = [
     'Closed', '00:00', '01:00', '02:00', '03:00', '04:00', '05:00',
@@ -76,9 +95,7 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
     '20:00', '21:00', '22:00', '23:00'
   ];
 
-  useEffect(() => {
-    fetchBusinessData();
-  }, []);
+
 
   const fetchBusinessData = async () => {
     try {
@@ -650,17 +667,15 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
         {/* Category */}
         <View className="mb-4">
           <Text className="text-gray-900 font-semibold mb-2">Business Category</Text>
-          <View className="bg-white rounded-xl border border-gray-200">
-            <Picker
-              selectedValue={formData.category}
-              onValueChange={(value) => handleInputChange('category', value)}
-              style={{ height: 50 }}
-            >
-              {categories.map((cat) => (
-                <Picker.Item key={cat.value} label={cat.label} value={cat.value} />
-              ))}
-            </Picker>
-          </View>
+          <TouchableOpacity
+            onPress={() => setCategoryModalVisible(true)}
+            className="bg-white rounded-xl px-4 py-3 border border-gray-200 flex-row justify-between items-center"
+          >
+            <Text className="text-gray-900 font-medium">
+              {categories.find(c => c.value === formData.category)?.label || 'Select Category'}
+            </Text>
+            <Icon name="chevron-down" size={20} color="#6B7280" />
+          </TouchableOpacity>
         </View>
 
         {/* Opening Hours */}
@@ -671,30 +686,21 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
               <Text className="text-gray-900 w-24 capitalize">{day}:</Text>
 
               <View className="flex-row flex-1">
-                <View className="flex-1 mr-2 bg-white rounded-xl border border-gray-200">
-                  <Picker
-                    selectedValue={openHours[day].open}
-                    onValueChange={(value) => updateOpenHours(day, 'open', value)}
-                    style={{ height: 50 }}
-                  >
-                    {timeSlots.map((time) => (
-                      <Picker.Item key={time} label={time} value={time} />
-                    ))}
-                  </Picker>
-                </View>
+                <TouchableOpacity
+                  onPress={() => setTimePickerModal({ visible: true, day, field: 'open' })}
+                  className="flex-1 mr-2 bg-white rounded-xl px-3 py-3 border border-gray-200"
+                >
+                  <Text className="text-gray-900 text-center font-medium">{openHours[day].open}</Text>
+                </TouchableOpacity>
 
-                <View className="flex-1 ml-2 bg-white rounded-xl border border-gray-200">
-                  <Picker
-                    selectedValue={openHours[day].close}
-                    onValueChange={(value) => updateOpenHours(day, 'close', value)}
-                    style={{ height: 50 }}
-                    enabled={openHours[day].open !== 'Closed'}
-                  >
-                    {timeSlots.map((time) => (
-                      <Picker.Item key={time} label={time} value={time} />
-                    ))}
-                  </Picker>
-                </View>
+                <TouchableOpacity
+                  onPress={() => setTimePickerModal({ visible: true, day, field: 'close' })}
+                  disabled={openHours[day].open === 'Closed'}
+                  className={`flex-1 ml-2 bg-white rounded-xl px-3 py-3 border border-gray-200 ${openHours[day].open === 'Closed' ? 'opacity-50' : ''
+                    }`}
+                >
+                  <Text className="text-gray-900 text-center font-medium">{openHours[day].close}</Text>
+                </TouchableOpacity>
               </View>
             </View>
           ))}
@@ -725,6 +731,101 @@ export default function EditBusinessInfoScreen({ navigation, route }) {
         </TouchableOpacity>
 
       </ScrollView>
+
+      {/* Category Selection Modal */}
+      <Modal
+        visible={categoryModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setCategoryModalVisible(false)}
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white rounded-t-3xl p-6">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-xl font-bold text-gray-900">Select Category</Text>
+              <TouchableOpacity onPress={() => setCategoryModalVisible(false)}>
+                <Icon name="close" size={28} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView className="max-h-96">
+              {loadingCategories ? (
+                <View className="py-8">
+                  <ActivityIndicator size="small" color="#9333EA" />
+                  <Text className="text-center text-gray-500 mt-2">Loading categories...</Text>
+                </View>
+              ) : (
+                categories.map((category) => (
+                  <TouchableOpacity
+                    key={category.value}
+                    onPress={() => {
+                      handleInputChange('category', category.value);
+                      setCategoryModalVisible(false);
+                    }}
+                    className={`py-4 px-4 rounded-xl mb-2 border ${formData.category === category.value ? 'bg-purple-50 border-purple-500' : 'bg-gray-50 border-gray-200'
+                      }`}
+                  >
+                    <Text className={`font-semibold ${formData.category === category.value ? 'text-purple-700' : 'text-gray-700'
+                      }`}>
+                      {category.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Time Picker Modal */}
+      <Modal
+        visible={timePickerModal.visible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setTimePickerModal({ ...timePickerModal, visible: false })}
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white rounded-t-3xl p-6">
+            <View className="flex-row justify-between items-center mb-4">
+              <View>
+                <Text className="text-xl font-bold text-gray-900 capitalize">{timePickerModal.day}</Text>
+                <Text className="text-sm text-gray-600">
+                  Select {timePickerModal.field === 'open' ? 'opening' : 'closing'} time
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setTimePickerModal({ ...timePickerModal, visible: false })}>
+                <Icon name="close" size={28} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView className="max-h-96">
+              <View className="flex-row flex-wrap">
+                {timeSlots.map((time) => (
+                  <TouchableOpacity
+                    key={time}
+                    onPress={() => {
+                      const { day, field } = timePickerModal;
+                      updateOpenHours(day, field, time);
+                      setTimePickerModal({ ...timePickerModal, visible: false });
+                    }}
+                    className={`w-[31%] py-3 mb-3 rounded-xl items-center border mr-[2%] ${timePickerModal.day && openHours[timePickerModal.day]?.[timePickerModal.field] === time
+                      ? 'bg-purple-50 border-purple-500'
+                      : 'bg-gray-50 border-gray-200'
+                      }`}
+                  >
+                    <Text className={`font-bold text-xs ${timePickerModal.day && openHours[timePickerModal.day]?.[timePickerModal.field] === time
+                      ? 'text-purple-700'
+                      : 'text-gray-700'
+                      }`}>
+                      {time}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

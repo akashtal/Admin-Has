@@ -9,12 +9,12 @@ import {
   TextInput,
   Modal,
   StatusBar,
-  Image
+  Image,
+  Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons as Icon } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Picker } from '@react-native-picker/picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import COLORS from '../../config/colors';
@@ -451,18 +451,24 @@ export default function ManageUpdatesScreen({ navigation, route }) {
 
           <ScrollView className="flex-1 px-6 py-6">
             {/* Type Selection */}
-            <View className="mb-4">
-              <Text className="text-gray-900 font-semibold mb-2">Type</Text>
-              <View className="bg-gray-100 rounded-xl border border-gray-200">
-                <Picker
-                  selectedValue={formData.type}
-                  onValueChange={(value) => setFormData({ ...formData, type: value })}
-                  style={{ height: 50 }}
-                >
-                  <Picker.Item label="Offer" value="offer" />
-                  <Picker.Item label="Update" value="update" />
-                  <Picker.Item label="Announcement" value="announcement" />
-                </Picker>
+            <View className="mb-6">
+              <Text className="text-gray-900 font-semibold mb-3">Type</Text>
+              <View className="flex-row items-center gap-2 flex-wrap">
+                {['offer', 'update', 'announcement'].map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    onPress={() => setFormData({ ...formData, type })}
+                    className={`px-4 py-3 rounded-xl border ${formData.type === type
+                      ? 'bg-purple-600 border-purple-600'
+                      : 'bg-white border-gray-200'
+                      }`}
+                  >
+                    <Text className={`font-semibold capitalize ${formData.type === type ? 'text-white' : 'text-gray-600'
+                      }`}>
+                      {type}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
 
@@ -498,17 +504,27 @@ export default function ManageUpdatesScreen({ navigation, route }) {
             {/* Offer-specific fields */}
             {formData.type === 'offer' && (
               <>
-                <View className="mb-4">
-                  <Text className="text-gray-900 font-semibold mb-2">Discount Type</Text>
-                  <View className="bg-gray-100 rounded-xl border border-gray-200">
-                    <Picker
-                      selectedValue={formData.discountType}
-                      onValueChange={(value) => setFormData({ ...formData, discountType: value })}
-                      style={{ height: 50 }}
-                    >
-                      <Picker.Item label="Percentage (%)" value="percentage" />
-                      <Picker.Item label="Fixed Amount (₹)" value="fixed" />
-                    </Picker>
+                <View className="mb-6">
+                  <Text className="text-gray-900 font-semibold mb-3">Discount Type</Text>
+                  <View className="flex-row items-center gap-2">
+                    {[
+                      { label: 'Percentage (%)', value: 'percentage' },
+                      { label: 'Fixed Amount (₹)', value: 'fixed' }
+                    ].map((option) => (
+                      <TouchableOpacity
+                        key={option.value}
+                        onPress={() => setFormData({ ...formData, discountType: option.value })}
+                        className={`flex-1 px-4 py-3 rounded-xl border items-center ${formData.discountType === option.value
+                          ? 'bg-purple-600 border-purple-600'
+                          : 'bg-white border-gray-200'
+                          }`}
+                      >
+                        <Text className={`font-bold ${formData.discountType === option.value ? 'text-white' : 'text-gray-600'
+                          }`}>
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
                 </View>
 
@@ -524,29 +540,46 @@ export default function ManageUpdatesScreen({ navigation, route }) {
                   />
                 </View>
 
-                <View className="mb-4">
+                <View className="mb-6">
                   <Text className="text-gray-900 font-semibold mb-2">Valid Until</Text>
                   <TouchableOpacity
                     onPress={() => setShowDatePicker(true)}
-                    className="bg-gray-100 rounded-xl px-4 py-3 border border-gray-200"
+                    className="bg-white rounded-xl px-4 py-3 border border-gray-200 flex-row justify-between items-center"
                   >
-                    <Text className="text-gray-900">
-                      {formData.validUntil.toLocaleDateString()}
+                    <Text className="text-gray-900 font-medium">
+                      {formData.validUntil.toLocaleDateString(undefined, {
+                        weekday: 'short',
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
                     </Text>
+                    <Icon name="calendar-outline" size={20} color="#6B7280" />
                   </TouchableOpacity>
+
                   {showDatePicker && (
-                    <DateTimePicker
-                      value={formData.validUntil}
-                      mode="date"
-                      display="default"
-                      onChange={(event, selectedDate) => {
-                        setShowDatePicker(false);
-                        if (selectedDate) {
-                          setFormData({ ...formData, validUntil: selectedDate });
-                        }
-                      }}
-                      minimumDate={new Date()}
-                    />
+                    <View className="mt-2 bg-white rounded-xl border border-gray-100 p-2">
+                      <DateTimePicker
+                        value={formData.validUntil}
+                        mode="date"
+                        display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                        onChange={(event, selectedDate) => {
+                          const currentDate = selectedDate || formData.validUntil;
+                          setShowDatePicker(Platform.OS === 'ios'); // Keep open for iOS inline, close for Android default
+                          setFormData({ ...formData, validUntil: currentDate });
+                        }}
+                        minimumDate={new Date()}
+                        style={Platform.OS === 'ios' ? { height: 320 } : {}}
+                      />
+                      {Platform.OS === 'ios' && (
+                        <TouchableOpacity
+                          onPress={() => setShowDatePicker(false)}
+                          className="bg-purple-600 py-3 rounded-lg mt-2 items-center"
+                        >
+                          <Text className="text-white font-bold">Done</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   )}
                 </View>
               </>
@@ -599,4 +632,3 @@ export default function ManageUpdatesScreen({ navigation, route }) {
     </View>
   );
 }
-

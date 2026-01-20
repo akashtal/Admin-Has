@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, Modal, TextInput, Alert, Linking } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, Modal, TextInput, Alert, Linking, Platform, KeyboardAvoidingView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons as Icon } from '@expo/vector-icons';
@@ -556,62 +556,67 @@ export default function BusinessDashboardScreen({ navigation }) {
         transparent={true}
         onRequestClose={() => setTripAdvisorModalVisible(false)}
       >
-        <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white rounded-t-3xl p-6">
-            <View className="flex-row justify-between items-center mb-6">
-              <Text className="text-2xl font-bold text-gray-900">Edit TripAdvisor Rating</Text>
-              <TouchableOpacity onPress={() => setTripAdvisorModalVisible(false)}>
-                <Icon name="close" size={28} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Rating */}
-              <View className="mb-4">
-                <Text className="text-gray-900 font-semibold mb-2">Rating (0-5) *</Text>
-                <TextInput
-                  className="bg-gray-50 rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
-                  placeholder="e.g., 4.5"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="decimal-pad"
-                  value={tripAdvisorData.rating}
-                  onChangeText={(value) => setTripAdvisorData({ ...tripAdvisorData, rating: value })}
-                />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          className="flex-1"
+        >
+          <View className="flex-1 justify-end bg-black/50">
+            <View className="bg-white rounded-t-3xl p-6">
+              <View className="flex-row justify-between items-center mb-6">
+                <Text className="text-2xl font-bold text-gray-900">Edit TripAdvisor Rating</Text>
+                <TouchableOpacity onPress={() => setTripAdvisorModalVisible(false)}>
+                  <Icon name="close" size={28} color="#6B7280" />
+                </TouchableOpacity>
               </View>
 
-              {/* Review Count */}
-              <View className="mb-6">
-                <Text className="text-gray-900 font-semibold mb-2">Review Count *</Text>
-                <TextInput
-                  className="bg-gray-50 rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
-                  placeholder="e.g., 150"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="number-pad"
-                  value={tripAdvisorData.reviewCount}
-                  onChangeText={(value) => setTripAdvisorData({ ...tripAdvisorData, reviewCount: value })}
-                />
-              </View>
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                {/* Rating */}
+                <View className="mb-4">
+                  <Text className="text-gray-900 font-semibold mb-2">Rating (0-5) *</Text>
+                  <TextInput
+                    className="bg-gray-50 rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
+                    placeholder="e.g., 4.5"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="decimal-pad"
+                    value={tripAdvisorData.rating}
+                    onChangeText={(value) => setTripAdvisorData({ ...tripAdvisorData, rating: value })}
+                  />
+                </View>
 
-              {/* Submit Button */}
-              <TouchableOpacity
-                onPress={handleUpdateTripAdvisorRating}
-                disabled={syncing}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={['#00AA6C', '#008C57']}
-                  className="rounded-xl py-4 items-center"
+                {/* Review Count */}
+                <View className="mb-6">
+                  <Text className="text-gray-900 font-semibold mb-2">Review Count *</Text>
+                  <TextInput
+                    className="bg-gray-50 rounded-xl px-4 py-3 text-gray-900 border border-gray-200"
+                    placeholder="e.g., 150"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="number-pad"
+                    value={tripAdvisorData.reviewCount}
+                    onChangeText={(value) => setTripAdvisorData({ ...tripAdvisorData, reviewCount: value })}
+                  />
+                </View>
+
+                {/* Submit Button */}
+                <TouchableOpacity
+                  onPress={handleUpdateTripAdvisorRating}
+                  disabled={syncing}
+                  activeOpacity={0.8}
                 >
-                  {syncing ? (
-                    <ActivityIndicator size="small" color="#FFF" />
-                  ) : (
-                    <Text className="text-white font-bold text-lg">Update Rating</Text>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
-            </ScrollView>
+                  <LinearGradient
+                    colors={['#00AA6C', '#008C57']}
+                    className="rounded-xl py-4 items-center"
+                  >
+                    {syncing ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <Text className="text-white font-bold text-lg">Update Rating</Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View >
   );
