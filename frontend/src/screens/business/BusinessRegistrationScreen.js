@@ -148,7 +148,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
       // Using location bias to UK instead of strict country filtering for better results
       // UK center coordinates: 54.7023545, -3.2765753
       const autocompleteResponse = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&location=54.7023545,-3.2765753&radius=200000&components=country:gb&key=${GOOGLE_API_KEY}`
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&components=country:gb&types=establishment|geocode&key=${GOOGLE_API_KEY}`
       );
 
       if (!autocompleteResponse.ok) {
@@ -166,6 +166,7 @@ export default function BusinessRegistrationScreen({ navigation }) {
         setShowAddressSuggestions(false);
         return;
       }
+
 
       // Step 2: Get detailed information (lat/lng) for each prediction
       const detailedSuggestions = await Promise.all(

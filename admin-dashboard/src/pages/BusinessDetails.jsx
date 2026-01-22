@@ -1011,7 +1011,7 @@ const BusinessDetails = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                 {/* Address Proof */}
-                {business.documents.addressProof && (
+                {business.documents.addressProof?.url && (
                   <div className="border border-gray-200 rounded-lg p-4">
                     <p className="font-medium text-gray-900 mb-2">Address Proof</p>
                     <a
@@ -1037,7 +1037,7 @@ const BusinessDetails = () => {
                 )}
 
                 {/* Selfie */}
-                {business.documents.selfie && (
+                {business.documents.selfie?.url && (
                   <div className="border border-gray-200 rounded-lg p-4">
                     <p className="font-medium text-gray-900 mb-2">Owner Selfie</p>
                     <a

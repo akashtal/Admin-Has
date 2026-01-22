@@ -126,7 +126,7 @@ export default function BusinessKYCScreen({ navigation, route }) {
             // This ensures the app redirects to Dashboard when kycStatus changes to 'in_review'
             navigation.reset({
                 index: 0,
-                routes: [{ name: 'MainTabs' }]
+                routes: [{ name: 'Business' }]
             });
 
         } catch (error) {

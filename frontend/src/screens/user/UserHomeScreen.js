@@ -186,7 +186,8 @@ export default function UserHomeScreen({ navigation }) {
       dispatch(getNearbyBusinesses({
         latitude: coords.latitude,
         longitude: coords.longitude,
-        radius: 50000
+        // radius: 50000
+        radius: 20000000 // 20,000km (Global) - Show all businesses sorted by distance
       }));
     } catch (error) {
       console.error('❌ Error getting current location:', error);
@@ -196,7 +197,7 @@ export default function UserHomeScreen({ navigation }) {
       dispatch(getNearbyBusinesses({
         latitude: 51.5283, // Default to London coordinates if location fails
         longitude: -0.1005,
-        radius: 50000
+        radius: 20000000 // Global
       }));
     }
   };
@@ -245,6 +246,13 @@ export default function UserHomeScreen({ navigation }) {
       if (currentLocation) {
         params.latitude = currentLocation.latitude;
         params.longitude = currentLocation.longitude;
+
+        // If no distance filter is set, use Global Radius (20,000km)
+        // This ensures "All Businesses" are shown sorted by distance by default
+        if (!distanceFilter) {
+          params.radius = 20000000;
+        }
+
         await dispatch(getNearbyBusinesses(params));
       } else {
         await dispatch(getAllActiveBusinesses(params));
@@ -256,9 +264,25 @@ export default function UserHomeScreen({ navigation }) {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchFilteredBusinesses();
+
+    // Reset all filters on refresh to show "All Businesses"
+    setSelectedCategory(null);
+    setRatingFilter({ source: null, stars: null });
+    setDistanceFilter(null); // Assuming this state setter exists
+
+    // We need to fetch with "empty" filters immediately implies Global Scope
+    if (currentLocation) {
+      await dispatch(getNearbyBusinesses({
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+        radius: 20000000 // Force Global
+      }));
+    } else {
+      await dispatch(getAllActiveBusinesses());
+    }
+
     setRefreshing(false);
-  }, [fetchFilteredBusinesses]);
+  }, [currentLocation, dispatch]);
 
   useEffect(() => {
     fetchFilteredBusinesses();

@@ -10,6 +10,8 @@ import LoginWithPhoneScreen from '../screens/auth/LoginWithPhoneScreen';
 import ConfirmEmailScreen from '../screens/auth/ConfirmEmailScreen';
 import VerifyOTPScreen from '../screens/auth/VerifyOTPScreen';
 
+import BusinessDetailScreen from '../screens/user/BusinessDetailScreen';
+
 const Stack = createStackNavigator();
 
 export default function AuthNavigator() {
@@ -29,6 +31,7 @@ export default function AuthNavigator() {
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
       <Stack.Screen name="LoginWithPhone" component={LoginWithPhoneScreen} />
+      <Stack.Screen name="BusinessDetail" component={BusinessDetailScreen} />
     </Stack.Navigator>
   );
 }

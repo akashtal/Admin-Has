@@ -3,12 +3,45 @@ import { View, ActivityIndicator, Image } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useSelector, useDispatch } from 'react-redux';
+
 import { loadUser } from '../store/slices/authSlice';
+import * as Linking from 'expo-linking';
 
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 
+
+
 const Stack = createStackNavigator();
+
+// Deep Linking Configuration
+const prefixes = [Linking.createURL('/'), 'hashview://'];
+
+const mainLinking = {
+  prefixes,
+  config: {
+    screens: {
+      // Main App (Authenticated) via Tab Navigator
+      // The path maps 'business/:id' to the BusinessDetail screen inside the Home tab
+      Home: {
+        screens: {
+          BusinessDetail: 'business/:businessId',
+        }
+      },
+    }
+  }
+};
+
+const authLinking = {
+  prefixes,
+  config: {
+    screens: {
+      // Auth Stack (Unauthenticated)
+      Login: 'login',
+      BusinessDetail: 'business/:businessId', // Direct route in AuthStack
+    }
+  }
+};
 
 export default function AppNavigator() {
   const dispatch = useDispatch();
@@ -55,7 +88,7 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={isAuthenticated ? mainLinking : authLinking}>
       {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );
