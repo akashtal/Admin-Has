@@ -144,9 +144,11 @@ export default function BusinessRegistrationScreen({ navigation }) {
         return;
       }
 
-      // Step 1: Get place predictions using Places Autocomplete API (UK addresses only)
+      // Step 1: Get place predictions using Places Autocomplete API
+      // Using location bias to UK instead of strict country filtering for better results
+      // UK center coordinates: 54.7023545, -3.2765753
       const autocompleteResponse = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&components=country:gb&types=establishment|geocode&key=${GOOGLE_API_KEY}`
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&location=54.7023545,-3.2765753&radius=200000&components=country:gb&key=${GOOGLE_API_KEY}`
       );
 
       if (!autocompleteResponse.ok) {
@@ -752,7 +754,14 @@ export default function BusinessRegistrationScreen({ navigation }) {
         name: formData.businessName?.trim() || '',
         ownerName: `${formData.firstName || ''} ${formData.lastName || ''}`.trim(),
         email: formData.email?.trim() || '',
-        phone: formData.phone?.trim() || '',
+        // Phone in E.164 format (e.g., +447123456789) - no spaces for backend validation
+        phone: (() => {
+          const phoneNumber = businessPhoneInputRef.current?.getNumberAfterPossiblyEliminatingZero();
+          if (phoneNumber && typeof phoneNumber === 'string') {
+            return phoneNumber.replace(/\s/g, '');
+          }
+          return formData.phone?.replace(/\s/g, '') || '';
+        })(),
         address: formData.address?.trim() || '',
         // UK Address fields
         buildingNumber: formData.buildingNumber?.trim() || '',
@@ -789,6 +798,9 @@ export default function BusinessRegistrationScreen({ navigation }) {
       if (images.logo || images.coverImage || (images.gallery && images.gallery.length > 0)) {
         console.log('📸 Starting background image uploads...');
 
+        // Track upload failures to notify user
+        const uploadFailures = [];
+
         // Upload images in parallel with timeout
         const uploadPromises = [];
 
@@ -802,12 +814,16 @@ export default function BusinessRegistrationScreen({ navigation }) {
                 return ApiService.updateBusinessImages(businessId, {
                   logo: logoData.url,
                   logoPublicId: logoData.publicId
-                }).catch(err => console.error('Failed to update logo:', err));
+                }).catch(err => {
+                  console.error('Failed to update logo:', err);
+                  uploadFailures.push('Logo');
+                });
               }),
               new Promise((_, reject) => setTimeout(() => reject(new Error('Logo upload timeout')), 30000))
             ]).catch(error => {
               console.error('⚠️ Logo upload failed or timed out:', error.message);
               setUploadStatus(prev => ({ ...prev, logo: false }));
+              uploadFailures.push('Logo');
             })
           );
         }
@@ -822,12 +838,16 @@ export default function BusinessRegistrationScreen({ navigation }) {
                 return ApiService.updateBusinessImages(businessId, {
                   coverImage: coverData.url,
                   coverImagePublicId: coverData.publicId
-                }).catch(err => console.error('Failed to update cover image:', err));
+                }).catch(err => {
+                  console.error('Failed to update cover image:', err);
+                  uploadFailures.push('Cover Image');
+                });
               }),
               new Promise((_, reject) => setTimeout(() => reject(new Error('Cover upload timeout')), 30000))
             ]).catch(error => {
               console.error('⚠️ Cover image upload failed or timed out:', error.message);
               setUploadStatus(prev => ({ ...prev, coverImage: false }));
+              uploadFailures.push('Cover Image');
             })
           );
         }
@@ -845,19 +865,33 @@ export default function BusinessRegistrationScreen({ navigation }) {
                 }));
                 return ApiService.updateBusinessImages(businessId, {
                   images: galleryUrls
-                }).catch(err => console.error('Failed to update gallery images:', err));
+                }).catch(err => {
+                  console.error('Failed to update gallery images:', err);
+                  uploadFailures.push('Gallery Images');
+                });
               }),
               new Promise((_, reject) => setTimeout(() => reject(new Error('Gallery upload timeout')), 60000))
             ]).catch(error => {
               console.error('⚠️ Gallery upload failed or timed out:', error.message);
               setUploadStatus(prev => ({ ...prev, gallery: false }));
+              uploadFailures.push('Gallery Images');
             })
           );
         }
 
-        // Wait for all uploads (but don't block navigation)
+        // Wait for all uploads and notify user of any failures
         Promise.allSettled(uploadPromises).then(() => {
           console.log('📸 All image uploads completed');
+
+          // Notify user if any uploads failed
+          if (uploadFailures.length > 0) {
+            const failedItems = uploadFailures.join(', ');
+            Alert.alert(
+              'Image Upload Issues',
+              `Your business was registered successfully, but the following images failed to upload:\n\n${failedItems}\n\nYou can add them later from your Business Dashboard.`,
+              [{ text: 'OK' }]
+            );
+          }
         });
       }
 

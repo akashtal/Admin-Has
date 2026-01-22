@@ -21,6 +21,7 @@ exports.registerBusiness = async (req, res, next) => {
       website, tripAdvisorLink, googleBusinessName, openingHours
     } = req.body;
 
+
     // Validate required fields for business registration
     if (!phone || !phone.trim()) {
       return res.status(400).json({
@@ -30,24 +31,54 @@ exports.registerBusiness = async (req, res, next) => {
       });
     }
 
-    // Validate address - require key address fields for business registration
-    // At minimum, we need street, city, and postcode/pincode
-    const hasRequiredAddressFields = (street && street.trim()) &&
-      (city && city.trim()) &&
-      (postcode && postcode.trim() || pincode && pincode.trim());
+    // Sanitize phone number: remove spaces, dashes, parentheses for consistent storage
+    const sanitizedPhone = phone.replace(/[\s\-\(\)]/g, '');
 
-    if (!hasRequiredAddressFields && !address) {
+
+
+    // Validate address - require key address fields for business registration
+    // Street and city are always required
+    // For UK: require postcode
+    // For other countries: accept pincode or postcode
+
+    const isUK = !country || country === 'United Kingdom' || country === 'UK' || country === 'GB';
+
+    if (!street || !street.trim()) {
       return res.status(400).json({
         success: false,
-        message: 'Business address is required. Please provide street, city, and postcode.',
-        field: 'address',
-        errors: [
-          !street || !street.trim() ? 'Street is required' : null,
-          !city || !city.trim() ? 'City is required' : null,
-          (!postcode || !postcode.trim()) && (!pincode || !pincode.trim()) ? 'Postcode or pincode is required' : null
-        ].filter(Boolean)
+        message: 'Street address is required for business registration',
+        field: 'street'
       });
     }
+
+    if (!city || !city.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'City/Town is required for business registration',
+        field: 'city'
+      });
+    }
+
+    // UK addresses require postcode, international addresses can use postcode or pincode
+    if (isUK) {
+      if (!postcode || !postcode.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Postcode is required for UK businesses',
+          field: 'postcode'
+        });
+      }
+    } else {
+      // International addresses
+      if ((!postcode || !postcode.trim()) && (!pincode || !pincode.trim())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Postcode or PIN code is required for business registration',
+          field: 'postcode'
+        });
+      }
+    }
+
 
     // Check if business already exists for this user
     const existingBusiness = await Business.findOne({ owner: req.user.id });
@@ -63,12 +94,12 @@ exports.registerBusiness = async (req, res, next) => {
       name,
       ownerName,
       email,
-      phone,
+      phone: sanitizedPhone,
       category,
       description,
       owner: req.user.id,
       status: 'pending',
-      kycStatus: 'approved',
+      kycStatus: 'pending',
       radius: radius || 50
     };
 
@@ -99,12 +130,6 @@ exports.registerBusiness = async (req, res, next) => {
         landmark: landmark || '',
         country: country || 'United Kingdom',
         fullAddress: address || addressParts.join(', ')  // Use address if provided, otherwise combine parts
-      };
-    } else if (typeof address === 'string') {
-      // Simple string address
-      businessData.address = {
-        fullAddress: address,
-        country: country || 'United Kingdom'
       };
     } else if (address && typeof address === 'object') {
       // Structured address object
@@ -306,47 +331,100 @@ exports.uploadDocuments = async (req, res, next) => {
       });
     }
 
-    // Handle file uploads
-    if (req.files) {
-      if (req.files.ownerIdProof) {
-        business.documents.ownerIdProof = {
-          url: `/uploads/${req.files.ownerIdProof[0].filename}`,
-          verified: false,
-          status: 'pending'
-        };
-      }
-      if (req.files.addressProof) {
-        business.documents.addressProof = {
-          url: `/uploads/${req.files.addressProof[0].filename}`,
-          verified: false,
-          status: 'pending'
-        };
-      }
-      if (req.files.selfie) {
-        business.documents.selfie = {
-          url: `/uploads/${req.files.selfie[0].filename}`,
-          verified: false,
-          status: 'pending'
-        };
-        // Also update legacy root fields for backward compatibility if needed
-        business.selfieUrl = `/uploads/${req.files.selfie[0].filename}`;
-      }
-      if (req.files.foodSafetyCertificate) {
-        business.documents.foodSafetyCertificate = {
-          url: `/uploads/${req.files.foodSafetyCertificate[0].filename}`,
-          verified: false,
-          status: 'pending'
-        };
-      }
-      if (req.files.businessLicense) {
-        business.documents.businessLicense = {
-          url: `/uploads/${req.files.businessLicense[0].filename}`,
-          verified: false,
-          status: 'pending'
-        };
-      }
+    // Check if files exist
+    if (!req.files || Object.keys(req.files).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No documents uploaded'
+      });
     }
 
+    // Handle file uploads
+    let hasAddressProof = false;
+    let hasSelfie = false;
+
+    if (req.files.addressProof) {
+      business.documents.addressProof = {
+        url: `/uploads/${req.files.addressProof[0].filename}`,
+        verified: false,
+        status: 'pending'
+      };
+      hasAddressProof = true;
+    }
+
+    if (req.files.selfie) {
+      const selfieUrl = `/uploads/${req.files.selfie[0].filename}`;
+      // const selfieFilename = req.files.selfie[0].filename;
+
+      business.documents.selfie = {
+        url: selfieUrl,
+        verified: false,
+        status: 'pending'
+      };
+      // Also update legacy root fields for backward compatibility
+      business.selfieUrl = selfieUrl;
+
+      // Update User (BusinessOwner) profile photo as requested
+      // "not buisness logo it shuld user profile photo"
+      try {
+        const BusinessOwner = require('../models/BusinessOwner.model');
+        const User = require('../models/User.model');
+
+        // Try finding owner in BusinessOwner collection first
+        let owner = await BusinessOwner.findById(req.user.id);
+        if (!owner) {
+          // Fallback to User collection
+          owner = await User.findById(req.user.id);
+        }
+
+        if (owner) {
+          owner.profileImage = selfieUrl;
+          await owner.save();
+          console.log(`✅ Updated owner profile image from KYC selfie: ${owner._id}`);
+        }
+      } catch (err) {
+        console.error('Failed to update owner profile image:', err);
+      }
+
+      hasSelfie = true;
+    }
+
+    // Handle other optional documents if they exist (backward compatibility or future use)
+    if (req.files.ownerIdProof) {
+      business.documents.ownerIdProof = {
+        url: `/uploads/${req.files.ownerIdProof[0].filename}`,
+        verified: false,
+        status: 'pending'
+      };
+    }
+    if (req.files.foodSafetyCertificate) {
+      business.documents.foodSafetyCertificate = {
+        url: `/uploads/${req.files.foodSafetyCertificate[0].filename}`,
+        verified: false,
+        status: 'pending'
+      };
+    }
+    if (req.files.businessLicense) {
+      business.documents.businessLicense = {
+        url: `/uploads/${req.files.businessLicense[0].filename}`,
+        verified: false,
+        status: 'pending'
+      };
+    }
+
+    // Validation: Require Address Proof and Selfie
+    // If not all mandatory documents are present (and not already present in DB), reject
+    const addressProofPresent = hasAddressProof || (business.documents.addressProof && business.documents.addressProof.url);
+    const selfiePresent = hasSelfie || (business.documents.selfie && business.documents.selfie.url);
+
+    if (!addressProofPresent || !selfiePresent) {
+      return res.status(400).json({
+        success: false,
+        message: 'Both Address Proof and Selfie are required to complete KYC.'
+      });
+    }
+
+    // Update status only if mandatory docs are present
     business.kycStatus = 'in_review';
     await business.save();
 
@@ -356,6 +434,7 @@ exports.uploadDocuments = async (req, res, next) => {
       business
     });
   } catch (error) {
+    console.error('Upload documents error:', error);
     next(error);
   }
 };

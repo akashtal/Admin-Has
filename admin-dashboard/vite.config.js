@@ -9,7 +9,7 @@ export default defineConfig({
     proxy: {
       '/api': {
         // Use localhost for development (more reliable than IP)
-        target: process.env.VITE_API_URL || 'http://localhost:5000',
+        target: process.env.VITE_API_URL || 'http://localhost:5001',
         changeOrigin: true,
         secure: false
       }

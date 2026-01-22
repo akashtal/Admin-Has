@@ -16,15 +16,19 @@ const BRAND_COLORS = {
 // Generate QR code for business with logo and branding
 exports.generateBusinessQRCode = async (businessId, businessName) => {
   try {
-    const qrData = {
-      type: 'business',
-      id: businessId,
-      name: businessName,
-      timestamp: new Date().toISOString()
-    };
+    // IMPORTANT: Use web URL instead of JSON for smart app redirect
+    // Format: https://hashview.app/business/{id}
+    // This URL will:
+    // 1. If app installed: Open app via deep link (hashview://business/{id})
+    // 2. If app NOT installed: Redirect to App Store (iOS) or Play Store (Android)
 
-    // Step 1: Generate base QR code with brand colors
-    const qrCodeBuffer = await QRCode.toBuffer(JSON.stringify(qrData), {
+    const webURL = process.env.WEB_APP_URL || 'https://hashview.app';
+    const qrCodeURL = `${webURL}/business/${businessId}`;
+
+    console.log(`📱 Generating QR code with smart URL: ${qrCodeURL}`);
+
+    // Step 1: Generate base QRcode with brand colors
+    const qrCodeBuffer = await QRCode.toBuffer(qrCodeURL, {
       errorCorrectionLevel: 'H', // High error correction to allow logo overlay
       type: 'png',
       width: 800,
@@ -37,7 +41,7 @@ exports.generateBusinessQRCode = async (businessId, businessName) => {
 
     // Step 2: Load QR code image and logo
     const qrImage = await loadImage(qrCodeBuffer);
-    
+
     // Try to load logo from different possible locations
     let logoImage = null;
     const logoPaths = [
@@ -98,7 +102,7 @@ exports.generateBusinessQRCode = async (businessId, businessName) => {
     if (logoImage) {
       const logoX = padding + (qrSize / 2) - (logoSize / 2);
       const logoY = padding + (qrSize / 2) - (logoSize / 2);
-      
+
       // Draw white background circle for logo
       ctx.fillStyle = BRAND_COLORS.white;
       ctx.beginPath();
@@ -128,7 +132,7 @@ exports.generateBusinessQRCode = async (businessId, businessName) => {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(businessName, canvasWidth / 2, padding + qrSize + 40);
-      
+
       // Add "Scan for Details" text
       ctx.fillStyle = BRAND_COLORS.secondary;
       ctx.font = '18px Arial';
@@ -142,12 +146,10 @@ exports.generateBusinessQRCode = async (businessId, businessName) => {
     console.error('Error generating styled QR code:', error);
     // Fallback to simple QR code if styling fails
     try {
-      const qrCodeString = await QRCode.toDataURL(JSON.stringify({
-        type: 'business',
-        id: businessId,
-        name: businessName,
-        timestamp: new Date().toISOString()
-      }), {
+      const webURL = process.env.WEB_APP_URL || 'https://hashview.app';
+      const qrCodeURL = `${webURL}/business/${businessId}`;
+
+      const qrCodeString = await QRCode.toDataURL(qrCodeURL, {
         errorCorrectionLevel: 'H',
         type: 'image/png',
         width: 300,

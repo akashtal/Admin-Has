@@ -108,39 +108,37 @@ export default function RoleSelectionScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Guest Access - iOS Only */}
-        {Platform.OS === 'ios' && (
-          <TouchableOpacity
-            onPress={() => dispatch(loginAsGuest())}
-            activeOpacity={0.8}
-            className="mt-6 w-full"
+        {/* Guest Access - Available on Both iOS and Android */}
+        <TouchableOpacity
+          onPress={() => dispatch(loginAsGuest())}
+          activeOpacity={0.8}
+          className="mt-6 w-full"
+        >
+          <View
+            className="flex-row items-center justify-between p-4 rounded-3xl border border-white/20 bg-white/10"
+            style={{
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 8,
+            }}
           >
-            <View
-              className="flex-row items-center justify-between p-4 rounded-3xl border border-white/20 bg-white/10"
-              style={{
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.1,
-                shadowRadius: 8,
-              }}
-            >
-              <View className="flex-row items-center">
-                <View className="bg-white/20 rounded-full p-2.5 mr-3">
-                  <Icon name="planet-outline" size={20} color="white" />
-                </View>
-                <View>
-                  <Text className="text-lg font-bold text-white">
-                    Continue as Guest
-                  </Text>
-                  <Text className="text-white/70 text-xs">
-                    Explore without an account
-                  </Text>
-                </View>
+            <View className="flex-row items-center">
+              <View className="bg-white/20 rounded-full p-2.5 mr-3">
+                <Icon name="planet-outline" size={20} color="white" />
               </View>
-              <Icon name="arrow-forward-circle-outline" size={24} color="white" style={{ opacity: 0.8 }} />
+              <View>
+                <Text className="text-lg font-bold text-white">
+                  Continue as Guest
+                </Text>
+                <Text className="text-white/70 text-xs">
+                  Explore without an account
+                </Text>
+              </View>
             </View>
-          </TouchableOpacity>
-        )}
+            <Icon name="arrow-forward-circle-outline" size={24} color="white" style={{ opacity: 0.8 }} />
+          </View>
+        </TouchableOpacity>
 
         {/* Admin Login Hint */}
         <View className="mt-8">

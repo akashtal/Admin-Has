@@ -450,6 +450,13 @@ exports.login = async (req, res, next) => {
     user.lastLogin = new Date();
     await user.save();
 
+    // For business owners, fetch their businesses from the Business collection
+    let businesses = [];
+    if (user.role === 'business') {
+      const Business = require('../models/Business.model');
+      businesses = await Business.find({ owner: user._id });
+    }
+
     // Generate token with userType
     const token = generateToken(user._id, userType);
 
@@ -466,7 +473,7 @@ exports.login = async (req, res, next) => {
         profileImage: user.profileImage,
         emailVerified: user.emailVerified,
         phoneVerified: user.phoneVerified,
-        ...(user.role === 'business' && user.businesses && { businesses: user.businesses })
+        ...(user.role === 'business' && { businesses })
       }
     });
   } catch (error) {
@@ -692,6 +699,13 @@ exports.getMe = async (req, res, next) => {
       });
     }
 
+    // For business owners, fetch their businesses from the Business collection
+    let businesses = [];
+    if (user.role === 'business') {
+      const Business = require('../models/Business.model');
+      businesses = await Business.find({ owner: user._id });
+    }
+
     // Return user data based on their role
     res.status(200).json({
       success: true,
@@ -707,7 +721,7 @@ exports.getMe = async (req, res, next) => {
         status: user.status,
         createdAt: user.createdAt,
         // Include business-specific fields if it's a business owner
-        ...(user.role === 'business' && { businesses: user.businesses }),
+        ...(user.role === 'business' && { businesses }),
         // Include customer-specific fields if it's a customer
         ...(user.role === 'customer' && { location: user.location })
       }

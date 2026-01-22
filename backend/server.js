@@ -55,7 +55,10 @@ const io = socketIO(server, {
 });
 
 // Middleware
-app.use(helmet()); // Security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP to allow images from Cloudinary
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+})); // Security headers
 app.use(compression()); // Compress responses
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
@@ -67,6 +70,12 @@ app.use(morgan('combined', { stream: { write: message => logger.info(message.tri
 
 // Static files
 app.use('/uploads', express.static('uploads'));
+app.use('/public', express.static('public'));
+
+// Smart QR redirect route - serves landing page with business ID
+app.get('/business/:id', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'business.html'));
+});
 
 // Health check
 app.get('/health', (req, res) => {

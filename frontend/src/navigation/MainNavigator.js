@@ -81,6 +81,44 @@ function UserStack() {
 
 // Business Stack
 function BusinessStack() {
+  const { user } = useSelector((state) => state.auth);
+
+  // Check if business exists and KYC status
+  // Note: user.businesses is populated by getMe/login endpoints
+  const business = user?.businesses && user.businesses.length > 0 ? user.businesses[0] : null;
+
+  // KYC Status Check
+  // Default to pending if not set
+  const kycStatus = business?.kycStatus || 'pending';
+
+  // Allowed statuses to access dashboard
+  const isKYCComplete = ['in_review', 'verified', 'approved'].includes(kycStatus);
+
+  // Scenario 1: No Business Registered -> Force Registration
+  if (!business) {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="BusinessRegistration" component={BusinessRegistrationScreen} />
+        {/* Fallback routes usually not needed here but kept for transition safety */}
+        <Stack.Screen name="BusinessKYC" component={BusinessKYCScreen} />
+      </Stack.Navigator>
+    );
+  }
+
+  // Scenario 2: Business Exists but KYC Incomplete -> Force KYC
+  if (!isKYCComplete) {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen
+          name="BusinessKYC"
+          component={BusinessKYCScreen}
+          initialParams={{ businessId: business._id }}
+        />
+      </Stack.Navigator>
+    );
+  }
+
+  // Scenario 3: KYC Complete -> Full Dashboard Access
   return (
     <Stack.Navigator
       screenOptions={{

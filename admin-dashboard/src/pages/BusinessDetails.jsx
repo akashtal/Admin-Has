@@ -875,21 +875,56 @@ const BusinessDetails = () => {
                     <p className="text-sm text-gray-600 mb-4 text-center">
                       Users can scan this QR code to view business details and leave reviews
                     </p>
-                    <button
-                      onClick={() => {
-                        // Create download link
-                        const link = document.createElement('a');
-                        link.href = business.qrCode;
-                        link.download = `${business.name.replace(/[^a-z0-9]/gi, '_')}_QRCode.png`;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                      }}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition shadow-sm flex items-center"
-                    >
-                      <Download size={18} className="mr-2" />
-                      Download QR Code
-                    </button>
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={() => {
+                          // Create download link
+                          const link = document.createElement('a');
+                          link.href = business.qrCode;
+                          link.download = `${business.name.replace(/[^a-z0-9]/gi, '_')}_QRCode.png`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition shadow-sm flex items-center"
+                      >
+                        <Download size={18} className="mr-2" />
+                        Download QR Code
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!window.confirm('Regenerate QR code with new smart URL format? This will update the existing QR code.')) return;
+                          try {
+                            setQrGenerating(true);
+                            const response = await adminApi.generateBusinessQRCode(id);
+                            if (response.data?.success) {
+                              await fetchBusinessDetails();
+                              alert('QR code regenerated successfully with new URL format!');
+                            }
+                          } catch (error) {
+                            console.error('Error regenerating QR code:', error);
+                            alert(error.response?.data?.message || 'Failed to regenerate QR code');
+                          } finally {
+                            setQrGenerating(false);
+                          }
+                        }}
+                        disabled={qrGenerating}
+                        className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-medium rounded-lg transition shadow-sm flex items-center"
+                        title="Regenerate QR code with new smart URL format"
+                      >
+                        {qrGenerating ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Regenerating...
+                          </>
+                        ) : (
+                          <>
+                            <QrCode size={18} className="mr-2" />
+                            Regenerate
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <>
@@ -968,35 +1003,34 @@ const BusinessDetails = () => {
             </div>
           )}
 
+
           {/* KYC Documents */}
-          {business.documents && (
+          {business.documents && (business.documents.addressProof || business.documents.selfie) && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">KYC Documents (Identity Verification)</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-                {/* ID Proof */}
-                {business.documents.ownerIdProof && (
-                  <div className="border border-gray-200 rounded-lg p-4">
-                    <p className="font-medium text-gray-900 mb-2">Owner ID Proof</p>
-                    <a href={business.documents.ownerIdProof.url} target="_blank" rel="noopener noreferrer">
-                      <img
-                        src={business.documents.ownerIdProof.url}
-                        alt="ID Proof"
-                        className="w-full h-48 object-cover rounded-md bg-gray-50 border border-gray-100"
-                      />
-                    </a>
-                  </div>
-                )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                 {/* Address Proof */}
                 {business.documents.addressProof && (
                   <div className="border border-gray-200 rounded-lg p-4">
                     <p className="font-medium text-gray-900 mb-2">Address Proof</p>
-                    <a href={business.documents.addressProof.url} target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={business.documents.addressProof.url.startsWith('http')
+                        ? business.documents.addressProof.url
+                        : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${business.documents.addressProof.url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       <img
-                        src={business.documents.addressProof.url}
+                        src={business.documents.addressProof.url.startsWith('http')
+                          ? business.documents.addressProof.url
+                          : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${business.documents.addressProof.url}`}
                         alt="Address Proof"
                         className="w-full h-48 object-cover rounded-md bg-gray-50 border border-gray-100"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999">Image not found</text></svg>';
+                        }}
                       />
                     </a>
                   </div>
@@ -1006,11 +1040,23 @@ const BusinessDetails = () => {
                 {business.documents.selfie && (
                   <div className="border border-gray-200 rounded-lg p-4">
                     <p className="font-medium text-gray-900 mb-2">Owner Selfie</p>
-                    <a href={business.documents.selfie.url} target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={business.documents.selfie.url.startsWith('http')
+                        ? business.documents.selfie.url
+                        : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${business.documents.selfie.url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       <img
-                        src={business.documents.selfie.url}
+                        src={business.documents.selfie.url.startsWith('http')
+                          ? business.documents.selfie.url
+                          : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${business.documents.selfie.url}`}
                         alt="Selfie"
                         className="w-full h-48 object-cover rounded-md bg-gray-50 border border-gray-100"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><text x="50%" y="50%" text-anchor="middle" dy=".3em" fill="%23999">Image not found</text></svg>';
+                        }}
                       />
                     </a>
                   </div>

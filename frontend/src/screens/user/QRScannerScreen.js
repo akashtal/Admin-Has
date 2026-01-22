@@ -46,50 +46,61 @@ export default function QRScannerScreen({ navigation }) {
     try {
       console.log('📱 QR Code scanned:', data);
 
-      // Parse QR code data
-      let qrData;
-      try {
-        qrData = JSON.parse(data);
-      } catch (e) {
-        // If not JSON, might be a URL or other format
+      // Parse QR code data - support both URL and JSON formats
+      let businessId = null;
+
+      // Check if it's a URL format (new smart QR codes)
+      // Format: https://hashview.app/business/{id}
+      if (data.startsWith('http')) {
+        const urlMatch = data.match(/\/business\/([a-f0-9]+)/i);
+        if (urlMatch && urlMatch[1]) {
+          businessId = urlMatch[1];
+          console.log('✅ Extracted business ID from URL:', businessId);
+        } else {
+          Alert.alert(
+            'Invalid QR Code',
+            'This QR code is not a valid HashView business QR code.',
+            [{ text: 'OK', onPress: () => { setScanned(false); setLoading(false); } }]
+          );
+          return;
+        }
+      } else {
+        // Try parsing as JSON (old format - backward compatibility)
+        try {
+          const qrData = JSON.parse(data);
+          if (qrData.type === 'business' && qrData.id) {
+            businessId = qrData.id;
+            console.log('✅ Extracted business ID from JSON:', businessId);
+          } else {
+            Alert.alert(
+              'Invalid QR Code',
+              'This QR code is not a valid business QR code.',
+              [{ text: 'OK', onPress: () => { setScanned(false); setLoading(false); } }]
+            );
+            return;
+          }
+        } catch (e) {
+          Alert.alert(
+            'Invalid QR Code',
+            'This QR code is not a valid HashView business QR code.',
+            [{ text: 'OK', onPress: () => { setScanned(false); setLoading(false); } }]
+          );
+          return;
+        }
+      }
+
+      if (!businessId) {
         Alert.alert(
           'Invalid QR Code',
-          'This QR code is not a valid HashView business QR code.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setScanned(false);
-                setLoading(false);
-              }
-            }
-          ]
+          'Could not extract business information from QR code.',
+          [{ text: 'OK', onPress: () => { setScanned(false); setLoading(false); } }]
         );
         return;
       }
 
-      // Check if it's a business QR code
-      if (qrData.type !== 'business' || !qrData.id) {
-        Alert.alert(
-          'Invalid QR Code',
-          'This QR code is not a valid business QR code.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setScanned(false);
-                setLoading(false);
-              }
-            }
-          ]
-        );
-        return;
-      }
-
-      // Call API to get business details
-      const response = await axios.post(
-        `${API_CONFIG.BASE_URL}/business/qr/scan`,
-        { qrData: data },
+      // Fetch business details using business ID
+      const response = await axios.get(
+        `${API_CONFIG.BASE_URL}/business/${businessId}`,
         {
           headers: {
             'Content-Type': 'application/json'
@@ -109,15 +120,7 @@ export default function QRScannerScreen({ navigation }) {
         Alert.alert(
           'Error',
           response.data.message || 'Failed to load business details',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setScanned(false);
-                setLoading(false);
-              }
-            }
-          ]
+          [{ text: 'OK', onPress: () => { setScanned(false); setLoading(false); } }]
         );
       }
     } catch (error) {

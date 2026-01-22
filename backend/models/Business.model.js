@@ -30,7 +30,9 @@ const businessSchema = new mongoose.Schema({
   category: {
     type: String,
     required: [true, 'Business category is required'],
-    enum: ['restaurant', 'cafe', 'retail', 'services', 'healthcare', 'education', 'entertainment', 'salon', 'hotel', 'gym', 'other']
+    trim: true
+    // Note: Categories are now managed dynamically via the Category model
+    // Admin can add/remove categories without code changes
   },
   description: {
     type: String,

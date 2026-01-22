@@ -120,8 +120,22 @@ const schemas = {
     name: Joi.string().min(2).max(100).required(),
     ownerName: Joi.string().min(2).max(100).optional(),
     email: Joi.string().email().required(),
-    phone: Joi.string().pattern(/^\+?[0-9]{7,15}$/).required(),
-    category: Joi.string().valid('restaurant', 'cafe', 'retail', 'services', 'healthcare', 'education', 'entertainment', 'salon', 'hotel', 'gym', 'other').required(),
+    phone: Joi.string()
+      .custom((value, helpers) => {
+        // Sanitize phone: remove spaces, dashes, parentheses
+        const sanitized = value.replace(/[\s\-\(\)]/g, '');
+        // Validate E.164 format: optional +, then 7-15 digits
+        if (!/^\+?[0-9]{7,15}$/.test(sanitized)) {
+          return helpers.error('any.invalid');
+        }
+        return sanitized; // Return sanitized value
+      })
+      .required()
+      .messages({
+        'any.invalid': 'Phone number must be in international format (e.g., +447123456789)',
+        'any.required': 'Phone number is required'
+      }),
+    category: Joi.string().trim().min(2).max(50).required(), // Dynamic categories from database
     description: Joi.string().max(500).allow('', null).optional(),
     // Accept address as string OR structured object OR manual fields
     address: Joi.alternatives().try(
@@ -142,13 +156,23 @@ const schemas = {
       })
     ).optional(),
     // Manual address fields (sent separately from address object)
+    // Street, city, and postcode are REQUIRED for business registration
     buildingNumber: Joi.string().allow('', null).optional(),
-    street: Joi.string().allow('').optional(),
+    street: Joi.string().trim().min(1).required().messages({
+      'string.empty': 'Street address is required',
+      'any.required': 'Street address is required'
+    }),
     area: Joi.string().allow('').optional(),
-    city: Joi.string().allow('').optional(),
+    city: Joi.string().trim().min(1).required().messages({
+      'string.empty': 'City/Town is required',
+      'any.required': 'City/Town is required'
+    }),
     county: Joi.string().allow('', null).optional(),
     state: Joi.string().allow('').optional(),
-    postcode: Joi.string().allow('', null).optional(),
+    postcode: Joi.string().trim().min(1).required().messages({
+      'string.empty': 'Postcode is required',
+      'any.required': 'Postcode is required for business registration'
+    }),
     country: Joi.string().allow('', null).optional(),
     pincode: Joi.string().allow('').optional(),
     landmark: Joi.string().allow('').optional(),

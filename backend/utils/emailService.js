@@ -410,6 +410,16 @@ const sendPasswordResetEmail = async (to, otp, name = 'User') => {
 // Generic function to send any email
 const sendEmail = async ({ to, subject, html, text }) => {
   try {
+    if (!to) {
+      throw new Error('Email recipient (to) is required');
+    }
+    if (!subject) {
+      throw new Error('Email subject is required');
+    }
+    if (!html && !text) {
+      throw new Error('Email body (html or text) is required');
+    }
+
     const fromEmail = process.env.FROM_EMAIL || process.env.SMTP_USER || 'noreply@gmail.com';
 
     if (useSendGridAPI) {

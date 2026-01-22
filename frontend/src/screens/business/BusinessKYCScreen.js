@@ -12,6 +12,7 @@ import {
     Platform
 } from 'react-native';
 import { useDispatch } from 'react-redux';
+import { loadUser } from '../../store/slices/authSlice';
 import { Ionicons as Icon } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
@@ -24,8 +25,22 @@ export default function BusinessKYCScreen({ navigation, route }) {
     const businessId = route.params?.businessId;
     const [uploading, setUploading] = useState(false);
 
+    // Block hardware back button
+    React.useEffect(() => {
+        const onBackPress = () => {
+            // Return true to stop default back behavior
+            return true;
+        };
+
+        const subscription = require('react-native').BackHandler.addEventListener(
+            'hardwareBackPress',
+            onBackPress
+        );
+
+        return () => subscription.remove();
+    }, []);
+
     const [documents, setDocuments] = useState({
-        ownerIdProof: null,
         addressProof: null,
         selfie: null
     });
@@ -64,8 +79,8 @@ export default function BusinessKYCScreen({ navigation, route }) {
     };
 
     const handleSubmit = async () => {
-        if (!documents.ownerIdProof || !documents.addressProof || !documents.selfie) {
-            showErrorMessage('Please upload all required documents');
+        if (!documents.addressProof || !documents.selfie) {
+            showErrorMessage('Please upload address proof and selfie to continue');
             return;
         }
 
@@ -92,23 +107,26 @@ export default function BusinessKYCScreen({ navigation, route }) {
                 });
             };
 
-            appendFile('ownerIdProof', documents.ownerIdProof);
             appendFile('addressProof', documents.addressProof);
             appendFile('selfie', documents.selfie);
 
-            console.log('📤 Uploading KYC documents for business:', businessId);
+            console.log('📤 Uploading KYC documents (address proof + selfie) for business:', businessId);
 
             await dispatch(uploadDocuments({ id: businessId, formData })).unwrap();
+
+            // Refresh user profile to update business KYC status in Redux
+            await dispatch(loadUser()).unwrap();
 
             showSuccessMessage(
                 'Verification Submitted',
                 'Your documents have been submitted for admin verification.'
             );
 
-            // Navigate to dashboard
+            // Force navigation reset to trigger MainNavigator re-evaluation
+            // This ensures the app redirects to Dashboard when kycStatus changes to 'in_review'
             navigation.reset({
                 index: 0,
-                routes: [{ name: 'BusinessDashboard' }],
+                routes: [{ name: 'MainTabs' }]
             });
 
         } catch (error) {
@@ -195,23 +213,16 @@ export default function BusinessKYCScreen({ navigation, route }) {
                 </View>
 
                 {renderUploadCard(
-                    'ownerIdProof',
-                    'Government ID Proof',
-                    'Upload clear photo of Passport, Driver\'s License, or National ID',
-                    'card'
-                )}
-
-                {renderUploadCard(
                     'addressProof',
-                    'Address Proof',
-                    'Upload Electricity Bill, Bank Statement, or Rent Agreement',
+                    'Business Address Proof',
+                    'Upload Electricity Bill, Bank Statement, Rent Agreement, or Business License',
                     'document-text'
                 )}
 
                 {renderUploadCard(
                     'selfie',
-                    'Your Selfie',
-                    'Take a clear selfie to match with your ID',
+                    'Owner Selfie (Profile Photo)',
+                    'Take a clear selfie - this will be your business profile photo',
                     'camera'
                 )}
 
