@@ -4,6 +4,7 @@ node_modules/
 dist/
 npm-debug.*
 *.jks
+EC2_COMMANDS.md
 *.p8
 *.p12
 *.key

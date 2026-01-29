@@ -5,6 +5,7 @@ logs/
 aws.zip
 *.log
 npm-debug.log*
+EC2_COMMANDS.md
 uploads/
 yoti-key.pem
 .vscode/
