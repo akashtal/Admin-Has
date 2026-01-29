@@ -25,3 +25,6 @@ dist-ssr
 *.sln
 *.sw?
 %USERPROFILE%
+.env
+.env.local
+.example.env
