@@ -22,6 +22,11 @@ router.post('/business/cover', protect, authorize('business'), uploadBusinessCov
 router.post('/business/documents', protect, authorize('business'), uploadBusinessDocuments);
 router.post('/business/gallery', protect, authorize('business'), uploadBusinessGallery);
 
+// Admin uploads (admin can upload for any business)
+router.post('/admin/business/logo', protect, authorize('admin'), uploadBusinessLogo);
+router.post('/admin/business/cover', protect, authorize('admin'), uploadBusinessCover);
+router.post('/admin/business/gallery', protect, authorize('admin'), uploadBusinessGallery);
+
 // Review media uploads (customers only)
 router.post('/review/photos', protect, uploadReviewPhotos);
 router.post('/review/videos', protect, uploadReviewVideos);

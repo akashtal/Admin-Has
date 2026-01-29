@@ -194,30 +194,34 @@ exports.getBusinessById = async (req, res, next) => {
   }
 };
 
-// @desc    Create business (Admin)
+// @desc    Create business (Admin) - Owner info is OPTIONAL
 // @route   POST /api/admin/businesses
 // @access  Private (Admin)
 exports.createBusiness = async (req, res, next) => {
   try {
     const {
-      name, ownerName, email, phone, category, description,
-      address, latitude, longitude, radius,
+      name, ownerName, firstName, lastName, email, phone, category, description,
+      address, buildingNumber, street, city, county, postcode, country, landmark,
+      latitude, longitude, radius,
       website, facebook, instagram, twitter,
       tripAdvisorUrl, googleBusinessName,
-      openingHours, ownerId
+      openingHours, ownerId, skipOwnerCreation
     } = req.body;
 
-    // Validate required fields
-    if (!name || !email || !phone || !category || !latitude || !longitude) {
+    // Validate required fields - owner info (email, phone) is now OPTIONAL
+    if (!name || !category || !latitude || !longitude) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide name, email, phone, category, and location'
+        message: 'Please provide name, category, and location (latitude, longitude)'
       });
     }
 
-    // Find or require owner
-    let owner;
+    // Determine if we should create/link an owner
+    const hasOwnerInfo = email || ownerId;
+    let owner = null;
+
     if (ownerId) {
+      // Link to existing owner
       owner = await BusinessOwner.findById(ownerId);
       if (!owner) {
         return res.status(404).json({
@@ -225,49 +229,58 @@ exports.createBusiness = async (req, res, next) => {
           message: 'Owner not found'
         });
       }
-    } else {
+    } else if (hasOwnerInfo && !skipOwnerCreation) {
       // Create owner account if email provided
-      if (!email || !ownerName) {
-        return res.status(400).json({
-          success: false,
-          message: 'Owner email and name required if ownerId not provided'
-        });
-      }
-      
+      const ownerFullName = ownerName || `${firstName || ''} ${lastName || ''}`.trim() || 'Business Owner';
+
       // Check if owner already exists
       owner = await BusinessOwner.findOne({ email: email.toLowerCase() });
       if (!owner) {
         // Create new owner with temporary password
         const tempPassword = Math.random().toString(36).slice(-12);
         owner = await BusinessOwner.create({
-          name: ownerName,
+          name: ownerFullName,
           email: email.toLowerCase(),
-          phone: phone,
+          phone: phone || '',
           passwordHash: tempPassword, // Will be hashed by pre-save hook
           emailVerified: true, // Admin created, auto-verify
           phoneVerified: true
         });
+        console.log(`✅ Created owner account for: ${email}`);
+      }
+
+      // Check if this owner already has a business
+      const existingBusiness = await Business.findOne({ owner: owner._id });
+      if (existingBusiness) {
+        return res.status(400).json({
+          success: false,
+          message: 'This owner already has a registered business'
+        });
       }
     }
+    // If no owner info provided and skipOwnerCreation is true, create business without owner
 
-    // Check if business already exists
-    const existingBusiness = await Business.findOne({ owner: owner._id });
-    if (existingBusiness) {
-      return res.status(400).json({
-        success: false,
-        message: 'This owner already has a registered business'
-      });
+    // Build full address from UK format fields
+    let fullAddress = '';
+    if (typeof address === 'string' && address.trim()) {
+      fullAddress = address.trim();
+    } else {
+      const addressParts = [];
+      if (buildingNumber) addressParts.push(buildingNumber);
+      if (street) addressParts.push(street);
+      if (city) addressParts.push(city);
+      if (county) addressParts.push(county);
+      if (postcode) addressParts.push(postcode);
+      if (country) addressParts.push(country);
+      if (landmark) addressParts.push(`Near: ${landmark}`);
+      fullAddress = addressParts.join(', ');
     }
 
     // Prepare business data
     const businessData = {
       name,
-      ownerName: ownerName || owner.name,
-      email,
-      phone,
       category,
       description: description || '',
-      owner: owner._id,
       status: req.body.status || 'pending',
       kycStatus: req.body.kycStatus || 'pending',
       radius: radius || 50,
@@ -277,13 +290,36 @@ exports.createBusiness = async (req, res, next) => {
       }
     };
 
-    // Handle address
-    if (typeof address === 'string') {
-      businessData.address = { fullAddress: address };
-    } else if (address) {
+    // Add owner info only if we have an owner
+    if (owner) {
+      businessData.owner = owner._id;
+      businessData.ownerName = ownerName || owner.name;
+      businessData.email = email || owner.email;
+      businessData.phone = phone || owner.phone;
+    } else {
+      // Business without owner - use provided info or defaults
+      const ownerFullName = ownerName || `${firstName || ''} ${lastName || ''}`.trim();
+      if (ownerFullName) businessData.ownerName = ownerFullName;
+      if (email) businessData.email = email;
+      if (phone) businessData.phone = phone;
+    }
+
+    // Handle address - UK format support
+    if (typeof address === 'object' && address !== null) {
       businessData.address = {
         ...address,
-        fullAddress: address.fullAddress || `${address.street || ''}, ${address.city || ''}, ${address.state || ''}, ${address.country || ''}`.trim()
+        fullAddress: address.fullAddress || fullAddress
+      };
+    } else {
+      businessData.address = {
+        buildingNumber: buildingNumber || '',
+        street: street || '',
+        city: city || '',
+        county: county || '',
+        postcode: postcode || '',
+        country: country || 'United Kingdom',
+        landmark: landmark || '',
+        fullAddress: fullAddress
       };
     }
 
@@ -312,7 +348,7 @@ exports.createBusiness = async (req, res, next) => {
 
     // Handle logo/cover images if provided as URLs
     if (req.body.logo) {
-      businessData.logo = typeof req.body.logo === 'string' 
+      businessData.logo = typeof req.body.logo === 'string'
         ? { url: req.body.logo, publicId: req.body.logoPublicId || null }
         : req.body.logo;
     }
@@ -329,9 +365,11 @@ exports.createBusiness = async (req, res, next) => {
 
     const business = await Business.create(businessData);
 
+    console.log(`✅ Admin created business: ${business.name} (${owner ? 'with owner' : 'without owner'})`);
+
     res.status(201).json({
       success: true,
-      message: 'Business created successfully',
+      message: `Business created successfully${owner ? '' : ' (no owner account)'}`,
       business
     });
   } catch (error) {
@@ -754,9 +792,9 @@ exports.updateReviewStatus = async (req, res, next) => {
 // @access  Private (Admin)
 exports.sendNotification = async (req, res, next) => {
   try {
-    const { 
-      title, 
-      message, 
+    const {
+      title,
+      message,
       recipientType,    // 'user', 'business', 'all_users', 'all_businesses', 'specific_user', 'specific_business'
       recipientIds,     // Array of user/business IDs (for specific recipients)
       data              // Optional data payload for the notification
@@ -773,56 +811,56 @@ exports.sendNotification = async (req, res, next) => {
 
     let sentCount = 0;
     let recipientList = [];
-    
+
     // Load BusinessOwner model once (used in multiple cases)
     const BusinessOwner = require('../models/BusinessOwner.model');
 
     switch (recipientType) {
       case 'all_users':
         // Get ALL active users (not just those with push tokens)
-        const allUsers = await User.find({ 
+        const allUsers = await User.find({
           role: 'customer',
           status: 'active'
         }).select('_id pushToken');
-        
+
         console.log(`   📊 Found ${allUsers.length} total active users`);
-        
+
         recipientList = allUsers.map(u => u._id);
-        
+
         // Send push notifications to those with tokens
         const usersWithTokens = allUsers.filter(u => u.pushToken);
         console.log(`   📱 ${usersWithTokens.length} users have push tokens`);
-        
+
         if (usersWithTokens.length > 0) {
           const userIdsWithTokens = usersWithTokens.map(u => u._id);
           await sendBulkNotifications(userIdsWithTokens, title, message, data);
           console.log(`   ✅ Push notifications sent to ${usersWithTokens.length} users`);
         }
-        
+
         sentCount = recipientList.length;
         console.log(`   💾 Will save ${sentCount} notification records`);
         break;
 
       case 'all_businesses':
         // Get ALL active business owners (not just those with push tokens)
-        const allBusinessOwners = await BusinessOwner.find({ 
+        const allBusinessOwners = await BusinessOwner.find({
           status: 'active'
         }).select('_id pushToken');
-        
+
         console.log(`   📊 Found ${allBusinessOwners.length} total active business owners`);
-        
+
         recipientList = allBusinessOwners.map(b => b._id);
-        
+
         // Send push notifications to those with tokens
         const ownersWithTokens = allBusinessOwners.filter(o => o.pushToken);
         console.log(`   📱 ${ownersWithTokens.length} business owners have push tokens`);
-        
+
         if (ownersWithTokens.length > 0) {
           const ownerIdsWithTokens = ownersWithTokens.map(o => o._id);
           await sendBulkNotifications(ownerIdsWithTokens, title, message, data);
           console.log(`   ✅ Push notifications sent to ${ownersWithTokens.length} business owners`);
         }
-        
+
         sentCount = recipientList.length;
         console.log(`   💾 Will save ${sentCount} notification records`);
         break;
@@ -835,9 +873,9 @@ exports.sendNotification = async (req, res, next) => {
             message: 'Please provide at least one user ID'
           });
         }
-        
+
         console.log(`   📊 Sending to ${recipientIds.length} specific user(s)`);
-        
+
         recipientList = recipientIds;
         for (const userId of recipientIds) {
           await sendPushNotification(userId, title, message, data);
@@ -854,9 +892,9 @@ exports.sendNotification = async (req, res, next) => {
             message: 'Please provide at least one business ID'
           });
         }
-        
+
         console.log(`   📊 Sending to ${recipientIds.length} specific business(es)`);
-        
+
         for (const businessId of recipientIds) {
           const business = await Business.findById(businessId).select('owner');
           if (business && business.owner) {
@@ -877,20 +915,20 @@ exports.sendNotification = async (req, res, next) => {
 
     // Save individual notification records for each recipient (for notification history)
     const allRecipients = recipientList.length > 0 ? recipientList : (recipientIds || []);
-    
+
     console.log(`   💾 Preparing to save notifications for ${allRecipients.length} recipients`);
-    
+
     if (allRecipients && allRecipients.length > 0) {
       let savedCount = 0;
       let failedCount = 0;
-      
+
       const notificationPromises = allRecipients.map(async (recipientId) => {
         try {
           // Determine if recipient is User or BusinessOwner based on recipientType
-          const sentToModel = (recipientType === 'all_businesses' || recipientType === 'specific_business') 
-            ? 'BusinessOwner' 
+          const sentToModel = (recipientType === 'all_businesses' || recipientType === 'specific_business')
+            ? 'BusinessOwner'
             : 'User';
-          
+
           const notification = await Notification.create({
             title,
             message,
@@ -910,7 +948,7 @@ exports.sendNotification = async (req, res, next) => {
           return null;
         }
       });
-      
+
       await Promise.all(notificationPromises);
       console.log(`   ✅ Saved ${savedCount} notification records to database`);
       if (failedCount > 0) {
@@ -1213,9 +1251,9 @@ exports.unsuspendAccount = async (req, res, next) => {
     // Restore original account based on account type
     if (suspendedAccount.accountType === 'user' || suspendedAccount.accountType === 'businessOwner') {
       const UserModel = suspendedAccount.accountType === 'user' ? User : BusinessOwner;
-      
+
       const account = await UserModel.findById(suspendedAccount.originalAccountId);
-      
+
       if (account) {
         account.status = 'active';
         await account.save();

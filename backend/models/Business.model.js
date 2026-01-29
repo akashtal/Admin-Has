@@ -10,8 +10,8 @@ const businessSchema = new mongoose.Schema({
   },
   owner: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    ref: 'User'
+    // Optional - admin can create businesses without owner
   },
   ownerName: {
     type: String,
@@ -19,13 +19,13 @@ const businessSchema = new mongoose.Schema({
   },
   email: {
     type: String,
-    required: [true, 'Business email is required'],
     lowercase: true,
     trim: true
+    // Optional - admin can create businesses without email
   },
   phone: {
-    type: String,
-    required: [true, 'Business phone is required']
+    type: String
+    // Optional - admin can create businesses without phone
   },
   category: {
     type: String,
@@ -36,7 +36,7 @@ const businessSchema = new mongoose.Schema({
   },
   description: {
     type: String,
-    maxlength: [500, 'Description cannot exceed 500 characters']
+    maxlength: [2000, 'Description cannot exceed 2000 characters']
   },
   address: {
     buildingNumber: String,  // UK: Building/House number
